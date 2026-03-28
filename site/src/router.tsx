@@ -135,12 +135,6 @@ const UserAuthSettingsPage = lazy(
 			"./pages/DeploymentSettingsPage/UserAuthSettingsPage/UserAuthSettingsPage"
 		),
 );
-const ExternalAuthSettingsPage = lazy(
-	() =>
-		import(
-			"./pages/DeploymentSettingsPage/ExternalAuthSettingsPage/ExternalAuthSettingsPage"
-		),
-);
 const OAuth2AppsSettingsPage = lazy(
 	() =>
 		import(
@@ -651,10 +645,7 @@ export const router = createBrowserRouter(
 
 							<Route path="network" element={<NetworkSettingsPage />} />
 							<Route path="userauth" element={<UserAuthSettingsPage />} />
-							<Route
-								path="external-auth"
-								element={<ExternalAuthSettingsPage />}
-							/>
+
 
 							<Route
 								path="notifications"
@@ -668,6 +659,24 @@ export const router = createBrowserRouter(
 						</Route>
 						<Route path="appearance" element={<AppearanceSettingsPage />} />
 						<Route path="workspace-proxies" element={<WorkspaceProxyPage />} />
+						<Route path="external-auth">
+							<Route
+								index
+								lazy={() =>
+									import(
+										"./pages/DeploymentSettingsPage/ExternalAuthSettingsPage/ExternalAuthSettingsPage"
+									)
+								}
+							/>
+							<Route
+								path="add"
+								lazy={() =>
+									import(
+										"./pages/DeploymentSettingsPage/ExternalAuthSettingsPage/CreateExternalAuthProviderPage"
+									)
+								}
+							/>
+						</Route>
 						<Route path="oauth2-provider">
 							<Route index element={<NotFoundPage />} />
 							<Route path="apps">
