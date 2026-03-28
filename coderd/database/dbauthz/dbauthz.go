@@ -1956,7 +1956,10 @@ func (q *querier) DeleteExternalAuthLink(ctx context.Context, arg database.Delet
 }
 
 func (q *querier) DeleteExternalAuthProviderConfig(ctx context.Context, id uuid.UUID) error {
-	panic("not implemented")
+	if err := q.authorizeContext(ctx, policy.ActionUpdate, rbac.ResourceDeploymentConfig); err != nil {
+		return err
+	}
+	return q.db.DeleteExternalAuthProviderConfig(ctx, id)
 }
 
 func (q *querier) DeleteGroupByID(ctx context.Context, id uuid.UUID) error {
@@ -3053,15 +3056,24 @@ func (q *querier) GetExternalAuthLinksByUserID(ctx context.Context, userID uuid.
 }
 
 func (q *querier) GetExternalAuthProviderConfigByID(ctx context.Context, id uuid.UUID) (database.ExternalAuthProviderConfig, error) {
-	panic("not implemented")
+	if err := q.authorizeContext(ctx, policy.ActionRead, rbac.ResourceDeploymentConfig); err != nil {
+		return database.ExternalAuthProviderConfig{}, err
+	}
+	return q.db.GetExternalAuthProviderConfigByID(ctx, id)
 }
 
 func (q *querier) GetExternalAuthProviderConfigByProviderID(ctx context.Context, providerID string) (database.ExternalAuthProviderConfig, error) {
-	panic("not implemented")
+	if err := q.authorizeContext(ctx, policy.ActionRead, rbac.ResourceDeploymentConfig); err != nil {
+		return database.ExternalAuthProviderConfig{}, err
+	}
+	return q.db.GetExternalAuthProviderConfigByProviderID(ctx, providerID)
 }
 
 func (q *querier) GetExternalAuthProviderConfigs(ctx context.Context) ([]database.ExternalAuthProviderConfig, error) {
-	panic("not implemented")
+	if err := q.authorizeContext(ctx, policy.ActionRead, rbac.ResourceDeploymentConfig); err != nil {
+		return nil, err
+	}
+	return q.db.GetExternalAuthProviderConfigs(ctx)
 }
 
 func (q *querier) GetFailedWorkspaceBuildsByTemplateID(ctx context.Context, arg database.GetFailedWorkspaceBuildsByTemplateIDParams) ([]database.GetFailedWorkspaceBuildsByTemplateIDRow, error) {
@@ -5098,7 +5110,10 @@ func (q *querier) InsertExternalAuthLink(ctx context.Context, arg database.Inser
 }
 
 func (q *querier) InsertExternalAuthProviderConfig(ctx context.Context, arg database.InsertExternalAuthProviderConfigParams) (database.ExternalAuthProviderConfig, error) {
-	panic("not implemented")
+	if err := q.authorizeContext(ctx, policy.ActionUpdate, rbac.ResourceDeploymentConfig); err != nil {
+		return database.ExternalAuthProviderConfig{}, err
+	}
+	return q.db.InsertExternalAuthProviderConfig(ctx, arg)
 }
 
 func (q *querier) InsertFile(ctx context.Context, arg database.InsertFileParams) (database.File, error) {
@@ -6226,7 +6241,10 @@ func (q *querier) UpdateExternalAuthLinkRefreshToken(ctx context.Context, arg da
 }
 
 func (q *querier) UpdateExternalAuthProviderConfig(ctx context.Context, arg database.UpdateExternalAuthProviderConfigParams) (database.ExternalAuthProviderConfig, error) {
-	panic("not implemented")
+	if err := q.authorizeContext(ctx, policy.ActionUpdate, rbac.ResourceDeploymentConfig); err != nil {
+		return database.ExternalAuthProviderConfig{}, err
+	}
+	return q.db.UpdateExternalAuthProviderConfig(ctx, arg)
 }
 
 func (q *querier) UpdateGitSSHKey(ctx context.Context, arg database.UpdateGitSSHKeyParams) (database.GitSSHKey, error) {
@@ -7349,7 +7367,10 @@ func (q *querier) UpsertDefaultProxy(ctx context.Context, arg database.UpsertDef
 }
 
 func (q *querier) UpsertExternalAuthProviderConfigFromEnv(ctx context.Context, arg database.UpsertExternalAuthProviderConfigFromEnvParams) (database.ExternalAuthProviderConfig, error) {
-	panic("not implemented")
+	if err := q.authorizeContext(ctx, policy.ActionUpdate, rbac.ResourceDeploymentConfig); err != nil {
+		return database.ExternalAuthProviderConfig{}, err
+	}
+	return q.db.UpsertExternalAuthProviderConfigFromEnv(ctx, arg)
 }
 
 func (q *querier) UpsertHealthSettings(ctx context.Context, value string) error {
