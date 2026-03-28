@@ -310,6 +310,83 @@ func (db *dbCrypt) UpdateExternalAuthLinkRefreshToken(ctx context.Context, param
 	return db.Store.UpdateExternalAuthLinkRefreshToken(ctx, params)
 }
 
+func (db *dbCrypt) GetExternalAuthProviderConfigByID(ctx context.Context, id uuid.UUID) (database.ExternalAuthProviderConfig, error) {
+	cfg, err := db.Store.GetExternalAuthProviderConfigByID(ctx, id)
+	if err != nil {
+		return database.ExternalAuthProviderConfig{}, err
+	}
+	if err := db.decryptField(&cfg.ClientSecretEncrypted, cfg.ClientSecretKeyID); err != nil {
+		return database.ExternalAuthProviderConfig{}, err
+	}
+	return cfg, nil
+}
+
+func (db *dbCrypt) GetExternalAuthProviderConfigByProviderID(ctx context.Context, providerID string) (database.ExternalAuthProviderConfig, error) {
+	cfg, err := db.Store.GetExternalAuthProviderConfigByProviderID(ctx, providerID)
+	if err != nil {
+		return database.ExternalAuthProviderConfig{}, err
+	}
+	if err := db.decryptField(&cfg.ClientSecretEncrypted, cfg.ClientSecretKeyID); err != nil {
+		return database.ExternalAuthProviderConfig{}, err
+	}
+	return cfg, nil
+}
+
+func (db *dbCrypt) GetExternalAuthProviderConfigs(ctx context.Context) ([]database.ExternalAuthProviderConfig, error) {
+	cfgs, err := db.Store.GetExternalAuthProviderConfigs(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for idx := range cfgs {
+		if err := db.decryptField(&cfgs[idx].ClientSecretEncrypted, cfgs[idx].ClientSecretKeyID); err != nil {
+			return nil, err
+		}
+	}
+	return cfgs, nil
+}
+
+func (db *dbCrypt) InsertExternalAuthProviderConfig(ctx context.Context, params database.InsertExternalAuthProviderConfigParams) (database.ExternalAuthProviderConfig, error) {
+	if err := db.encryptField(&params.ClientSecretEncrypted, &params.ClientSecretKeyID); err != nil {
+		return database.ExternalAuthProviderConfig{}, err
+	}
+	cfg, err := db.Store.InsertExternalAuthProviderConfig(ctx, params)
+	if err != nil {
+		return database.ExternalAuthProviderConfig{}, err
+	}
+	if err := db.decryptField(&cfg.ClientSecretEncrypted, cfg.ClientSecretKeyID); err != nil {
+		return database.ExternalAuthProviderConfig{}, err
+	}
+	return cfg, nil
+}
+
+func (db *dbCrypt) UpdateExternalAuthProviderConfig(ctx context.Context, params database.UpdateExternalAuthProviderConfigParams) (database.ExternalAuthProviderConfig, error) {
+	if err := db.encryptField(&params.ClientSecretEncrypted, &params.ClientSecretKeyID); err != nil {
+		return database.ExternalAuthProviderConfig{}, err
+	}
+	cfg, err := db.Store.UpdateExternalAuthProviderConfig(ctx, params)
+	if err != nil {
+		return database.ExternalAuthProviderConfig{}, err
+	}
+	if err := db.decryptField(&cfg.ClientSecretEncrypted, cfg.ClientSecretKeyID); err != nil {
+		return database.ExternalAuthProviderConfig{}, err
+	}
+	return cfg, nil
+}
+
+func (db *dbCrypt) UpsertExternalAuthProviderConfigFromEnv(ctx context.Context, params database.UpsertExternalAuthProviderConfigFromEnvParams) (database.ExternalAuthProviderConfig, error) {
+	if err := db.encryptField(&params.ClientSecretEncrypted, &params.ClientSecretKeyID); err != nil {
+		return database.ExternalAuthProviderConfig{}, err
+	}
+	cfg, err := db.Store.UpsertExternalAuthProviderConfigFromEnv(ctx, params)
+	if err != nil {
+		return database.ExternalAuthProviderConfig{}, err
+	}
+	if err := db.decryptField(&cfg.ClientSecretEncrypted, cfg.ClientSecretKeyID); err != nil {
+		return database.ExternalAuthProviderConfig{}, err
+	}
+	return cfg, nil
+}
+
 func (db *dbCrypt) GetCryptoKeys(ctx context.Context) ([]database.CryptoKey, error) {
 	keys, err := db.Store.GetCryptoKeys(ctx)
 	if err != nil {
