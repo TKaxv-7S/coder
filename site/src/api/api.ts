@@ -1987,6 +1987,23 @@ class ApiMethods {
 			}
 		};
 
+	getExternalAuthProviderConfigs =
+		async (): Promise<TypesGen.ExternalAuthProviderEntry[]> => {
+			const res = await this.axios.get("/api/v2/external-auth-providers");
+			return res.data;
+		};
+
+	createExternalAuthProviderConfig = async (
+		req: TypesGen.CreateExternalAuthProviderRequest,
+	): Promise<TypesGen.ExternalAuthProviderEntry> => {
+		const res = await this.axios.post("/api/v2/external-auth-providers", req);
+		return res.data;
+	};
+
+	deleteExternalAuthProviderConfig = async (id: string): Promise<void> => {
+		await this.axios.delete(`/api/v2/external-auth-providers/${id}`);
+	};
+
 	getExternalAuthProvider = async (
 		provider: string,
 	): Promise<TypesGen.ExternalAuth> => {
