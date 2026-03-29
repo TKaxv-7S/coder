@@ -40,24 +40,24 @@ type ExternalAuthProviderEntry struct {
 // CreateExternalAuthProviderRequest is the request body for creating a new
 // external auth provider configuration.
 type CreateExternalAuthProviderRequest struct {
-	ProviderID           string   `json:"provider_id" validate:"required"`
-	Type                 string   `json:"type" validate:"required"`
-	DisplayName          string   `json:"display_name"`
-	DisplayIcon          string   `json:"display_icon"`
-	ClientID             string   `json:"client_id" validate:"required"`
-	ClientSecret         string   `json:"client_secret"`
-	AuthURL              string   `json:"auth_url"`
-	TokenURL             string   `json:"token_url"`
-	ValidateURL          string   `json:"validate_url"`
-	RevokeURL            string   `json:"revoke_url"`
-	DeviceCodeURL        string   `json:"device_code_url"`
+	ProviderID           string   `json:"provider_id" validate:"required,max=128"`
+	Type                 string   `json:"type" validate:"required,max=64"`
+	DisplayName          string   `json:"display_name,omitempty" validate:"omitempty,max=256"`
+	DisplayIcon          string   `json:"display_icon,omitempty" validate:"omitempty,max=256"`
+	ClientID             string   `json:"client_id" validate:"required,max=512"`
+	ClientSecret         string   `json:"client_secret,omitempty" validate:"omitempty,max=4096"`
+	AuthURL              string   `json:"auth_url,omitempty" validate:"omitempty,url,max=1024"`
+	TokenURL             string   `json:"token_url,omitempty" validate:"omitempty,url,max=1024"`
+	ValidateURL          string   `json:"validate_url,omitempty" validate:"omitempty,url,max=1024"`
+	RevokeURL            string   `json:"revoke_url,omitempty" validate:"omitempty,url,max=1024"`
+	DeviceCodeURL        string   `json:"device_code_url,omitempty" validate:"omitempty,url,max=1024"`
 	Scopes               []string `json:"scopes"`
 	ExtraTokenKeys       []string `json:"extra_token_keys"`
 	NoRefresh            bool     `json:"no_refresh"`
 	DeviceFlow           bool     `json:"device_flow"`
-	Regex                string   `json:"regex"`
-	AppInstallURL        string   `json:"app_install_url"`
-	AppInstallationsURL  string   `json:"app_installations_url"`
+	Regex                string   `json:"regex,omitempty" validate:"omitempty,max=1024"`
+	AppInstallURL        string   `json:"app_install_url,omitempty" validate:"omitempty,url,max=1024"`
+	AppInstallationsURL  string   `json:"app_installations_url,omitempty" validate:"omitempty,url,max=1024"`
 	CodeChallengeMethods []string `json:"code_challenge_methods"`
 }
 
@@ -65,25 +65,25 @@ type CreateExternalAuthProviderRequest struct {
 // existing external auth provider configuration. This is a full replace
 // (PUT semantics).
 type UpdateExternalAuthProviderRequest struct {
-	Type        string `json:"type" validate:"required"`
-	DisplayName string `json:"display_name"`
-	DisplayIcon string `json:"display_icon"`
-	ClientID    string `json:"client_id" validate:"required"`
+	Type        string `json:"type" validate:"required,max=64"`
+	DisplayName string `json:"display_name,omitempty" validate:"omitempty,max=256"`
+	DisplayIcon string `json:"display_icon,omitempty" validate:"omitempty,max=256"`
+	ClientID    string `json:"client_id" validate:"required,max=512"`
 	// ClientSecret is optional. If nil, the existing secret is preserved.
 	// If non-nil, the secret is replaced with the new value.
-	ClientSecret         *string  `json:"client_secret,omitempty"`
-	AuthURL              string   `json:"auth_url"`
-	TokenURL             string   `json:"token_url"`
-	ValidateURL          string   `json:"validate_url"`
-	RevokeURL            string   `json:"revoke_url"`
-	DeviceCodeURL        string   `json:"device_code_url"`
+	ClientSecret         *string  `json:"client_secret,omitempty" validate:"omitempty,max=4096"`
+	AuthURL              string   `json:"auth_url,omitempty" validate:"omitempty,url,max=1024"`
+	TokenURL             string   `json:"token_url,omitempty" validate:"omitempty,url,max=1024"`
+	ValidateURL          string   `json:"validate_url,omitempty" validate:"omitempty,url,max=1024"`
+	RevokeURL            string   `json:"revoke_url,omitempty" validate:"omitempty,url,max=1024"`
+	DeviceCodeURL        string   `json:"device_code_url,omitempty" validate:"omitempty,url,max=1024"`
 	Scopes               []string `json:"scopes"`
 	ExtraTokenKeys       []string `json:"extra_token_keys"`
 	NoRefresh            bool     `json:"no_refresh"`
 	DeviceFlow           bool     `json:"device_flow"`
-	Regex                string   `json:"regex"`
-	AppInstallURL        string   `json:"app_install_url"`
-	AppInstallationsURL  string   `json:"app_installations_url"`
+	Regex                string   `json:"regex,omitempty" validate:"omitempty,max=1024"`
+	AppInstallURL        string   `json:"app_install_url,omitempty" validate:"omitempty,url,max=1024"`
+	AppInstallationsURL  string   `json:"app_installations_url,omitempty" validate:"omitempty,url,max=1024"`
 	CodeChallengeMethods []string `json:"code_challenge_methods"`
 }
 
