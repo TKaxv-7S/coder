@@ -51,10 +51,10 @@ UPDATE external_auth_provider_configs SET
     app_installations_url = $20,
     code_challenge_methods = $21,
     source = $22
-WHERE id = $1 RETURNING *;
+WHERE id = $1 AND source != 'env' RETURNING *;
 
--- name: DeleteExternalAuthProviderConfig :exec
-DELETE FROM external_auth_provider_configs WHERE id = $1;
+-- name: DeleteExternalAuthProviderConfig :execrows
+DELETE FROM external_auth_provider_configs WHERE id = $1 AND source != 'env';
 
 -- name: UpsertExternalAuthProviderConfigFromEnv :one
 INSERT INTO external_auth_provider_configs (
@@ -97,6 +97,8 @@ INSERT INTO external_auth_provider_configs (
     app_installations_url = EXCLUDED.app_installations_url,
     code_challenge_methods = EXCLUDED.code_challenge_methods,
     source = 'env'
+WHERE external_auth_provider_configs.source = 'env'
+   OR external_auth_provider_configs.source IS NULL
 RETURNING *;
 
 -- name: DeleteExternalAuthProviderConfigsBySourceNotInProviderIDs :exec

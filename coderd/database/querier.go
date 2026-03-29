@@ -113,7 +113,7 @@ type sqlcQuerier interface {
 	DeleteCustomRole(ctx context.Context, arg DeleteCustomRoleParams) error
 	DeleteExpiredAPIKeys(ctx context.Context, arg DeleteExpiredAPIKeysParams) (int64, error)
 	DeleteExternalAuthLink(ctx context.Context, arg DeleteExternalAuthLinkParams) error
-	DeleteExternalAuthProviderConfig(ctx context.Context, id uuid.UUID) error
+	DeleteExternalAuthProviderConfig(ctx context.Context, id uuid.UUID) (int64, error)
 	// Removes env-sourced external auth provider configs whose provider_id
 	// is not in the given list of active provider IDs. This is used during
 	// startup to clean up stale env-sourced rows that are no longer present

@@ -1955,9 +1955,9 @@ func (q *querier) DeleteExternalAuthLink(ctx context.Context, arg database.Delet
 	}, q.db.DeleteExternalAuthLink)(ctx, arg)
 }
 
-func (q *querier) DeleteExternalAuthProviderConfig(ctx context.Context, id uuid.UUID) error {
+func (q *querier) DeleteExternalAuthProviderConfig(ctx context.Context, id uuid.UUID) (int64, error) {
 	if err := q.authorizeContext(ctx, policy.ActionUpdate, rbac.ResourceDeploymentConfig); err != nil {
-		return err
+		return 0, err
 	}
 	return q.db.DeleteExternalAuthProviderConfig(ctx, id)
 }

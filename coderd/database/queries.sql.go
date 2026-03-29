@@ -13928,13 +13928,16 @@ func (q *sqlQuerier) UpdateExternalAuthLinkRefreshToken(ctx context.Context, arg
 	return err
 }
 
-const deleteExternalAuthProviderConfig = `-- name: DeleteExternalAuthProviderConfig :exec
-DELETE FROM external_auth_provider_configs WHERE id = $1
+const deleteExternalAuthProviderConfig = `-- name: DeleteExternalAuthProviderConfig :execrows
+DELETE FROM external_auth_provider_configs WHERE id = $1 AND source != 'env'
 `
 
-func (q *sqlQuerier) DeleteExternalAuthProviderConfig(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.ExecContext(ctx, deleteExternalAuthProviderConfig, id)
-	return err
+func (q *sqlQuerier) DeleteExternalAuthProviderConfig(ctx context.Context, id uuid.UUID) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteExternalAuthProviderConfig, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const deleteExternalAuthProviderConfigsBySourceNotInProviderIDs = `-- name: DeleteExternalAuthProviderConfigsBySourceNotInProviderIDs :exec
@@ -14205,7 +14208,7 @@ UPDATE external_auth_provider_configs SET
     app_installations_url = $20,
     code_challenge_methods = $21,
     source = $22
-WHERE id = $1 RETURNING id, created_at, updated_at, provider_id, type, display_name, display_icon, client_id, client_secret_encrypted, client_secret_key_id, auth_url, token_url, validate_url, revoke_url, device_code_url, scopes, extra_token_keys, no_refresh, device_flow, regex, app_install_url, app_installations_url, code_challenge_methods, source
+WHERE id = $1 AND source != 'env' RETURNING id, created_at, updated_at, provider_id, type, display_name, display_icon, client_id, client_secret_encrypted, client_secret_key_id, auth_url, token_url, validate_url, revoke_url, device_code_url, scopes, extra_token_keys, no_refresh, device_flow, regex, app_install_url, app_installations_url, code_challenge_methods, source
 `
 
 type UpdateExternalAuthProviderConfigParams struct {
@@ -14329,6 +14332,8 @@ INSERT INTO external_auth_provider_configs (
     app_installations_url = EXCLUDED.app_installations_url,
     code_challenge_methods = EXCLUDED.code_challenge_methods,
     source = 'env'
+WHERE external_auth_provider_configs.source = 'env'
+   OR external_auth_provider_configs.source IS NULL
 RETURNING id, created_at, updated_at, provider_id, type, display_name, display_icon, client_id, client_secret_encrypted, client_secret_key_id, auth_url, token_url, validate_url, revoke_url, device_code_url, scopes, extra_token_keys, no_refresh, device_flow, regex, app_install_url, app_installations_url, code_challenge_methods, source
 `
 

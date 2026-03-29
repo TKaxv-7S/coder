@@ -830,11 +830,12 @@ func (mr *MockStoreMockRecorder) DeleteExternalAuthLink(ctx, arg any) *gomock.Ca
 }
 
 // DeleteExternalAuthProviderConfig mocks base method.
-func (m *MockStore) DeleteExternalAuthProviderConfig(ctx context.Context, id uuid.UUID) error {
+func (m *MockStore) DeleteExternalAuthProviderConfig(ctx context.Context, id uuid.UUID) (int64, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DeleteExternalAuthProviderConfig", ctx, id)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // DeleteExternalAuthProviderConfig indicates an expected call of DeleteExternalAuthProviderConfig.

@@ -504,12 +504,12 @@ func (m queryMetricsStore) DeleteExternalAuthLink(ctx context.Context, arg datab
 	return r0
 }
 
-func (m queryMetricsStore) DeleteExternalAuthProviderConfig(ctx context.Context, id uuid.UUID) error {
+func (m queryMetricsStore) DeleteExternalAuthProviderConfig(ctx context.Context, id uuid.UUID) (int64, error) {
 	start := time.Now()
-	r0 := m.s.DeleteExternalAuthProviderConfig(ctx, id)
+	r0, r1 := m.s.DeleteExternalAuthProviderConfig(ctx, id)
 	m.queryLatencies.WithLabelValues("DeleteExternalAuthProviderConfig").Observe(time.Since(start).Seconds())
 	m.queryCounts.WithLabelValues(httpmw.ExtractHTTPRoute(ctx), httpmw.ExtractHTTPMethod(ctx), "DeleteExternalAuthProviderConfig").Inc()
-	return r0
+	return r0, r1
 }
 
 func (m queryMetricsStore) DeleteExternalAuthProviderConfigsBySourceNotInProviderIDs(ctx context.Context, activeProviderIds []string) error {
