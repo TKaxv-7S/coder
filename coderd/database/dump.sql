@@ -1592,7 +1592,7 @@ CREATE TABLE external_auth_provider_configs (
     display_icon text DEFAULT ''::text NOT NULL,
     client_id text NOT NULL,
     client_secret_encrypted text DEFAULT ''::text NOT NULL,
-    client_secret_key_id text DEFAULT ''::text,
+    client_secret_key_id text,
     auth_url text DEFAULT ''::text NOT NULL,
     token_url text DEFAULT ''::text NOT NULL,
     validate_url text DEFAULT ''::text NOT NULL,
