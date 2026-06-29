@@ -13,6 +13,31 @@ import (
 	"github.com/coder/coder/v2/codersdk"
 )
 
+func TestLogThrottle(t *testing.T) {
+	t.Parallel()
+
+	const interval = time.Minute
+	var th logThrottle
+	start := time.Now()
+
+	suppressed, ok := th.shouldLog(start, interval)
+	require.True(t, ok, "the first event should log")
+	require.EqualValues(t, 0, suppressed)
+
+	for i := range 3 {
+		_, ok := th.shouldLog(start.Add(time.Duration(i+1)*time.Second), interval)
+		require.False(t, ok, "events within the interval should be suppressed")
+	}
+
+	suppressed, ok = th.shouldLog(start.Add(interval), interval)
+	require.True(t, ok, "the first event after the interval should log")
+	require.EqualValues(t, 3, suppressed, "suppressed should count events since the last log")
+
+	suppressed, ok = th.shouldLog(start.Add(2*interval), interval)
+	require.True(t, ok)
+	require.EqualValues(t, 0, suppressed, "suppressed should reset after each log")
+}
+
 func TestGitlabDefaults(t *testing.T) {
 	t.Parallel()
 
