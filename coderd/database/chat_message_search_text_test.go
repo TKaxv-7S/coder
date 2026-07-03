@@ -39,6 +39,11 @@ func TestChatMessageSearchText(t *testing.T) {
 			want: sql.NullString{String: "first second", Valid: true},
 		},
 		{
+			name:    "OnlyNonTextParts",
+			content: sql.NullString{String: `[{"type":"reasoning","text":"thinking"}]`, Valid: true},
+			want:    sql.NullString{},
+		},
+		{
 			name:    "ScalarContent",
 			content: sql.NullString{String: `"hello"`, Valid: true},
 			want:    sql.NullString{},
