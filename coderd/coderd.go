@@ -261,7 +261,6 @@ type Options struct {
 	// ChatWorkerDisabled skips starting the chat daemon's background
 	// worker.
 	ChatWorkerDisabled bool
-	// ChatDebugProxy forwards a debug snapshot request to the owning replica.
 	// When nil (OSS), the snapshot is always served from local state.
 	ChatDebugProxy func(rw http.ResponseWriter, r *http.Request, replicaID uuid.UUID)
 
@@ -2303,7 +2302,6 @@ type API struct {
 	dbRolluper *dbrollup.Rolluper
 	// chatDaemon handles background processing of pending chats.
 	chatDaemon *chatd.Server
-	// chatDebugProxy forwards debug snapshot requests to the owning replica.
 	// Nil on single-node OSS; set by enterprise via Options.ChatDebugProxy.
 	chatDebugProxy func(rw http.ResponseWriter, r *http.Request, replicaID uuid.UUID)
 	// gitSyncWorker refreshes stale chat diff statuses in the background.

@@ -29,11 +29,9 @@ import (
 	"github.com/coder/quartz"
 )
 
-// The types below mirror the (unexported) response type for
-// GET /api/experimental/chats/{chat}/debug/snapshot, i.e. chatDebugSnapshot
-// and friends in exp_chats.go. They are redeclared here because this file
-// lives in the external coderd_test package and the production types are
-// unexported; keep the JSON tags in sync with exp_chats.go.
+// Redeclared here because this file lives in the external coderd_test
+// package and the production types (chatDebugSnapshot and friends in
+// exp_chats.go) are unexported; keep the JSON tags in sync.
 type debugSnapshot struct {
 	ExecutionState string                `json:"execution_state"`
 	Database       debugSnapshotDatabase `json:"database"`
@@ -79,7 +77,6 @@ type debugSnapshotRuntime struct {
 	MessageBuffers       []messagepartbuffer.EpisodeInfo `json:"message_buffers"`
 }
 
-// driveChatToError transitions the chat from running to error state.
 func driveChatToError(ctx context.Context, t *testing.T, api *coderd.API, chatID uuid.UUID, msg string) {
 	t.Helper()
 	chatdCtx := dbauthz.AsChatd(ctx) //nolint:gocritic
@@ -94,7 +91,7 @@ func driveChatToError(ctx context.Context, t *testing.T, api *coderd.API, chatID
 	}))
 }
 
-// addQueuedMessage puts a message on the running chat's queue (R0 → R1).
+// addQueuedMessage drives R0 → R1.
 func addQueuedMessage(ctx context.Context, t *testing.T, api *coderd.API, chat codersdk.Chat) {
 	t.Helper()
 	chatdCtx := dbauthz.AsChatd(ctx) //nolint:gocritic
@@ -116,7 +113,6 @@ func addQueuedMessage(ctx context.Context, t *testing.T, api *coderd.API, chat c
 	}))
 }
 
-// getDebugSnapshot fetches and decodes the debug snapshot for a chat.
 func getDebugSnapshot(t *testing.T, client *codersdk.ExperimentalClient, chatID uuid.UUID) debugSnapshot {
 	t.Helper()
 	ctx := testutil.Context(t, testutil.WaitShort)
@@ -130,22 +126,16 @@ func getDebugSnapshot(t *testing.T, client *codersdk.ExperimentalClient, chatID 
 	return out
 }
 
-// assertDebugSnapshotGolden compares snap against the golden JSON fixture
-// at testdata/chatdebugsnapshot/<name>.json.golden, following the same
-// pattern as the golden file tests in insights_test.go: non-deterministic
-// fields (timestamps, the per-instance local worker ID) are reset to their
-// zero value directly on the typed struct, and the comparison is done with
-// cmp.Diff on the decoded struct rather than on raw JSON text. Any
-// dynamically-generated UUIDs that appear elsewhere in the payload (e.g.
-// runner/worker IDs) should be arranged by the caller to be deterministic
-// fixture values instead of uuid.New(), matching the convention used for
-// insights golden files.
+// assertDebugSnapshotGolden resets non-deterministic fields (timestamps, the
+// per-instance local worker ID) before diffing snap against
+// testdata/chatdebugsnapshot/<name>.json.golden, matching the pattern in
+// insights_test.go. Callers must arrange for any other dynamic values (e.g.
+// runner/worker IDs) to be deterministic fixture values, not uuid.New().
 //
-// Callers must be tests whose name matches `make gen`'s `Test.*Golden$`
-// filter (see coderd/.gen-golden in the Makefile); otherwise
-// `make clean/golden-files` deletes the fixture and it never gets
-// regenerated. Run `go test ./coderd -run "Test.*Golden$" -update`, or
-// `make gen/golden-files`, to regenerate fixtures.
+// The test name must match make gen's `Test.*Golden$` filter (see
+// coderd/.gen-golden in the Makefile) or `make clean/golden-files` deletes
+// the fixture with nothing to regenerate it. Run
+// `go test ./coderd -run "Test.*Golden$" -update` to (re)generate.
 func assertDebugSnapshotGolden(t *testing.T, name string, snap debugSnapshot) {
 	t.Helper()
 
@@ -178,8 +168,7 @@ func assertDebugSnapshotGolden(t *testing.T, name string, snap debugSnapshot) {
 }
 
 // normalizeDebugSnapshot zeroes fields that are never deterministic across
-// test runs (wall-clock timestamps, durations derived from them, and the
-// per-chatd.Server random worker ID) so golden comparisons are stable.
+// test runs so golden comparisons are stable.
 func normalizeDebugSnapshot(snap *debugSnapshot) {
 	snap.Database.CreatedAt = time.Time{}
 	snap.Database.UpdatedAt = time.Time{}
@@ -191,8 +180,6 @@ func normalizeDebugSnapshot(snap *debugSnapshot) {
 	snap.Runtime.LocalWorkerID = uuid.Nil
 }
 
-// createDebugChat creates a chat with the minimum required fields for debug
-// snapshot tests. It also sets up the model config prerequisite.
 func createDebugChat(ctx context.Context, t *testing.T, client *codersdk.ExperimentalClient, orgID uuid.UUID) codersdk.Chat {
 	t.Helper()
 	_ = createChatModelConfig(t, client)
@@ -207,7 +194,6 @@ func createDebugChat(ctx context.Context, t *testing.T, client *codersdk.Experim
 	return chat
 }
 
-// TestGetChatDebugSnapshot_ExecutionState verifies execution_state for W/R0/E0/R1.
 func TestGetChatDebugSnapshot_ExecutionState(t *testing.T) {
 	t.Parallel()
 
@@ -259,7 +245,6 @@ func TestGetChatDebugSnapshot_ExecutionState(t *testing.T) {
 			require.Equal(t, tc.wantStatus, snap.Database.Status)
 			require.Equal(t, tc.wantQueue, snap.Database.QueueDepth)
 			if tc.name == "E0" {
-				// last_error is a JSON object; verify it contains the expected message.
 				var lastErr struct {
 					Message string `json:"message"`
 				}
@@ -270,7 +255,6 @@ func TestGetChatDebugSnapshot_ExecutionState(t *testing.T) {
 	}
 }
 
-// TestGetChatDebugSnapshot_MessageStats_Golden verifies the message_stats breakdown.
 func TestGetChatDebugSnapshot_MessageStats_Golden(t *testing.T) {
 	t.Parallel()
 	ctx := testutil.Context(t, testutil.WaitLong)
@@ -279,7 +263,6 @@ func TestGetChatDebugSnapshot_MessageStats_Golden(t *testing.T) {
 
 	chat := createDebugChat(ctx, t, client, firstUser.OrganizationID)
 
-	// Commit 2 assistant + 1 tool message.
 	chatdCtx := dbauthz.AsChatd(ctx) //nolint:gocritic
 	content, err := chatprompt.MarshalParts([]codersdk.ChatMessagePart{codersdk.ChatMessageText("hi")})
 	require.NoError(t, err)
@@ -299,7 +282,7 @@ func TestGetChatDebugSnapshot_MessageStats_Golden(t *testing.T) {
 	assertDebugSnapshotGolden(t, "message_stats", snap)
 }
 
-// TestGetChatDebugSnapshot_Heartbeat verifies heartbeat presence and staleness.
+// TestGetChatDebugSnapshot_Heartbeat verifies is_stale flips as the clock advances.
 func TestGetChatDebugSnapshot_Heartbeat(t *testing.T) {
 	t.Parallel()
 	ctx := testutil.Context(t, testutil.WaitLong)
@@ -316,7 +299,6 @@ func TestGetChatDebugSnapshot_Heartbeat(t *testing.T) {
 	snap := getDebugSnapshot(t, client, chat.ID)
 	require.Nil(t, snap.Database.Heartbeat)
 
-	// Acquire ownership (sets worker_id + runner_id) then upsert a heartbeat.
 	runnerID := uuid.New()
 	chatdCtx := dbauthz.AsChatd(ctx) //nolint:gocritic
 	machine := chatstate.NewChatMachine(api.Database, api.Pubsub, chat.ID)
@@ -345,7 +327,6 @@ func TestGetChatDebugSnapshot_Heartbeat(t *testing.T) {
 	require.GreaterOrEqual(t, hb.AgeSeconds, float64(0))
 	require.False(t, hb.IsStale)
 
-	// Advance the clock past the staleness threshold and verify is_stale flips.
 	mClock.Advance((chatstate.HeartbeatStaleSeconds + 1) * time.Second)
 
 	snap = getDebugSnapshot(t, client, chat.ID)
@@ -390,8 +371,6 @@ func TestGetChatDebugSnapshot_ChatDaemonDisabled(t *testing.T) {
 	require.Equal(t, http.StatusServiceUnavailable, resp.StatusCode)
 }
 
-// TestGetChatDebugSnapshot_Runtime_Unowned_Golden verifies the runtime section when
-// the chat has no owner. worker_id_matches_local must be false and no runners.
 func TestGetChatDebugSnapshot_Runtime_Unowned_Golden(t *testing.T) {
 	t.Parallel()
 	ctx := testutil.Context(t, testutil.WaitLong)
@@ -404,9 +383,6 @@ func TestGetChatDebugSnapshot_Runtime_Unowned_Golden(t *testing.T) {
 	assertDebugSnapshotGolden(t, "runtime_unowned", snap)
 }
 
-// TestGetChatDebugSnapshot_MultiReplica_ProxiesToOwner_Golden verifies that when the
-// chat is owned by a different replica the proxy is invoked and its response
-// is returned verbatim.
 func TestGetChatDebugSnapshot_MultiReplica_ProxiesToOwner_Golden(t *testing.T) {
 	t.Parallel()
 	ctx := testutil.Context(t, testutil.WaitLong)
@@ -429,7 +405,6 @@ func TestGetChatDebugSnapshot_MultiReplica_ProxiesToOwner_Golden(t *testing.T) {
 				case proxyCalled <- struct{}{}:
 				default:
 				}
-				// Write a minimal snapshot response as if from the owning pod.
 				rw.Header().Set("Content-Type", "application/json")
 				rw.WriteHeader(http.StatusOK)
 				_ = json.NewEncoder(rw).Encode(debugSnapshot{
@@ -477,8 +452,6 @@ func TestGetChatDebugSnapshot_MultiReplica_ProxiesToOwner_Golden(t *testing.T) {
 	assertDebugSnapshotGolden(t, "multi_replica_proxies_to_owner", snap)
 }
 
-// TestGetChatDebugSnapshot_MultiReplica_ProxyError verifies that when the proxy
-// returns an error the client receives a non-200 response.
 func TestGetChatDebugSnapshot_MultiReplica_ProxyError(t *testing.T) {
 	t.Parallel()
 	ctx := testutil.Context(t, testutil.WaitLong)

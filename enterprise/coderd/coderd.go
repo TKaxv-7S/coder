@@ -222,9 +222,6 @@ func New(ctx context.Context, options *Options) (_ *API, err error) {
 	}
 	options.Options.ChatStreamPartsDialer = entchatd.NewStreamPartsDialer(replicaCfg)
 
-	// Forward debug snapshot requests to the owning replica by resolving its
-	// address and proxying the full HTTP request. The owning pod handles it
-	// locally and returns its own DB + runtime response.
 	options.Options.ChatDebugProxy = func(rw http.ResponseWriter, r *http.Request, replicaID uuid.UUID) {
 		address, ok := resolveReplicaAddress(r.Context(), replicaID)
 		if !ok {

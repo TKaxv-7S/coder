@@ -77,8 +77,6 @@ func (p Part) jsonValue() partJSON {
 	}
 }
 
-// EpisodeInfo is a point-in-time snapshot of one buffered episode, returned
-// by InspectChat for debugging purposes.
 type EpisodeInfo struct {
 	HistoryVersion    int64 `json:"history_version"`
 	GenerationAttempt int64 `json:"generation_attempt"`
@@ -562,7 +560,6 @@ func serializedPartBytes(part Part) (int64, error) {
 	return int64(len(data)), nil
 }
 
-// InspectChat returns a snapshot of all known episodes for the given chat ID.
 // It holds the buffer lock only briefly, so the returned data may be
 // slightly stale; it is intended for debugging only.
 func (b *Buffer) InspectChat(chatID uuid.UUID) []EpisodeInfo {

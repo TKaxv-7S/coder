@@ -7889,7 +7889,6 @@ func (api *API) streamChatParts(rw http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// chatDebugSnapshot is the response type for GET /api/experimental/chats/{chat}/debug/snapshot.
 // Types are defined locally so the shape can evolve freely without SDK compatibility concerns.
 type chatDebugSnapshot struct {
 	ExecutionState chatstate.ExecutionState `json:"execution_state"`
@@ -7919,8 +7918,7 @@ type chatDebugHeartbeat struct {
 	RunnerID    uuid.UUID `json:"runner_id"`
 	HeartbeatAt time.Time `json:"heartbeat_at"`
 	AgeSeconds  float64   `json:"age_seconds"`
-	// IsStale is true when age exceeds chatstate.HeartbeatStaleSeconds.
-	IsStale bool `json:"is_stale"`
+	IsStale     bool      `json:"is_stale"`
 	// Error is set when the heartbeat row could not be read (other than
 	// sql.ErrNoRows). When set, IsStale and AgeSeconds are meaningless and
 	// the omission of a heartbeat should not be interpreted as "no heartbeat
@@ -7941,15 +7939,11 @@ type chatDebugRuntime struct {
 	MessageBuffers       []messagepartbuffer.EpisodeInfo `json:"message_buffers"`
 }
 
-// ChatDebugForwardedHeader marks a debug snapshot request that has already
-// been forwarded once by another replica. It prevents a forwarding loop if
-// chat ownership transfers between the two replicas' database reads: the
-// receiving replica serves the request locally instead of forwarding it
-// again.
+// ChatDebugForwardedHeader prevents a forwarding loop if chat ownership
+// transfers between the two replicas' database reads: the receiving
+// replica serves the request locally instead of forwarding it again.
 const ChatDebugForwardedHeader = "X-Coder-Debug-Forwarded"
 
-// getChatDebugSnapshot returns a combined database + runtime snapshot for a
-// single chat. It is intended for developer troubleshooting.
 // EXPERIMENTAL: this endpoint is experimental and is subject to change.
 //
 // @x-apidocgen {"skip": true}
@@ -7962,17 +7956,15 @@ func (api *API) getChatDebugSnapshot(rw http.ResponseWriter, r *http.Request) {
 	}
 	chat := httpmw.ChatParam(r)
 
-	// If the chat is owned by a different replica and we have a proxy configured,
-	// forward the entire request there and return its response verbatim. Skip
-	// forwarding if this request was already forwarded once, to avoid bouncing
-	// indefinitely if ownership changes between the two replicas' reads.
+	// Skip forwarding if this request was already forwarded once, to avoid
+	// bouncing indefinitely if ownership changes between the two replicas'
+	// reads.
 	alreadyForwarded := r.Header.Get(ChatDebugForwardedHeader) != ""
 	if !alreadyForwarded && chat.WorkerID.Valid && chat.WorkerID.UUID != api.chatDaemon.WorkerID() && api.chatDebugProxy != nil {
 		api.chatDebugProxy(rw, r, chat.WorkerID.UUID)
 		return
 	}
 
-	// Queue depth.
 	queueDepth, err := api.Database.CountChatQueuedMessages(ctx, chat.ID)
 	if err != nil {
 		httpapi.Write(ctx, rw, http.StatusInternalServerError, codersdk.Response{
@@ -7982,7 +7974,6 @@ func (api *API) getChatDebugSnapshot(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Heartbeat. Only available when the chat has an assigned runner.
 	var hb *chatDebugHeartbeat
 	if chat.RunnerID.Valid {
 		row, hbErr := api.Database.GetChatHeartbeat(ctx, database.GetChatHeartbeatParams{
@@ -7999,7 +7990,6 @@ func (api *API) getChatDebugSnapshot(rw http.ResponseWriter, r *http.Request) {
 				IsStale:     age > float64(chatstate.HeartbeatStaleSeconds),
 			}
 		case errors.Is(hbErr, sql.ErrNoRows):
-			// No heartbeat yet; hb stays nil.
 		default:
 			api.Logger.Warn(ctx, "failed to fetch chat heartbeat for debug snapshot",
 				slog.F("chat_id", chat.ID),
@@ -8009,8 +7999,8 @@ func (api *API) getChatDebugSnapshot(rw http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Message stats. Use the aggregate query so we include deleted and
-	// model-visibility messages without fetching full message content.
+	// Aggregate query so we include deleted and model-visibility messages
+	// without fetching full message content.
 	msgStats, err := api.Database.GetChatMessageStatsByChatID(ctx, chat.ID)
 	if err != nil {
 		httpapi.Write(ctx, rw, http.StatusInternalServerError, codersdk.Response{
@@ -8037,7 +8027,6 @@ func (api *API) getChatDebugSnapshot(rw http.ResponseWriter, r *http.Request) {
 	// tradeoff is acceptable for a debug-only endpoint.
 	execState := chatstate.ClassifyExecutionState(chat, queueDepth > 0, true)
 
-	// Build database section.
 	dbSection := chatDebugDatabase{
 		Status:            string(chat.Status),
 		Archived:          chat.Archived,
@@ -8062,9 +8051,9 @@ func (api *API) getChatDebugSnapshot(rw http.ResponseWriter, r *http.Request) {
 		dbSection.RequiresActionDeadlineAt = &chat.RequiresActionDeadlineAt.Time
 	}
 
-	// Read runtime state from local in-memory state. The proxy check above
-	// ensures we only reach this point when we are the owning replica (or
-	// the chat is unowned, or no proxy is configured).
+	// The proxy check above ensures we only reach this point when we are
+	// the owning replica (or the chat is unowned, or no proxy is
+	// configured).
 	rtSnap := api.chatDaemon.Snapshot(chat.ID)
 	rtSection := chatDebugRuntime{
 		LocalWorkerID:        rtSnap.LocalWorkerID,

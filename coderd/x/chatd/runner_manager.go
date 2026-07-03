@@ -93,17 +93,14 @@ func (r *runnerRecord) startCleanup() {
 	r.cancel()
 }
 
-// RunnerSnapshot is a point-in-time view of one active runner, used for
-// debugging.
 type RunnerSnapshot struct {
 	RunnerID       uuid.UUID `json:"runner_id"`
 	WorkerID       uuid.UUID `json:"worker_id"`
 	ActiveTaskKind *TaskKind `json:"active_task_kind"` // nil when no task is executing
 }
 
-// InspectChat returns a snapshot of all runners currently active for the given
-// chat on this pod. It holds the manager lock only briefly and is safe to call
-// from any goroutine.
+// It holds the manager lock only briefly and is safe to call from any
+// goroutine.
 func (m *runnerManager) InspectChat(chatID uuid.UUID) []RunnerSnapshot {
 	m.mu.Lock()
 	defer m.mu.Unlock()
