@@ -9,7 +9,6 @@ import (
 	fantasyschema "charm.land/fantasy/schema"
 	"github.com/stretchr/testify/require"
 
-	"github.com/coder/coder/v2/coderd/util/ptr"
 	"github.com/coder/coder/v2/coderd/x/chatd/chatloop"
 	"github.com/coder/coder/v2/coderd/x/chatd/structuredoutput"
 	"github.com/coder/coder/v2/codersdk"
@@ -26,159 +25,8 @@ const validSchema = `{
 	"additionalProperties": false
 }`
 
-func jsonSchemaFormat(schema string) *codersdk.ChatResponseFormat {
-	return &codersdk.ChatResponseFormat{
-		Type: codersdk.ChatResponseFormatTypeJSONSchema,
-		JSONSchema: &codersdk.ChatResponseFormatJSONSchema{
-			Name:   "test_output",
-			Schema: json.RawMessage(schema),
-		},
-	}
-}
-
-func TestValidate(t *testing.T) {
-	t.Parallel()
-
-	t.Run("NilFormat", func(t *testing.T) {
-		t.Parallel()
-		require.Nil(t, structuredoutput.Validate(nil))
-	})
-
-	t.Run("TextWithoutSchema", func(t *testing.T) {
-		t.Parallel()
-		require.Nil(t, structuredoutput.Validate(&codersdk.ChatResponseFormat{
-			Type: codersdk.ChatResponseFormatTypeText,
-		}))
-	})
-
-	t.Run("TextWithSchemaRejected", func(t *testing.T) {
-		t.Parallel()
-		err := structuredoutput.Validate(&codersdk.ChatResponseFormat{
-			Type:       codersdk.ChatResponseFormatTypeText,
-			JSONSchema: &codersdk.ChatResponseFormatJSONSchema{Name: "x", Schema: json.RawMessage(`{"type":"object"}`)},
-		})
-		require.NotNil(t, err)
-		require.Equal(t, "response_format.json_schema", err.Field)
-	})
-
-	t.Run("MissingType", func(t *testing.T) {
-		t.Parallel()
-		err := structuredoutput.Validate(&codersdk.ChatResponseFormat{})
-		require.NotNil(t, err)
-		require.Equal(t, "response_format.type", err.Field)
-	})
-
-	t.Run("UnknownType", func(t *testing.T) {
-		t.Parallel()
-		err := structuredoutput.Validate(&codersdk.ChatResponseFormat{Type: "yaml"})
-		require.NotNil(t, err)
-		require.Equal(t, "response_format.type", err.Field)
-	})
-
-	t.Run("JSONSchemaMissingPayload", func(t *testing.T) {
-		t.Parallel()
-		err := structuredoutput.Validate(&codersdk.ChatResponseFormat{
-			Type: codersdk.ChatResponseFormatTypeJSONSchema,
-		})
-		require.NotNil(t, err)
-		require.Equal(t, "response_format.json_schema", err.Field)
-	})
-
-	t.Run("Valid", func(t *testing.T) {
-		t.Parallel()
-		require.Nil(t, structuredoutput.Validate(jsonSchemaFormat(validSchema)))
-	})
-
-	t.Run("Name", func(t *testing.T) {
-		t.Parallel()
-		for _, name := range []string{"", "has space", "über", strings.Repeat("a", 65)} {
-			format := jsonSchemaFormat(validSchema)
-			format.JSONSchema.Name = name
-			err := structuredoutput.Validate(format)
-			require.NotNil(t, err, "name %q should be rejected", name)
-			require.Equal(t, "response_format.json_schema.name", err.Field)
-		}
-		for _, name := range []string{"a", "snake_case", "kebab-case", "MiXeD123", strings.Repeat("a", 64)} {
-			format := jsonSchemaFormat(validSchema)
-			format.JSONSchema.Name = name
-			require.Nil(t, structuredoutput.Validate(format), "name %q should be accepted", name)
-		}
-	})
-
-	t.Run("StrictDefaulting", func(t *testing.T) {
-		t.Parallel()
-		// Omitted and explicit true are accepted.
-		require.Nil(t, structuredoutput.Validate(jsonSchemaFormat(validSchema)))
-		format := jsonSchemaFormat(validSchema)
-		format.JSONSchema.Strict = ptr.Ref(true)
-		require.Nil(t, structuredoutput.Validate(format))
-		// Explicit false is rejected rather than silently ignored.
-		format.JSONSchema.Strict = ptr.Ref(false)
-		err := structuredoutput.Validate(format)
-		require.NotNil(t, err)
-		require.Equal(t, "response_format.json_schema.strict", err.Field)
-	})
-
-	t.Run("SchemaMissing", func(t *testing.T) {
-		t.Parallel()
-		format := jsonSchemaFormat(validSchema)
-		format.JSONSchema.Schema = nil
-		err := structuredoutput.Validate(format)
-		require.NotNil(t, err)
-		require.Equal(t, "response_format.json_schema.schema", err.Field)
-	})
-
-	t.Run("SchemaTooLarge", func(t *testing.T) {
-		t.Parallel()
-		huge := `{"type":"object","description":"` + strings.Repeat("x", structuredoutput.MaxSchemaBytes) + `"}`
-		err := structuredoutput.Validate(jsonSchemaFormat(huge))
-		require.NotNil(t, err)
-		require.Equal(t, "response_format.json_schema.schema", err.Field)
-		require.Contains(t, err.Detail, "maximum size")
-	})
-
-	t.Run("SchemaNotJSON", func(t *testing.T) {
-		t.Parallel()
-		err := structuredoutput.Validate(jsonSchemaFormat(`{"type": "object"`))
-		require.NotNil(t, err)
-		require.Equal(t, "response_format.json_schema.schema", err.Field)
-	})
-
-	t.Run("RootNotObject", func(t *testing.T) {
-		t.Parallel()
-		for _, schema := range []string{
-			`{"type":"array","items":{"type":"string"}}`,
-			`{"type":"string"}`,
-			`{"properties":{"a":{"type":"string"}}}`,
-			`true`,
-		} {
-			err := structuredoutput.Validate(jsonSchemaFormat(schema))
-			require.NotNil(t, err, "schema %s should be rejected", schema)
-			require.Equal(t, "response_format.json_schema.schema", err.Field)
-		}
-	})
-
-	t.Run("FragmentLocalRefs", func(t *testing.T) {
-		t.Parallel()
-		valid := `{
-			"type": "object",
-			"properties": {"node": {"$ref": "#/$defs/node"}},
-			"$defs": {"node": {"type": "object", "properties": {"name": {"type": "string"}}}}
-		}`
-		require.Nil(t, structuredoutput.Validate(jsonSchemaFormat(valid)))
-
-		for _, schema := range []string{
-			`{"type":"object","properties":{"a":{"$ref":"https://example.com/schema.json"}}}`,
-			`{"type":"object","properties":{"a":{"$ref":"file:///etc/passwd"}}}`,
-			`{"type":"object","properties":{"a":{"$dynamicRef":"https://example.com/x"}}}`,
-			`{"type":"object","allOf":[{"$ref":"other.json#/foo"}]}`,
-		} {
-			err := structuredoutput.Validate(jsonSchemaFormat(schema))
-			require.NotNil(t, err, "schema %s should be rejected", schema)
-			require.Equal(t, "response_format.json_schema.schema", err.Field)
-			require.Contains(t, err.Detail, "fragment-local")
-		}
-	})
+func schemaFormat(schema string) *codersdk.ChatResponseFormat {
+	return &codersdk.ChatResponseFormat{Schema: json.RawMessage(schema)}
 }
 
 func TestNewRequest(t *testing.T) {
@@ -189,23 +37,62 @@ func TestNewRequest(t *testing.T) {
 		req, verr := structuredoutput.NewRequest(nil)
 		require.Nil(t, verr)
 		require.Nil(t, req)
-
-		req, verr = structuredoutput.NewRequest(&codersdk.ChatResponseFormat{
-			Type: codersdk.ChatResponseFormatTypeText,
-		})
-		require.Nil(t, verr)
-		require.Nil(t, req)
 	})
 
-	t.Run("CarriesMetadata", func(t *testing.T) {
+	t.Run("CarriesDescription", func(t *testing.T) {
 		t.Parallel()
-		format := jsonSchemaFormat(validSchema)
-		format.JSONSchema.Description = "a report"
+		format := schemaFormat(validSchema)
+		format.Description = "a report"
 		req, verr := structuredoutput.NewRequest(format)
 		require.Nil(t, verr)
-		require.Equal(t, "test_output", req.Name)
 		require.Equal(t, "a report", req.Description)
-		require.JSONEq(t, validSchema, string(req.Schema))
+	})
+
+	t.Run("SchemaValidation", func(t *testing.T) {
+		t.Parallel()
+		fragmentRefSchema := `{
+			"type": "object",
+			"properties": {"node": {"$ref": "#/$defs/node"}},
+			"$defs": {"node": {"type": "object", "properties": {"name": {"type": "string"}}}}
+		}`
+		// Exceeds maxSchemaBytes (16 KiB).
+		hugeSchema := `{"type":"object","description":"` + strings.Repeat("x", 16*1024) + `"}`
+
+		cases := []struct {
+			name   string
+			schema string
+			// wantDetail is a substring of the expected validation
+			// error detail; empty means the schema must be accepted.
+			wantDetail string
+		}{
+			{name: "Valid", schema: validSchema},
+			{name: "FragmentLocalRef", schema: fragmentRefSchema},
+			{name: "Missing", schema: "", wantDetail: "is required"},
+			{name: "TooLarge", schema: hugeSchema, wantDetail: "maximum size"},
+			{name: "NotJSON", schema: `{"type": "object"`, wantDetail: "must be a JSON object"},
+			{name: "RootArray", schema: `{"type":"array","items":{"type":"string"}}`, wantDetail: `"type":"object"`},
+			{name: "RootString", schema: `{"type":"string"}`, wantDetail: `"type":"object"`},
+			{name: "RootTypeOmitted", schema: `{"properties":{"a":{"type":"string"}}}`, wantDetail: `"type":"object"`},
+			{name: "RootBoolean", schema: `true`, wantDetail: "must be a JSON object"},
+			{name: "RemoteHTTPRef", schema: `{"type":"object","properties":{"a":{"$ref":"https://example.com/schema.json"}}}`, wantDetail: "fragment-local"},
+			{name: "RemoteFileRef", schema: `{"type":"object","properties":{"a":{"$ref":"file:///etc/passwd"}}}`, wantDetail: "fragment-local"},
+			{name: "RemoteDynamicRef", schema: `{"type":"object","properties":{"a":{"$dynamicRef":"https://example.com/x"}}}`, wantDetail: "fragment-local"},
+			{name: "RelativeDocumentRef", schema: `{"type":"object","allOf":[{"$ref":"other.json#/foo"}]}`, wantDetail: "fragment-local"},
+		}
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+				req, verr := structuredoutput.NewRequest(schemaFormat(tc.schema))
+				if tc.wantDetail == "" {
+					require.Nil(t, verr)
+					require.NotNil(t, req)
+					return
+				}
+				require.NotNil(t, verr)
+				require.Equal(t, "response_format.schema", verr.Field)
+				require.Contains(t, verr.Detail, tc.wantDetail)
+			})
+		}
 	})
 }
 
@@ -214,7 +101,7 @@ func TestTool(t *testing.T) {
 
 	newRequest := func(t *testing.T, schema string) *structuredoutput.Request {
 		t.Helper()
-		req, verr := structuredoutput.NewRequest(jsonSchemaFormat(schema))
+		req, verr := structuredoutput.NewRequest(schemaFormat(schema))
 		require.Nil(t, verr)
 		require.NotNil(t, req)
 		return req
@@ -258,8 +145,8 @@ func TestTool(t *testing.T) {
 
 	t.Run("InfoIncludesDescription", func(t *testing.T) {
 		t.Parallel()
-		format := jsonSchemaFormat(validSchema)
-		format.JSONSchema.Description = "a quarterly report"
+		format := schemaFormat(validSchema)
+		format.Description = "a quarterly report"
 		req, verr := structuredoutput.NewRequest(format)
 		require.Nil(t, verr)
 		info := structuredoutput.Tool(req).Info()
@@ -351,26 +238,21 @@ func TestTool(t *testing.T) {
 		fantasyschema.Normalize(inputSchema)
 
 		// The normalized tool-input schema validates the whole
-		// {"output": ...} argument object. ValidateOutput extracts
-		// the "output" property before validating, so nest the tool
-		// args under "output" once to reuse it for the check.
+		// {"output": ...} argument object. Build a finalizer for it
+		// and nest the tool args under "output" once so its Run
+		// validates them against the normalized schema.
 		normalized, err := json.Marshal(inputSchema)
 		require.NoError(t, err)
-		envelope, verr := structuredoutput.NewRequest(&codersdk.ChatResponseFormat{
-			Type: codersdk.ChatResponseFormatTypeJSONSchema,
-			JSONSchema: &codersdk.ChatResponseFormatJSONSchema{
-				Name:   "normalized_envelope",
-				Schema: normalized,
-			},
-		})
-		require.Nil(t, verr)
+		envelopeTool := structuredoutput.Tool(newRequest(t, string(normalized)))
 
 		validArgs := `{"output": {"name": null, "list": [1, "x"], "child": {"deep": "y"}}}`
 		invalidArgs := `{"output": {"child": {"deep": true}}}`
-		_, err = envelope.ValidateOutput([]byte(`{"output": ` + validArgs + `}`))
-		require.NoError(t, err, "normalized schema must accept what the original accepts")
-		_, err = envelope.ValidateOutput([]byte(`{"output": ` + invalidArgs + `}`))
-		require.Error(t, err, "normalized schema must reject what the original rejects")
+		resp, err := envelopeTool.Run(t.Context(), fantasy.ToolCall{Input: `{"output": ` + validArgs + `}`})
+		require.NoError(t, err)
+		require.False(t, resp.IsError, "normalized schema must accept what the original accepts")
+		resp, err = envelopeTool.Run(t.Context(), fantasy.ToolCall{Input: `{"output": ` + invalidArgs + `}`})
+		require.NoError(t, err)
+		require.True(t, resp.IsError, "normalized schema must reject what the original rejects")
 
 		// The Normalize mutation above must not corrupt the tool's
 		// own validation: Run validates against the compiled

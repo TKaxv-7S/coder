@@ -2,9 +2,6 @@ package chatd
 
 import (
 	"context"
-	"encoding/json"
-
-	"golang.org/x/xerrors"
 
 	"cdr.dev/slog/v3"
 	"github.com/coder/coder/v2/coderd/database"
@@ -23,37 +20,6 @@ This turn requires a structured final answer.
 - Call ` + structuredoutput.ToolName + ` alone, never batched with other tool calls.
 - If the tool returns a validation error, fix the listed fields and call it again.
 </structured_output>`
-
-// ExtractStructuredOutputValue returns the validated structured
-// output value from the active turn's persisted history: the Result
-// of the latest successful (non-error) coder_structured_output tool
-// result after the turn's trigger user message. The bool reports
-// whether such a result exists. This pins the recovery contract for
-// SDK clients: the tool-result part's Result field carries the
-// canonical validated JSON of the unwrapped "output" value.
-func ExtractStructuredOutputValue(messages []database.ChatMessage) (json.RawMessage, bool, error) {
-	start := activeTurnStart(messages)
-	for i := len(messages) - 1; i >= start; i-- {
-		msg := messages[i]
-		if msg.Deleted || msg.Compressed || msg.Role != database.ChatMessageRoleTool {
-			continue
-		}
-		parts, err := chatprompt.ParseContent(msg)
-		if err != nil {
-			return nil, false, xerrors.Errorf("parse tool message: %w", err)
-		}
-		for j := len(parts) - 1; j >= 0; j-- {
-			part := parts[j]
-			if part.Type != codersdk.ChatMessagePartTypeToolResult ||
-				part.ToolName != structuredoutput.ToolName ||
-				part.IsError {
-				continue
-			}
-			return part.Result, true, nil
-		}
-	}
-	return nil, false, nil
-}
 
 // activeTurnResponseFormat returns the active turn's structured
 // output request from the latest visible user message. It must

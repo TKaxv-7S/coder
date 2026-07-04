@@ -22,11 +22,8 @@ const testResponseFormatSchema = `{
 
 func testResponseFormat() codersdk.ChatResponseFormat {
 	return codersdk.ChatResponseFormat{
-		Type: codersdk.ChatResponseFormatTypeJSONSchema,
-		JSONSchema: &codersdk.ChatResponseFormatJSONSchema{
-			Name:   "test_answer",
-			Schema: json.RawMessage(testResponseFormatSchema),
-		},
+		Schema:      json.RawMessage(testResponseFormatSchema),
+		Description: "test answer",
 	}
 }
 
@@ -59,6 +56,20 @@ func textAssistantMessage(t *testing.T, id int64, text string) database.ChatMess
 	})
 }
 
+func finalizerCallMessage(t *testing.T, id int64, callID string, args string) database.ChatMessage {
+	t.Helper()
+	return chatMessageWithParts(t, id, database.ChatMessageRoleAssistant, []codersdk.ChatMessagePart{
+		codersdk.ChatMessageToolCall(callID, structuredoutput.ToolName, json.RawMessage(args)),
+	})
+}
+
+func finalizerResultMessage(t *testing.T, id int64, callID string, result string, isError bool) database.ChatMessage {
+	t.Helper()
+	return chatMessageWithParts(t, id, database.ChatMessageRoleTool, []codersdk.ChatMessagePart{
+		codersdk.ChatMessageToolResult(callID, structuredoutput.ToolName, json.RawMessage(result), isError, false),
+	})
+}
+
 func TestActiveTurnResponseFormat(t *testing.T) {
 	t.Parallel()
 
@@ -81,7 +92,7 @@ func TestActiveTurnResponseFormat(t *testing.T) {
 		}
 		req := activeTurnResponseFormat(ctx, logger, messages)
 		require.NotNil(t, req)
-		require.Equal(t, "test_answer", req.Name)
+		require.Equal(t, "test answer", req.Description)
 	})
 
 	t.Run("OlderTurnFormatIgnored", func(t *testing.T) {
@@ -140,7 +151,7 @@ func TestActiveTurnResponseFormat(t *testing.T) {
 	t.Run("LastPartWinsWithinMessage", func(t *testing.T) {
 		t.Parallel()
 		second := testResponseFormat()
-		second.JSONSchema.Name = "second_format"
+		second.Description = "second format"
 		msg := chatMessageWithParts(t, 1, database.ChatMessageRoleUser, []codersdk.ChatMessagePart{
 			codersdk.ChatMessageText("hello"),
 			codersdk.ChatMessageResponseFormat(format),
@@ -148,17 +159,13 @@ func TestActiveTurnResponseFormat(t *testing.T) {
 		})
 		req := activeTurnResponseFormat(ctx, logger, []database.ChatMessage{msg})
 		require.NotNil(t, req)
-		require.Equal(t, "second_format", req.Name)
+		require.Equal(t, "second format", req.Description)
 	})
 
 	t.Run("InvalidPersistedFormatIgnored", func(t *testing.T) {
 		t.Parallel()
 		invalid := codersdk.ChatResponseFormat{
-			Type: codersdk.ChatResponseFormatTypeJSONSchema,
-			JSONSchema: &codersdk.ChatResponseFormatJSONSchema{
-				Name:   "bad",
-				Schema: json.RawMessage(`{"type":"string"}`),
-			},
+			Schema: json.RawMessage(`{"type":"string"}`),
 		}
 		messages := []database.ChatMessage{
 			userMessageWithFormat(t, 1, "structured", &invalid),
@@ -167,78 +174,26 @@ func TestActiveTurnResponseFormat(t *testing.T) {
 	})
 }
 
-func TestExtractStructuredOutputValue(t *testing.T) {
-	t.Parallel()
-
-	format := testResponseFormat()
-	finalizerCall := func(id int64, callID string) database.ChatMessage {
-		return chatMessageWithParts(t, id, database.ChatMessageRoleAssistant, []codersdk.ChatMessagePart{
-			codersdk.ChatMessageToolCall(callID, structuredoutput.ToolName, json.RawMessage(`{"output":{"answer":"42"}}`)),
-		})
-	}
-	finalizerResult := func(id int64, callID string, result string, isError bool) database.ChatMessage {
-		return chatMessageWithParts(t, id, database.ChatMessageRoleTool, []codersdk.ChatMessagePart{
-			codersdk.ChatMessageToolResult(callID, structuredoutput.ToolName, json.RawMessage(result), isError, false),
-		})
-	}
-
-	t.Run("Found", func(t *testing.T) {
-		t.Parallel()
-		messages := []database.ChatMessage{
-			userMessageWithFormat(t, 1, "structured", &format),
-			finalizerCall(2, "call_1"),
-			finalizerResult(3, "call_1", `{"answer":"42"}`, false),
-		}
-		value, ok, err := ExtractStructuredOutputValue(messages)
-		require.NoError(t, err)
-		require.True(t, ok)
-		require.JSONEq(t, `{"answer":"42"}`, string(value))
-	})
-
-	t.Run("ErrorResultDoesNotCount", func(t *testing.T) {
-		t.Parallel()
-		messages := []database.ChatMessage{
-			userMessageWithFormat(t, 1, "structured", &format),
-			finalizerCall(2, "call_1"),
-			finalizerResult(3, "call_1", `{"error":"validation failed"}`, true),
-		}
-		_, ok, err := ExtractStructuredOutputValue(messages)
-		require.NoError(t, err)
-		require.False(t, ok)
-	})
-
-	t.Run("PreviousTurnResultIgnored", func(t *testing.T) {
-		t.Parallel()
-		messages := []database.ChatMessage{
-			userMessageWithFormat(t, 1, "structured", &format),
-			finalizerCall(2, "call_1"),
-			finalizerResult(3, "call_1", `{"answer":"old"}`, false),
-			userMessageWithFormat(t, 4, "again", &format),
-			textAssistantMessage(t, 5, "working"),
-		}
-		_, ok, err := ExtractStructuredOutputValue(messages)
-		require.NoError(t, err)
-		require.False(t, ok)
-	})
-}
-
 func TestDecideGenerationActionStructuredOutput(t *testing.T) {
 	t.Parallel()
 
 	format := testResponseFormat()
-	stopAfter := map[string]struct{}{structuredoutput.ToolName: {}}
+	// structuredDecision runs decideGenerationAction with the inputs
+	// prepareGeneration derives for a structured output turn.
+	structuredDecision := func(maxSteps int, messages []database.ChatMessage) (generationDecision, error) {
+		return decideGenerationAction(generationDecisionInput{
+			messages:                 messages,
+			stopAfterTools:           map[string]struct{}{structuredoutput.ToolName: {}},
+			structuredOutputRequired: true,
+			maxSteps:                 maxSteps,
+		})
+	}
 
 	t.Run("TextOnlyDoesNotFinish", func(t *testing.T) {
 		t.Parallel()
-		messages := []database.ChatMessage{
+		decision, err := structuredDecision(10, []database.ChatMessage{
 			userMessageWithFormat(t, 1, "structured", &format),
 			textAssistantMessage(t, 2, "here is your answer as text"),
-		}
-		decision, err := decideGenerationAction(generationDecisionInput{
-			messages:                 messages,
-			stopAfterTools:           stopAfter,
-			structuredOutputRequired: true,
-			maxSteps:                 10,
 		})
 		require.NoError(t, err)
 		require.Equal(t, generationActionGenerateAssistant, decision.kind)
@@ -246,12 +201,11 @@ func TestDecideGenerationActionStructuredOutput(t *testing.T) {
 
 	t.Run("TextOnlyFinishesWithoutStructuredOutput", func(t *testing.T) {
 		t.Parallel()
-		messages := []database.ChatMessage{
-			userMessageWithFormat(t, 1, "plain", nil),
-			textAssistantMessage(t, 2, "answer"),
-		}
 		decision, err := decideGenerationAction(generationDecisionInput{
-			messages: messages,
+			messages: []database.ChatMessage{
+				userMessageWithFormat(t, 1, "plain", nil),
+				textAssistantMessage(t, 2, "answer"),
+			},
 			maxSteps: 10,
 		})
 		require.NoError(t, err)
@@ -261,20 +215,10 @@ func TestDecideGenerationActionStructuredOutput(t *testing.T) {
 
 	t.Run("SuccessfulFinalizerFinishesTurn", func(t *testing.T) {
 		t.Parallel()
-		messages := []database.ChatMessage{
+		decision, err := structuredDecision(10, []database.ChatMessage{
 			userMessageWithFormat(t, 1, "structured", &format),
-			chatMessageWithParts(t, 2, database.ChatMessageRoleAssistant, []codersdk.ChatMessagePart{
-				codersdk.ChatMessageToolCall("call_1", structuredoutput.ToolName, json.RawMessage(`{"output":{"answer":"42"}}`)),
-			}),
-			chatMessageWithParts(t, 3, database.ChatMessageRoleTool, []codersdk.ChatMessagePart{
-				codersdk.ChatMessageToolResult("call_1", structuredoutput.ToolName, json.RawMessage(`{"answer":"42"}`), false, false),
-			}),
-		}
-		decision, err := decideGenerationAction(generationDecisionInput{
-			messages:                 messages,
-			stopAfterTools:           stopAfter,
-			structuredOutputRequired: true,
-			maxSteps:                 10,
+			finalizerCallMessage(t, 2, "call_1", `{"output":{"answer":"42"}}`),
+			finalizerResultMessage(t, 3, "call_1", `{"answer":"42"}`, false),
 		})
 		require.NoError(t, err)
 		require.Equal(t, generationActionFinishTurn, decision.kind)
@@ -283,20 +227,10 @@ func TestDecideGenerationActionStructuredOutput(t *testing.T) {
 
 	t.Run("ErrorFinalizerResultRetries", func(t *testing.T) {
 		t.Parallel()
-		messages := []database.ChatMessage{
+		decision, err := structuredDecision(10, []database.ChatMessage{
 			userMessageWithFormat(t, 1, "structured", &format),
-			chatMessageWithParts(t, 2, database.ChatMessageRoleAssistant, []codersdk.ChatMessagePart{
-				codersdk.ChatMessageToolCall("call_1", structuredoutput.ToolName, json.RawMessage(`{"output":{}}`)),
-			}),
-			chatMessageWithParts(t, 3, database.ChatMessageRoleTool, []codersdk.ChatMessagePart{
-				codersdk.ChatMessageToolResult("call_1", structuredoutput.ToolName, json.RawMessage(`{"error":"missing answer"}`), true, false),
-			}),
-		}
-		decision, err := decideGenerationAction(generationDecisionInput{
-			messages:                 messages,
-			stopAfterTools:           stopAfter,
-			structuredOutputRequired: true,
-			maxSteps:                 10,
+			finalizerCallMessage(t, 2, "call_1", `{"output":{}}`),
+			finalizerResultMessage(t, 3, "call_1", `{"error":"missing answer"}`, true),
 		})
 		require.NoError(t, err)
 		require.Equal(t, generationActionGenerateAssistant, decision.kind)
@@ -304,16 +238,10 @@ func TestDecideGenerationActionStructuredOutput(t *testing.T) {
 
 	t.Run("MaxStepsWithoutFinalizerFailsTerminally", func(t *testing.T) {
 		t.Parallel()
-		messages := []database.ChatMessage{
+		_, err := structuredDecision(2, []database.ChatMessage{
 			userMessageWithFormat(t, 1, "structured", &format),
 			textAssistantMessage(t, 2, "text one"),
 			textAssistantMessage(t, 3, "text two"),
-		}
-		_, err := decideGenerationAction(generationDecisionInput{
-			messages:                 messages,
-			stopAfterTools:           stopAfter,
-			structuredOutputRequired: true,
-			maxSteps:                 2,
 		})
 		require.Error(t, err)
 		require.True(t, isTerminalGeneration(err))
@@ -328,12 +256,7 @@ func TestDecideGenerationActionStructuredOutput(t *testing.T) {
 		for i := range maxStructuredOutputTextOnlySteps - 1 {
 			messages = append(messages, textAssistantMessage(t, int64(2+i), "plain text"))
 		}
-		decision, err := decideGenerationAction(generationDecisionInput{
-			messages:                 messages,
-			stopAfterTools:           stopAfter,
-			structuredOutputRequired: true,
-			maxSteps:                 100,
-		})
+		decision, err := structuredDecision(100, messages)
 		require.NoError(t, err)
 		require.Equal(t, generationActionGenerateAssistant, decision.kind)
 	})
@@ -346,12 +269,7 @@ func TestDecideGenerationActionStructuredOutput(t *testing.T) {
 		for i := range maxStructuredOutputTextOnlySteps {
 			messages = append(messages, textAssistantMessage(t, int64(2+i), "plain text"))
 		}
-		_, err := decideGenerationAction(generationDecisionInput{
-			messages:                 messages,
-			stopAfterTools:           stopAfter,
-			structuredOutputRequired: true,
-			maxSteps:                 100,
-		})
+		_, err := structuredDecision(100, messages)
 		require.Error(t, err)
 		require.True(t, isTerminalGeneration(err))
 		require.ErrorIs(t, err, errStructuredOutputNotProduced)
@@ -370,37 +288,27 @@ func TestDecideGenerationActionStructuredOutput(t *testing.T) {
 		}
 		next := int64(2 + maxStructuredOutputTextOnlySteps)
 		messages = append(messages,
-			chatMessageWithParts(t, next, database.ChatMessageRoleAssistant, []codersdk.ChatMessagePart{
-				codersdk.ChatMessageToolCall("call_1", structuredoutput.ToolName, json.RawMessage(`{"output":{}}`)),
-			}),
-			chatMessageWithParts(t, next+1, database.ChatMessageRoleTool, []codersdk.ChatMessagePart{
-				codersdk.ChatMessageToolResult("call_1", structuredoutput.ToolName, json.RawMessage(`{"error":"missing answer"}`), true, false),
-			}),
+			finalizerCallMessage(t, next, "call_1", `{"output":{}}`),
+			finalizerResultMessage(t, next+1, "call_1", `{"error":"missing answer"}`, true),
 			textAssistantMessage(t, next+2, "still plain text"),
 		)
-		decision, err := decideGenerationAction(generationDecisionInput{
-			messages:                 messages,
-			stopAfterTools:           stopAfter,
-			structuredOutputRequired: true,
-			maxSteps:                 100,
-		})
+		decision, err := structuredDecision(100, messages)
 		require.NoError(t, err)
 		require.Equal(t, generationActionGenerateAssistant, decision.kind)
 	})
 
 	t.Run("MaxStepsWithoutStructuredOutputFinishes", func(t *testing.T) {
 		t.Parallel()
-		messages := []database.ChatMessage{
-			userMessageWithFormat(t, 1, "plain", nil),
-			chatMessageWithParts(t, 2, database.ChatMessageRoleAssistant, []codersdk.ChatMessagePart{
-				codersdk.ChatMessageToolCall("call_1", "read_file", json.RawMessage(`{}`)),
-			}),
-			chatMessageWithParts(t, 3, database.ChatMessageRoleTool, []codersdk.ChatMessagePart{
-				codersdk.ChatMessageToolResult("call_1", "read_file", json.RawMessage(`{}`), false, false),
-			}),
-		}
 		decision, err := decideGenerationAction(generationDecisionInput{
-			messages: messages,
+			messages: []database.ChatMessage{
+				userMessageWithFormat(t, 1, "plain", nil),
+				chatMessageWithParts(t, 2, database.ChatMessageRoleAssistant, []codersdk.ChatMessagePart{
+					codersdk.ChatMessageToolCall("call_1", "read_file", json.RawMessage(`{}`)),
+				}),
+				chatMessageWithParts(t, 3, database.ChatMessageRoleTool, []codersdk.ChatMessagePart{
+					codersdk.ChatMessageToolResult("call_1", "read_file", json.RawMessage(`{}`), false, false),
+				}),
+			},
 			maxSteps: 1,
 		})
 		require.NoError(t, err)

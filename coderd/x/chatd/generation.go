@@ -240,11 +240,9 @@ func decideGenerationAction(input generationDecisionInput) (generationDecision, 
 		return generationDecision{}, err
 	}
 	// A structured output turn only finishes via the finalizer's
-	// stop-after result above. Text-only completion regenerates
-	// under required tool choice, but only within a short
-	// consecutive streak; past that (or when the step budget runs
-	// out) the turn fails terminally instead of succeeding via
-	// max_steps.
+	// stop-after result above. Text-only completion regenerates, but
+	// only within a short consecutive streak; past that or the step
+	// budget, the turn fails terminally.
 	if complete && !input.structuredOutputRequired {
 		return generationDecision{kind: generationActionFinishTurn, finishReason: generationFinishReasonComplete}, nil
 	}
@@ -650,9 +648,8 @@ func (s *taskStarter) generateAssistant(
 	defer closeEpisode()
 	runCtx := input.DebugTurn.Ensure(ctx, prepared.Chat, prepared.Debug)
 	// Structured output turns require a tool call on every step so
-	// the turn cannot end on plain text; success needs a validated
-	// finalizer result. Provider rejections of required tool choice
-	// surface as normal generation errors, never a silent downgrade.
+	// the turn cannot end on plain text; provider rejections surface
+	// as normal generation errors.
 	var toolChoice *fantasy.ToolChoice
 	if prepared.StructuredOutputRequired {
 		required := fantasy.ToolChoiceRequired

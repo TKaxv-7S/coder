@@ -167,8 +167,8 @@ func OverrideArbitraryJSONFields(ts *guts.Typescript) {
 	}
 	overrides := map[string]map[string]func() bindings.ExpressionType{
 		// JSON Schema documents; the server requires object roots.
-		"ChatResponseFormatJSONSchema": {"schema": jsonObject},
-		"DynamicTool":                  {"input_schema": jsonObject},
+		"ChatResponseFormat": {"schema": jsonObject},
+		"DynamicTool":        {"input_schema": jsonObject},
 		// Tool-call arguments are object-shaped by provider
 		// contract; results can be any JSON value (valid-JSON tool
 		// text passes through unwrapped).

@@ -506,8 +506,7 @@ func validateChatPlanMode(mode codersdk.ChatPlanMode) bool {
 // validateChatResponseFormat validates a request-level response
 // format against the turn's effective plan mode. On success it
 // returns the server-created response-format message part to append
-// to the user content, or nil when no structured output request is
-// active (format omitted or explicitly "text").
+// to the user content, or nil when the format is omitted.
 func validateChatResponseFormat(
 	format *codersdk.ChatResponseFormat,
 	effectivePlanMode database.NullChatPlanMode,
@@ -524,7 +523,7 @@ func validateChatResponseFormat(
 	}
 	if effectivePlanMode.Valid && effectivePlanMode.ChatPlanMode == database.ChatPlanModePlan {
 		return nil, &codersdk.Response{
-			Message: "response_format of type json_schema cannot be combined with plan mode.",
+			Message: "response_format cannot be combined with plan mode.",
 			Detail:  "Plan mode and structured output have conflicting turn-completion semantics.",
 		}
 	}

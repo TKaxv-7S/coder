@@ -53,9 +53,6 @@ const maxIntValue = int(^uint(0) >> 1)
 // success payload is a validated contract, such as the structured
 // output finalizer's canonical JSON: inserting a truncation marker
 // would corrupt the payload while it still persists as a success.
-// Exemption is bounded in practice because the model itself produced
-// the same bytes as tool-call arguments, which chat history already
-// persists untruncated alongside the result.
 type ResultTruncationExempter interface {
 	ExemptFromResultTruncation() bool
 }

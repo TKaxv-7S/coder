@@ -15884,47 +15884,15 @@
 		"codersdk.ChatResponseFormat": {
 			"type": "object",
 			"properties": {
-				"json_schema": {
-					"$ref": "#/definitions/codersdk.ChatResponseFormatJSONSchema"
-				},
-				"type": {
-					"enum": ["text", "json_schema"],
-					"allOf": [
-						{
-							"$ref": "#/definitions/codersdk.ChatResponseFormatType"
-						}
-					]
-				}
-			}
-		},
-		"codersdk.ChatResponseFormatJSONSchema": {
-			"type": "object",
-			"properties": {
 				"description": {
 					"description": "Description tells the model what the output is for. It is\nappended to the server's finalizer tool description.",
 					"type": "string"
 				},
-				"name": {
-					"description": "Name identifies the schema for the client. Metadata only; it\ndoes not change the tool the server uses to collect output.",
-					"type": "string"
-				},
 				"schema": {
-					"description": "Schema is a JSON Schema object. The root must have\n\"type\":\"object\"; wrap arrays or primitives in an object\nproperty. Any $ref values must be fragment-local (\"#...\").",
+					"description": "Schema is a JSON Schema object the turn's final output must\nsatisfy. The root must have \"type\":\"object\"; wrap arrays or\nprimitives in an object property. Any $ref values must be\nfragment-local (\"#...\").",
 					"type": "object"
-				},
-				"strict": {
-					"description": "Strict is accepted for wire compatibility with common\nresponse_format shapes. Only true (or omitted, which\ndefaults to true) is supported; false is rejected.",
-					"type": "boolean"
 				}
 			}
-		},
-		"codersdk.ChatResponseFormatType": {
-			"type": "string",
-			"enum": ["text", "json_schema"],
-			"x-enum-varnames": [
-				"ChatResponseFormatTypeText",
-				"ChatResponseFormatTypeJSONSchema"
-			]
 		},
 		"codersdk.ChatRetentionDaysResponse": {
 			"type": "object",

@@ -2886,38 +2886,18 @@ export interface ChatReasoningPart {
  * output that validates against the requested schema.
  */
 export interface ChatResponseFormat {
-	readonly type: ChatResponseFormatType;
-	readonly json_schema?: ChatResponseFormatJSONSchema;
-}
-
-// From codersdk/chats.go
-/**
- * ChatResponseFormatJSONSchema describes the JSON-schema-constrained
- * final output requested for a turn.
- */
-export interface ChatResponseFormatJSONSchema {
 	/**
-	 * Name identifies the schema for the client. Metadata only; it
-	 * does not change the tool the server uses to collect output.
+	 * Schema is a JSON Schema object the turn's final output must
+	 * satisfy. The root must have "type":"object"; wrap arrays or
+	 * primitives in an object property. Any $ref values must be
+	 * fragment-local ("#...").
 	 */
-	readonly name: string;
+	readonly schema: Record<string, unknown>;
 	/**
 	 * Description tells the model what the output is for. It is
 	 * appended to the server's finalizer tool description.
 	 */
 	readonly description?: string;
-	/**
-	 * Schema is a JSON Schema object. The root must have
-	 * "type":"object"; wrap arrays or primitives in an object
-	 * property. Any $ref values must be fragment-local ("#...").
-	 */
-	readonly schema: Record<string, unknown>;
-	/**
-	 * Strict is accepted for wire compatibility with common
-	 * response_format shapes. Only true (or omitted, which
-	 * defaults to true) is supported; false is rejected.
-	 */
-	readonly strict?: boolean;
 }
 
 // From codersdk/chats.go
@@ -2931,14 +2911,6 @@ export interface ChatResponseFormatPart {
 	 */
 	readonly response_format?: ChatResponseFormat;
 }
-
-// From codersdk/chats.go
-export type ChatResponseFormatType = "json_schema" | "text";
-
-export const ChatResponseFormatTypes: ChatResponseFormatType[] = [
-	"json_schema",
-	"text",
-];
 
 // From codersdk/chats.go
 /**

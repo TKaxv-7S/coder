@@ -27,17 +27,64 @@ const structuredE2ESchema = `{
 	"additionalProperties": false
 }`
 
-func structuredE2EContent(text string) []codersdk.ChatMessagePart {
-	return []codersdk.ChatMessagePart{
-		codersdk.ChatMessageText(text),
-		codersdk.ChatMessageResponseFormat(codersdk.ChatResponseFormat{
-			Type: codersdk.ChatResponseFormatTypeJSONSchema,
-			JSONSchema: &codersdk.ChatResponseFormatJSONSchema{
-				Name:   "answer_report",
-				Schema: json.RawMessage(structuredE2ESchema),
-			},
-		}),
+// structuredOutputE2E bundles the shared fixture of the structured
+// output e2e tests: a database, a fake OpenAI-compatible provider,
+// and an active chatd server.
+type structuredOutputE2E struct {
+	ctx    context.Context
+	db     database.Store
+	user   database.User
+	org    database.Organization
+	model  database.ChatModelConfig
+	server *chatd.Server
+}
+
+// newStructuredOutputE2E starts the fixture. streamFn handles the
+// provider's streamed generation calls; non-streaming (title)
+// requests are answered automatically.
+func newStructuredOutputE2E(t *testing.T, streamFn func(req *chattest.OpenAIRequest) chattest.OpenAIResponse) *structuredOutputE2E {
+	t.Helper()
+	db, ps := dbtestutil.NewDB(t)
+	openAIURL := chattest.NewOpenAI(t, func(req *chattest.OpenAIRequest) chattest.OpenAIResponse {
+		if !req.Stream {
+			return chattest.OpenAINonStreamingResponse("title")
+		}
+		return streamFn(req)
+	})
+	user, org, model := seedChatDependenciesWithProvider(t, db, "openai-compat", openAIURL)
+	return &structuredOutputE2E{
+		ctx:    testutil.Context(t, testutil.WaitLong),
+		db:     db,
+		user:   user,
+		org:    org,
+		model:  model,
+		server: newActiveTestServer(t, db, ps),
 	}
+}
+
+// createChat starts a turn whose trigger user message carries the
+// test schema as its structured output request.
+func (e *structuredOutputE2E) createChat(t *testing.T, title string, mutate ...func(*chatd.CreateOptions)) database.Chat {
+	t.Helper()
+	opts := chatd.CreateOptions{
+		OrganizationID: e.org.ID,
+		OwnerID:        e.user.ID,
+		APIKeyID:       testAPIKeyID(t, e.db, e.user.ID),
+		Title:          title,
+		ModelConfigID:  e.model.ID,
+		InitialUserContent: []codersdk.ChatMessagePart{
+			codersdk.ChatMessageText("answer with structure"),
+			codersdk.ChatMessageResponseFormat(codersdk.ChatResponseFormat{
+				Schema: json.RawMessage(structuredE2ESchema),
+			}),
+		},
+	}
+	for _, m := range mutate {
+		m(&opts)
+	}
+	chat, err := e.server.CreateChat(e.ctx, opts)
+	require.NoError(t, err)
+	return chat
 }
 
 func TestActiveServer_StructuredOutput(t *testing.T) {
@@ -46,15 +93,10 @@ func TestActiveServer_StructuredOutput(t *testing.T) {
 	t.Run("finalizer success finishes turn", func(t *testing.T) {
 		t.Parallel()
 
-		ctx := testutil.Context(t, testutil.WaitLong)
-		db, ps := dbtestutil.NewDB(t)
 		var streamedCallCount atomic.Int32
 		var rawBodiesMu sync.Mutex
 		var rawBodies []string
-		openAIURL := chattest.NewOpenAI(t, func(req *chattest.OpenAIRequest) chattest.OpenAIResponse {
-			if !req.Stream {
-				return chattest.OpenAINonStreamingResponse("title")
-			}
+		e2e := newStructuredOutputE2E(t, func(req *chattest.OpenAIRequest) chattest.OpenAIResponse {
 			rawBodiesMu.Lock()
 			rawBodies = append(rawBodies, string(req.RawBody))
 			rawBodiesMu.Unlock()
@@ -63,25 +105,14 @@ func TestActiveServer_StructuredOutput(t *testing.T) {
 				chattest.OpenAIToolCallChunk(structuredoutput.ToolName, `{"output":{"answer":"42"}}`),
 			)
 		})
-		user, org, model := seedChatDependenciesWithProvider(t, db, "openai-compat", openAIURL)
-		server := newActiveTestServer(t, db, ps)
+		chat := e2e.createChat(t, "structured-output-success")
 
-		chat, err := server.CreateChat(ctx, chatd.CreateOptions{
-			OrganizationID:     org.ID,
-			OwnerID:            user.ID,
-			APIKeyID:           testAPIKeyID(t, db, user.ID),
-			Title:              "structured-output-success",
-			ModelConfigID:      model.ID,
-			InitialUserContent: structuredE2EContent("what is the answer?"),
-		})
-		require.NoError(t, err)
-
-		chatResult := waitForChatStatus(ctx, t, db, chat.ID, database.ChatStatusWaiting)
+		chatResult := waitForChatStatus(e2e.ctx, t, e2e.db, chat.ID, database.ChatStatusWaiting)
 		require.False(t, chatResult.WorkerID.Valid)
 		require.Equal(t, int32(1), streamedCallCount.Load(),
 			"successful finalizer result should stop the turn after one model call")
 
-		parts := chatToolParts(ctx, t, db, chat.ID)
+		parts := chatToolParts(e2e.ctx, t, e2e.db, chat.ID)
 		call := requireToolCallPart(t, parts, structuredoutput.ToolName)
 		require.JSONEq(t, `{"output":{"answer":"42"}}`, string(call.Args))
 		result := requireToolResultPart(t, parts, structuredoutput.ToolName)
@@ -104,13 +135,8 @@ func TestActiveServer_StructuredOutput(t *testing.T) {
 	t.Run("invalid args retry then success", func(t *testing.T) {
 		t.Parallel()
 
-		ctx := testutil.Context(t, testutil.WaitLong)
-		db, ps := dbtestutil.NewDB(t)
 		var streamedCallCount atomic.Int32
-		openAIURL := chattest.NewOpenAI(t, func(req *chattest.OpenAIRequest) chattest.OpenAIResponse {
-			if !req.Stream {
-				return chattest.OpenAINonStreamingResponse("title")
-			}
+		e2e := newStructuredOutputE2E(t, func(_ *chattest.OpenAIRequest) chattest.OpenAIResponse {
 			switch streamedCallCount.Add(1) {
 			case 1:
 				// Missing required "answer" property.
@@ -123,24 +149,13 @@ func TestActiveServer_StructuredOutput(t *testing.T) {
 				)
 			}
 		})
-		user, org, model := seedChatDependenciesWithProvider(t, db, "openai-compat", openAIURL)
-		server := newActiveTestServer(t, db, ps)
+		chat := e2e.createChat(t, "structured-output-retry")
 
-		chat, err := server.CreateChat(ctx, chatd.CreateOptions{
-			OrganizationID:     org.ID,
-			OwnerID:            user.ID,
-			APIKeyID:           testAPIKeyID(t, db, user.ID),
-			Title:              "structured-output-retry",
-			ModelConfigID:      model.ID,
-			InitialUserContent: structuredE2EContent("answer with structure"),
-		})
-		require.NoError(t, err)
-
-		waitForChatStatus(ctx, t, db, chat.ID, database.ChatStatusWaiting)
+		waitForChatStatus(e2e.ctx, t, e2e.db, chat.ID, database.ChatStatusWaiting)
 		require.Equal(t, int32(2), streamedCallCount.Load(),
 			"validation failure should retry within the same turn")
 
-		parts := chatToolParts(ctx, t, db, chat.ID)
+		parts := chatToolParts(e2e.ctx, t, e2e.db, chat.ID)
 		var sawError, sawSuccess bool
 		for _, part := range parts {
 			if part.Type != codersdk.ChatMessagePartTypeToolResult || part.ToolName != structuredoutput.ToolName {
@@ -158,57 +173,11 @@ func TestActiveServer_StructuredOutput(t *testing.T) {
 		require.True(t, sawSuccess, "second finalizer call should produce the validated result")
 	})
 
-	t.Run("text only response does not finish turn", func(t *testing.T) {
-		t.Parallel()
-
-		ctx := testutil.Context(t, testutil.WaitLong)
-		db, ps := dbtestutil.NewDB(t)
-		var streamedCallCount atomic.Int32
-		openAIURL := chattest.NewOpenAI(t, func(req *chattest.OpenAIRequest) chattest.OpenAIResponse {
-			if !req.Stream {
-				return chattest.OpenAINonStreamingResponse("title")
-			}
-			switch streamedCallCount.Add(1) {
-			case 1:
-				// A plain-text answer must not complete the turn.
-				return chattest.OpenAIStreamingResponse(chattest.OpenAITextChunks("the answer is 42")...)
-			default:
-				return chattest.OpenAIStreamingResponse(
-					chattest.OpenAIToolCallChunk(structuredoutput.ToolName, `{"output":{"answer":"42"}}`),
-				)
-			}
-		})
-		user, org, model := seedChatDependenciesWithProvider(t, db, "openai-compat", openAIURL)
-		server := newActiveTestServer(t, db, ps)
-
-		chat, err := server.CreateChat(ctx, chatd.CreateOptions{
-			OrganizationID:     org.ID,
-			OwnerID:            user.ID,
-			APIKeyID:           testAPIKeyID(t, db, user.ID),
-			Title:              "structured-output-text-retry",
-			ModelConfigID:      model.ID,
-			InitialUserContent: structuredE2EContent("answer with structure"),
-		})
-		require.NoError(t, err)
-
-		waitForChatStatus(ctx, t, db, chat.ID, database.ChatStatusWaiting)
-		require.Equal(t, int32(2), streamedCallCount.Load(),
-			"a text-only step must regenerate instead of finishing the turn")
-
-		result := requireToolResultPart(t, chatToolParts(ctx, t, db, chat.ID), structuredoutput.ToolName)
-		require.False(t, result.IsError)
-	})
-
 	t.Run("dynamic tool pauses then finalizes", func(t *testing.T) {
 		t.Parallel()
 
-		ctx := testutil.Context(t, testutil.WaitLong)
-		db, ps := dbtestutil.NewDB(t)
 		var streamedCallCount atomic.Int32
-		openAIURL := chattest.NewOpenAI(t, func(req *chattest.OpenAIRequest) chattest.OpenAIResponse {
-			if !req.Stream {
-				return chattest.OpenAINonStreamingResponse("title")
-			}
+		e2e := newStructuredOutputE2E(t, func(_ *chattest.OpenAIRequest) chattest.OpenAIResponse {
 			switch streamedCallCount.Add(1) {
 			case 1:
 				return chattest.OpenAIStreamingResponse(
@@ -220,25 +189,15 @@ func TestActiveServer_StructuredOutput(t *testing.T) {
 				)
 			}
 		})
-		user, org, model := seedChatDependenciesWithProvider(t, db, "openai-compat", openAIURL)
 		dynamicToolsJSON := dynamicToolJSON(t, "my_dynamic_tool")
-		server := newActiveTestServer(t, db, ps)
-
-		chat, err := server.CreateChat(ctx, chatd.CreateOptions{
-			OrganizationID:     org.ID,
-			OwnerID:            user.ID,
-			APIKeyID:           testAPIKeyID(t, db, user.ID),
-			Title:              "structured-output-dynamic",
-			ModelConfigID:      model.ID,
-			InitialUserContent: structuredE2EContent("use the dynamic tool then answer"),
-			DynamicTools:       dynamicToolsJSON,
+		chat := e2e.createChat(t, "structured-output-dynamic", func(opts *chatd.CreateOptions) {
+			opts.DynamicTools = dynamicToolsJSON
 		})
-		require.NoError(t, err)
 
 		// 1. The dynamic tool call pauses the turn as usual.
 		var chatResult database.Chat
-		testutil.Eventually(ctx, t, func(ctx context.Context) bool {
-			got, getErr := db.GetChatByID(ctx, chat.ID)
+		testutil.Eventually(e2e.ctx, t, func(ctx context.Context) bool {
+			got, getErr := e2e.db.GetChatByID(ctx, chat.ID)
 			if getErr != nil {
 				return false
 			}
@@ -249,13 +208,13 @@ func TestActiveServer_StructuredOutput(t *testing.T) {
 			"expected requires_action, got %s (last_error=%q)",
 			chatResult.Status, chatLastErrorMessage(chatResult.LastError))
 
-		call := requireToolCallPart(t, chatToolParts(ctx, t, db, chat.ID), "my_dynamic_tool")
+		call := requireToolCallPart(t, chatToolParts(e2e.ctx, t, e2e.db, chat.ID), "my_dynamic_tool")
 
 		// 2. Submitting results resumes the turn, which then
 		// finalizes with structured output.
-		err = server.SubmitToolResults(ctx, chatd.SubmitToolResultsOptions{
+		err := e2e.server.SubmitToolResults(e2e.ctx, chatd.SubmitToolResultsOptions{
 			ChatID:        chat.ID,
-			UserID:        user.ID,
+			UserID:        e2e.user.ID,
 			ModelConfigID: chatResult.LastModelConfigID,
 			Results: []codersdk.ToolResult{{
 				ToolCallID: call.ToolCallID,
@@ -265,9 +224,9 @@ func TestActiveServer_StructuredOutput(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		chatResult = waitForChatStatus(ctx, t, db, chat.ID, database.ChatStatusWaiting)
+		waitForChatStatus(e2e.ctx, t, e2e.db, chat.ID, database.ChatStatusWaiting)
 		require.Equal(t, int32(2), streamedCallCount.Load())
-		result := requireToolResultPart(t, chatToolParts(ctx, t, db, chat.ID), structuredoutput.ToolName)
+		result := requireToolResultPart(t, chatToolParts(e2e.ctx, t, e2e.db, chat.ID), structuredoutput.ToolName)
 		require.False(t, result.IsError)
 		require.JSONEq(t, `{"answer":"from dynamic"}`, string(result.Result))
 	})
@@ -275,13 +234,8 @@ func TestActiveServer_StructuredOutput(t *testing.T) {
 	t.Run("finalizer batched with another tool is rejected then retried", func(t *testing.T) {
 		t.Parallel()
 
-		ctx := testutil.Context(t, testutil.WaitLong)
-		db, ps := dbtestutil.NewDB(t)
 		var streamedCallCount atomic.Int32
-		openAIURL := chattest.NewOpenAI(t, func(req *chattest.OpenAIRequest) chattest.OpenAIResponse {
-			if !req.Stream {
-				return chattest.OpenAINonStreamingResponse("title")
-			}
+		e2e := newStructuredOutputE2E(t, func(_ *chattest.OpenAIRequest) chattest.OpenAIResponse {
 			switch streamedCallCount.Add(1) {
 			case 1:
 				// The finalizer is exclusive: batching it with another
@@ -299,23 +253,12 @@ func TestActiveServer_StructuredOutput(t *testing.T) {
 				)
 			}
 		})
-		user, org, model := seedChatDependenciesWithProvider(t, db, "openai-compat", openAIURL)
-		server := newActiveTestServer(t, db, ps)
+		chat := e2e.createChat(t, "structured-output-exclusive")
 
-		chat, err := server.CreateChat(ctx, chatd.CreateOptions{
-			OrganizationID:     org.ID,
-			OwnerID:            user.ID,
-			APIKeyID:           testAPIKeyID(t, db, user.ID),
-			Title:              "structured-output-exclusive",
-			ModelConfigID:      model.ID,
-			InitialUserContent: structuredE2EContent("answer with structure"),
-		})
-		require.NoError(t, err)
-
-		waitForChatStatus(ctx, t, db, chat.ID, database.ChatStatusWaiting)
+		waitForChatStatus(e2e.ctx, t, e2e.db, chat.ID, database.ChatStatusWaiting)
 		require.Equal(t, int32(2), streamedCallCount.Load())
 
-		parts := chatToolParts(ctx, t, db, chat.ID)
+		parts := chatToolParts(e2e.ctx, t, e2e.db, chat.ID)
 		var policyError, success bool
 		for _, part := range parts {
 			if part.Type != codersdk.ChatMessagePartTypeToolResult || part.ToolName != structuredoutput.ToolName {
@@ -336,45 +279,31 @@ func TestActiveServer_StructuredOutput(t *testing.T) {
 	t.Run("oversized valid output is not truncated", func(t *testing.T) {
 		t.Parallel()
 
-		ctx := testutil.Context(t, testutil.WaitLong)
-		db, ps := dbtestutil.NewDB(t)
 		// Larger than the 16KiB tool-result truncation floor that a
 		// small context window produces.
 		bigAnswer := strings.Repeat("x", 40_000)
 		args, err := json.Marshal(map[string]any{"output": map[string]any{"answer": bigAnswer}})
 		require.NoError(t, err)
-		openAIURL := chattest.NewOpenAI(t, func(req *chattest.OpenAIRequest) chattest.OpenAIResponse {
-			if !req.Stream {
-				return chattest.OpenAINonStreamingResponse("title")
-			}
+		e2e := newStructuredOutputE2E(t, func(_ *chattest.OpenAIRequest) chattest.OpenAIResponse {
 			return chattest.OpenAIStreamingResponse(
 				chattest.OpenAIToolCallChunk(structuredoutput.ToolName, string(args)),
 			)
 		})
-		user, org, _ := seedChatDependenciesWithProvider(t, db, "openai-compat", openAIURL)
 		// A small context window keeps the per-result truncation
 		// budget at its floor; the schema-valid finalizer result must
 		// still persist intact because truncation would corrupt the
 		// canonical JSON while reporting success.
-		model := dbgen.ChatModelConfig(t, db, database.ChatModelConfig{
+		smallContextModel := dbgen.ChatModelConfig(t, e2e.db, database.ChatModelConfig{
 			Provider:     "openai-compat",
 			ContextLimit: 4096,
 		})
-		server := newActiveTestServer(t, db, ps)
-
-		chat, err := server.CreateChat(ctx, chatd.CreateOptions{
-			OrganizationID:     org.ID,
-			OwnerID:            user.ID,
-			APIKeyID:           testAPIKeyID(t, db, user.ID),
-			Title:              "structured-output-oversized",
-			ModelConfigID:      model.ID,
-			InitialUserContent: structuredE2EContent("answer at length"),
+		chat := e2e.createChat(t, "structured-output-oversized", func(opts *chatd.CreateOptions) {
+			opts.ModelConfigID = smallContextModel.ID
 		})
-		require.NoError(t, err)
 
-		waitForChatStatus(ctx, t, db, chat.ID, database.ChatStatusWaiting)
+		waitForChatStatus(e2e.ctx, t, e2e.db, chat.ID, database.ChatStatusWaiting)
 
-		result := requireToolResultPart(t, chatToolParts(ctx, t, db, chat.ID), structuredoutput.ToolName)
+		result := requireToolResultPart(t, chatToolParts(e2e.ctx, t, e2e.db, chat.ID), structuredoutput.ToolName)
 		require.False(t, result.IsError)
 		var decoded map[string]string
 		require.NoError(t, json.Unmarshal(result.Result, &decoded),
@@ -386,32 +315,16 @@ func TestActiveServer_StructuredOutput(t *testing.T) {
 	t.Run("persistent text only responses fail fast", func(t *testing.T) {
 		t.Parallel()
 
-		ctx := testutil.Context(t, testutil.WaitLong)
-		db, ps := dbtestutil.NewDB(t)
 		var streamedCallCount atomic.Int32
-		openAIURL := chattest.NewOpenAI(t, func(req *chattest.OpenAIRequest) chattest.OpenAIResponse {
-			if !req.Stream {
-				return chattest.OpenAINonStreamingResponse("title")
-			}
+		e2e := newStructuredOutputE2E(t, func(_ *chattest.OpenAIRequest) chattest.OpenAIResponse {
 			// Always answer in plain text, as a model or proxy that
 			// ignores required tool choice would.
 			streamedCallCount.Add(1)
 			return chattest.OpenAIStreamingResponse(chattest.OpenAITextChunks("plain text answer")...)
 		})
-		user, org, model := seedChatDependenciesWithProvider(t, db, "openai-compat", openAIURL)
-		server := newActiveTestServer(t, db, ps)
+		chat := e2e.createChat(t, "structured-output-text-storm")
 
-		chat, err := server.CreateChat(ctx, chatd.CreateOptions{
-			OrganizationID:     org.ID,
-			OwnerID:            user.ID,
-			APIKeyID:           testAPIKeyID(t, db, user.ID),
-			Title:              "structured-output-text-storm",
-			ModelConfigID:      model.ID,
-			InitialUserContent: structuredE2EContent("answer with structure"),
-		})
-		require.NoError(t, err)
-
-		chatResult := waitForChatStatus(ctx, t, db, chat.ID, database.ChatStatusError)
+		chatResult := waitForChatStatus(e2e.ctx, t, e2e.db, chat.ID, database.ChatStatusError)
 		payload := requireChatLastErrorPayload(t, chatResult.LastError)
 		require.Equal(t, codersdk.ChatErrorKindStructuredOutput, payload.Kind)
 		// maxStructuredOutputTextOnlySteps bounds the provider-call

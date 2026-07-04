@@ -1839,21 +1839,18 @@ func decodeNulInParts(parts []codersdk.ChatMessagePart) {
 
 // mapNulInResponseFormat applies NUL string/JSON mapping to the
 // caller-controlled fields of a response-format part. It returns a
-// deep copy so the caller's struct is never mutated (the part copy
-// in encodeNulInParts is shallow and shares the pointer).
+// copy so the caller's struct is never mutated (the part copy in
+// encodeNulInParts is shallow and shares the pointer).
 func mapNulInResponseFormat(
 	format *codersdk.ChatResponseFormat,
 	mapString func(string) string,
 	mapJSON func(json.RawMessage) json.RawMessage,
 ) *codersdk.ChatResponseFormat {
-	if format == nil || format.JSONSchema == nil {
-		return format
+	if format == nil {
+		return nil
 	}
 	mapped := *format
-	schema := *format.JSONSchema
-	schema.Name = mapString(schema.Name)
-	schema.Description = mapString(schema.Description)
-	schema.Schema = mapJSON(schema.Schema)
-	mapped.JSONSchema = &schema
+	mapped.Schema = mapJSON(mapped.Schema)
+	mapped.Description = mapString(mapped.Description)
 	return &mapped
 }

@@ -2725,13 +2725,8 @@ AuthorizationObject can represent a "set" of objects, such as: all workspaces in
         0
       ],
       "response_format": {
-        "json_schema": {
-          "description": "string",
-          "name": "string",
-          "schema": {},
-          "strict": true
-        },
-        "type": "text"
+        "description": "string",
+        "schema": {}
       },
       "result": {},
       "result_delta": "string",
@@ -2826,13 +2821,8 @@ AuthorizationObject can represent a "set" of objects, such as: all workspaces in
     0
   ],
   "response_format": {
-    "json_schema": {
-      "description": "string",
-      "name": "string",
-      "schema": {},
-      "strict": true
-    },
-    "type": "text"
+    "description": "string",
+    "schema": {}
   },
   "result": {},
   "result_delta": "string",
@@ -3003,13 +2993,8 @@ AuthorizationObject can represent a "set" of objects, such as: all workspaces in
             0
           ],
           "response_format": {
-            "json_schema": {
-              "description": "string",
-              "name": "string",
-              "schema": {},
-              "strict": true
-            },
-            "type": "text"
+            "description": "string",
+            "schema": {}
           },
           "result": {},
           "result_delta": "string",
@@ -3091,13 +3076,8 @@ AuthorizationObject can represent a "set" of objects, such as: all workspaces in
             0
           ],
           "response_format": {
-            "json_schema": {
-              "description": "string",
-              "name": "string",
-              "schema": {},
-              "strict": true
-            },
-            "type": "text"
+            "description": "string",
+            "schema": {}
           },
           "result": {},
           "result_delta": "string",
@@ -3326,13 +3306,8 @@ AuthorizationObject can represent a "set" of objects, such as: all workspaces in
         0
       ],
       "response_format": {
-        "json_schema": {
-          "description": "string",
-          "name": "string",
-          "schema": {},
-          "strict": true
-        },
-        "type": "text"
+        "description": "string",
+        "schema": {}
       },
       "result": {},
       "result_delta": "string",
@@ -3371,62 +3346,17 @@ AuthorizationObject can represent a "set" of objects, such as: all workspaces in
 
 ```json
 {
-  "json_schema": {
-    "description": "string",
-    "name": "string",
-    "schema": {},
-    "strict": true
-  },
-  "type": "text"
-}
-```
-
-### Properties
-
-| Name          | Type                                                                           | Required | Restrictions | Description |
-|---------------|--------------------------------------------------------------------------------|----------|--------------|-------------|
-| `json_schema` | [codersdk.ChatResponseFormatJSONSchema](#codersdkchatresponseformatjsonschema) | false    |              |             |
-| `type`        | [codersdk.ChatResponseFormatType](#codersdkchatresponseformattype)             | false    |              |             |
-
-#### Enumerated Values
-
-| Property | Value(s)              |
-|----------|-----------------------|
-| `type`   | `json_schema`, `text` |
-
-## codersdk.ChatResponseFormatJSONSchema
-
-```json
-{
   "description": "string",
-  "name": "string",
-  "schema": {},
-  "strict": true
+  "schema": {}
 }
 ```
 
 ### Properties
 
-| Name          | Type    | Required | Restrictions | Description                                                                                                                                                           |
-|---------------|---------|----------|--------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `description` | string  | false    |              | Description tells the model what the output is for. It is appended to the server's finalizer tool description.                                                        |
-| `name`        | string  | false    |              | Name identifies the schema for the client. Metadata only; it does not change the tool the server uses to collect output.                                              |
-| `schema`      | object  | false    |              | Schema is a JSON Schema object. The root must have "type":"object"; wrap arrays or primitives in an object property. Any $ref values must be fragment-local ("#..."). |
-| `strict`      | boolean | false    |              | Strict is accepted for wire compatibility with common response_format shapes. Only true (or omitted, which defaults to true) is supported; false is rejected.         |
-
-## codersdk.ChatResponseFormatType
-
-```json
-"text"
-```
-
-### Properties
-
-#### Enumerated Values
-
-| Value(s)              |
-|-----------------------|
-| `json_schema`, `text` |
+| Name          | Type   | Required | Restrictions | Description                                                                                                                                                                                                |
+|---------------|--------|----------|--------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `description` | string | false    |              | Description tells the model what the output is for. It is appended to the server's finalizer tool description.                                                                                             |
+| `schema`      | object | false    |              | Schema is a JSON Schema object the turn's final output must satisfy. The root must have "type":"object"; wrap arrays or primitives in an object property. Any $ref values must be fragment-local ("#..."). |
 
 ## codersdk.ChatRetentionDaysResponse
 
@@ -3558,13 +3488,8 @@ AuthorizationObject can represent a "set" of objects, such as: all workspaces in
           0
         ],
         "response_format": {
-          "json_schema": {
-            "description": "string",
-            "name": "string",
-            "schema": {},
-            "strict": true
-          },
-          "type": "text"
+          "description": "string",
+          "schema": {}
         },
         "result": {},
         "result_delta": "string",
@@ -3644,13 +3569,8 @@ AuthorizationObject can represent a "set" of objects, such as: all workspaces in
         0
       ],
       "response_format": {
-        "json_schema": {
-          "description": "string",
-          "name": "string",
-          "schema": {},
-          "strict": true
-        },
-        "type": "text"
+        "description": "string",
+        "schema": {}
       },
       "result": {},
       "result_delta": "string",
@@ -3718,13 +3638,8 @@ AuthorizationObject can represent a "set" of objects, such as: all workspaces in
             0
           ],
           "response_format": {
-            "json_schema": {
-              "description": "string",
-              "name": "string",
-              "schema": {},
-              "strict": true
-            },
-            "type": "text"
+            "description": "string",
+            "schema": {}
           },
           "result": {},
           "result_delta": "string",
@@ -3841,13 +3756,8 @@ AuthorizationObject can represent a "set" of objects, such as: all workspaces in
       0
     ],
     "response_format": {
-      "json_schema": {
-        "description": "string",
-        "name": "string",
-        "schema": {},
-        "strict": true
-      },
-      "type": "text"
+      "description": "string",
+      "schema": {}
     },
     "result": {},
     "result_delta": "string",
@@ -4474,13 +4384,8 @@ AuthorizationObject can represent a "set" of objects, such as: all workspaces in
   "model_config_id": "f5fb4d91-62ca-4377-9ee6-5d43ba00d205",
   "plan_mode": "plan",
   "response_format": {
-    "json_schema": {
-      "description": "string",
-      "name": "string",
-      "schema": {},
-      "strict": true
-    },
-    "type": "text"
+    "description": "string",
+    "schema": {}
   }
 }
 ```
@@ -4552,13 +4457,8 @@ AuthorizationObject can represent a "set" of objects, such as: all workspaces in
           0
         ],
         "response_format": {
-          "json_schema": {
-            "description": "string",
-            "name": "string",
-            "schema": {},
-            "strict": true
-          },
-          "type": "text"
+          "description": "string",
+          "schema": {}
         },
         "result": {},
         "result_delta": "string",
@@ -4639,13 +4539,8 @@ AuthorizationObject can represent a "set" of objects, such as: all workspaces in
           0
         ],
         "response_format": {
-          "json_schema": {
-            "description": "string",
-            "name": "string",
-            "schema": {},
-            "strict": true
-          },
-          "type": "text"
+          "description": "string",
+          "schema": {}
         },
         "result": {},
         "result_delta": "string",
@@ -4710,13 +4605,8 @@ AuthorizationObject can represent a "set" of objects, such as: all workspaces in
   "organization_id": "7c60d51f-b44e-4682-87d6-449835ea4de6",
   "plan_mode": "plan",
   "response_format": {
-    "json_schema": {
-      "description": "string",
-      "name": "string",
-      "schema": {},
-      "strict": true
-    },
-    "type": "text"
+    "description": "string",
+    "schema": {}
   },
   "system_prompt": "string",
   "unsafe_dynamic_tools": [
@@ -7094,13 +6984,8 @@ CreateWorkspaceRequest provides options for creating a new workspace. Only one o
           0
         ],
         "response_format": {
-          "json_schema": {
-            "description": "string",
-            "name": "string",
-            "schema": {},
-            "strict": true
-          },
-          "type": "text"
+          "description": "string",
+          "schema": {}
         },
         "result": {},
         "result_delta": "string",

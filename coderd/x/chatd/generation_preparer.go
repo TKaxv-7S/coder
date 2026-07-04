@@ -458,9 +458,9 @@ func (server *Server) prepareGeneration(
 		structuredOutputReq = activeTurnResponseFormat(ctx, logger, input.Messages)
 	}
 	if structuredOutputReq != nil {
-		// Appending before the builtinToolNames capture below makes
-		// appendDynamicTools' builtin precedence protect the
-		// finalizer name against dynamic tool collisions.
+		// Appended before the builtinToolNames capture below so
+		// builtin precedence protects the finalizer name against
+		// dynamic tool collisions.
 		tools = append(tools, structuredoutput.Tool(structuredOutputReq))
 		if exclusiveToolNames == nil {
 			exclusiveToolNames = map[string]bool{}

@@ -294,8 +294,7 @@ export const parseMessageContent = (
 				break;
 			}
 			case "response-format": {
-				// Response-format parts are structured output request
-				// metadata; they are not rendered in the timeline.
+				// Structured output request metadata; not rendered.
 				break;
 			}
 			default: {

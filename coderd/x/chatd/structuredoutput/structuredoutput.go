@@ -1,13 +1,10 @@
 // Package structuredoutput implements server-validated structured
-// final output for chat turns.
-//
-// A caller opts in by sending a response_format of type json_schema
-// on CreateChatRequest or CreateChatMessageRequest. chatd then runs
-// the normal agent loop but injects a server-owned finalizer tool
-// (ToolName) that the model must call to end the turn. The tool
-// validates the model's arguments against the caller's JSON schema;
-// the turn only finishes successfully once a validated result
-// exists. The finalizer is an implementation detail: the API
+// final output for chat turns. A caller opts in by sending a
+// response_format schema on a chat request; chatd runs the normal
+// agent loop but injects a server-owned finalizer tool (ToolName)
+// that validates the model's arguments against the caller's JSON
+// schema, and the turn only finishes successfully once a validated
+// result exists. The finalizer is an implementation detail: the API
 // guarantee is server-validated output, not provider-native
 // constrained decoding.
 package structuredoutput
@@ -18,7 +15,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
-	"regexp"
 	"slices"
 	"strings"
 
@@ -34,8 +30,8 @@ import (
 // HTTP layer and enforces builtin precedence at generation time.
 const ToolName = "coder_structured_output"
 
-// MaxSchemaBytes caps the caller-provided JSON schema size.
-const MaxSchemaBytes = 16 * 1024
+// maxSchemaBytes caps the caller-provided JSON schema size.
+const maxSchemaBytes = 16 * 1024
 
 // outputProperty is the single top-level argument of the finalizer
 // tool. The caller schema is nested under it because fantasy tool
@@ -43,102 +39,48 @@ const MaxSchemaBytes = 16 * 1024
 // implicit root object schema.
 const outputProperty = "output"
 
-var namePattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
-
 // Request is a normalized, validated structured output request
 // active for one assistant turn.
 type Request struct {
-	Name        string
 	Description string
-	Schema      json.RawMessage
 
-	// schemaMap is the decoded Schema object, parsed once during
+	// schemaMap is the decoded schema object, parsed once during
 	// NewRequest so tool definitions never reparse the raw bytes.
 	schemaMap map[string]any
 	compiled  *jsonschema.Schema
 }
 
-// Validate checks a request-level response_format. A nil format is
-// valid (structured output not requested). It returns a
-// *codersdk.ValidationError so HTTP handlers can produce
-// field-specific 400s.
-func Validate(format *codersdk.ChatResponseFormat) *codersdk.ValidationError {
-	_, err := NewRequest(format)
-	return err
-}
-
 // NewRequest validates format and compiles its schema. It returns
-// (nil, nil) when format is nil or explicitly "text" with no schema
-// payload, i.e. when the turn has no structured output request.
+// (nil, nil) when format is nil, i.e. when the turn has no
+// structured output request. Validation errors carry field names so
+// HTTP handlers can produce field-specific 400s.
 func NewRequest(format *codersdk.ChatResponseFormat) (*Request, *codersdk.ValidationError) {
 	if format == nil {
 		return nil, nil
 	}
-	switch format.Type {
-	case codersdk.ChatResponseFormatTypeText:
-		if format.JSONSchema != nil {
-			return nil, &codersdk.ValidationError{
-				Field:  "response_format.json_schema",
-				Detail: `must not be set when type is "text".`,
-			}
-		}
-		return nil, nil
-	case codersdk.ChatResponseFormatTypeJSONSchema:
-		// Validated below.
-	case "":
+	if len(format.Schema) == 0 {
 		return nil, &codersdk.ValidationError{
-			Field:  "response_format.type",
-			Detail: `is required; must be "text" or "json_schema".`,
-		}
-	default:
-		return nil, &codersdk.ValidationError{
-			Field:  "response_format.type",
-			Detail: fmt.Sprintf(`unsupported value %q; must be "text" or "json_schema".`, format.Type),
-		}
-	}
-
-	js := format.JSONSchema
-	if js == nil {
-		return nil, &codersdk.ValidationError{
-			Field:  "response_format.json_schema",
-			Detail: `is required when type is "json_schema".`,
-		}
-	}
-	if !namePattern.MatchString(js.Name) {
-		return nil, &codersdk.ValidationError{
-			Field:  "response_format.json_schema.name",
-			Detail: "must match ^[A-Za-z0-9_-]{1,64}$.",
-		}
-	}
-	if js.Strict != nil && !*js.Strict {
-		return nil, &codersdk.ValidationError{
-			Field:  "response_format.json_schema.strict",
-			Detail: "strict=false is not supported yet; omit strict or set it to true.",
-		}
-	}
-	if len(js.Schema) == 0 {
-		return nil, &codersdk.ValidationError{
-			Field:  "response_format.json_schema.schema",
+			Field:  "response_format.schema",
 			Detail: "is required.",
 		}
 	}
-	if len(js.Schema) > MaxSchemaBytes {
+	if len(format.Schema) > maxSchemaBytes {
 		return nil, &codersdk.ValidationError{
-			Field:  "response_format.json_schema.schema",
-			Detail: fmt.Sprintf("exceeds the maximum size of %d bytes.", MaxSchemaBytes),
+			Field:  "response_format.schema",
+			Detail: fmt.Sprintf("exceeds the maximum size of %d bytes.", maxSchemaBytes),
 		}
 	}
 
 	var root map[string]any
-	if err := json.Unmarshal(js.Schema, &root); err != nil {
+	if err := json.Unmarshal(format.Schema, &root); err != nil {
 		return nil, &codersdk.ValidationError{
-			Field:  "response_format.json_schema.schema",
+			Field:  "response_format.schema",
 			Detail: "must be a JSON object.",
 		}
 	}
 	if rootType, _ := root["type"].(string); rootType != "object" {
 		return nil, &codersdk.ValidationError{
-			Field:  "response_format.json_schema.schema",
+			Field:  "response_format.schema",
 			Detail: `root must declare "type":"object"; wrap arrays or primitives in an object property.`,
 		}
 	}
@@ -146,18 +88,16 @@ func NewRequest(format *codersdk.ChatResponseFormat) (*Request, *codersdk.Valida
 		return nil, refErr
 	}
 
-	compiled, err := compileSchema(js.Schema)
+	compiled, err := compileSchema(format.Schema)
 	if err != nil {
 		return nil, &codersdk.ValidationError{
-			Field:  "response_format.json_schema.schema",
+			Field:  "response_format.schema",
 			Detail: fmt.Sprintf("failed to compile: %v.", err),
 		}
 	}
 
 	return &Request{
-		Name:        js.Name,
-		Description: js.Description,
-		Schema:      js.Schema,
+		Description: format.Description,
 		schemaMap:   root,
 		compiled:    compiled,
 	}, nil
@@ -192,7 +132,7 @@ func validateFragmentOnlyRefs(node any) *codersdk.ValidationError {
 				ref, ok := child.(string)
 				if !ok || !strings.HasPrefix(ref, "#") {
 					return &codersdk.ValidationError{
-						Field:  "response_format.json_schema.schema",
+						Field:  "response_format.schema",
 						Detail: fmt.Sprintf(`%s values must be fragment-local (start with "#"); got %v.`, key, child),
 					}
 				}
@@ -269,7 +209,7 @@ func copyJSONAny(value any) any {
 }
 
 func (t *finalizerTool) Run(_ context.Context, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
-	canonical, err := t.req.ValidateOutput([]byte(call.Input))
+	canonical, err := t.req.validateOutput([]byte(call.Input))
 	if err != nil {
 		return fantasy.NewTextErrorResponse(err.Error()), nil
 	}
@@ -279,11 +219,8 @@ func (t *finalizerTool) Run(_ context.Context, call fantasy.ToolCall) (fantasy.T
 // ExemptFromResultTruncation implements chatloop's
 // ResultTruncationExempter: a successful finalizer result is the
 // canonical validated JSON of the output value, and truncating it
-// would corrupt the payload while still persisting it as a success,
-// breaking the recovery contract. The exposure is bounded because the
-// model already emitted the same bytes as tool-call arguments (which
-// history persists untruncated) and a successful result stops the
-// turn immediately. Error results are still truncated by chatloop.
+// would corrupt the payload while persisting it as a success. Error
+// results are still truncated by chatloop.
 func (*finalizerTool) ExemptFromResultTruncation() bool { return true }
 
 func (t *finalizerTool) ProviderOptions() fantasy.ProviderOptions {
@@ -294,11 +231,11 @@ func (t *finalizerTool) SetProviderOptions(opts fantasy.ProviderOptions) {
 	t.opts = opts
 }
 
-// ValidateOutput parses finalizer tool args, validates the "output"
+// validateOutput parses finalizer tool args, validates the "output"
 // value against the compiled schema, and returns its canonical JSON
 // encoding. Errors are stable, model-actionable strings surfaced as
 // retryable tool errors.
-func (r *Request) ValidateOutput(args []byte) (json.RawMessage, error) {
+func (r *Request) validateOutput(args []byte) (json.RawMessage, error) {
 	var parsed map[string]json.RawMessage
 	if err := json.Unmarshal(args, &parsed); err != nil {
 		return nil, xerrors.New(`invalid arguments: expected a JSON object of the form {"output": <value matching the schema>}.`)

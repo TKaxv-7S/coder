@@ -311,47 +311,20 @@ func AllChatMessagePartTypes() []ChatMessagePartType {
 	}
 }
 
-// ChatResponseFormatType selects how the assistant turn's final
-// output is constrained.
-type ChatResponseFormatType string
-
-const (
-	// ChatResponseFormatTypeText is the default free-form text
-	// behavior. It exists so callers can be explicit; it must not
-	// be combined with a JSON schema.
-	ChatResponseFormatTypeText ChatResponseFormatType = "text"
-	// ChatResponseFormatTypeJSONSchema requires the turn to finish
-	// with a JSON value validated against the caller's schema.
-	ChatResponseFormatTypeJSONSchema ChatResponseFormatType = "json_schema"
-)
-
 // ChatResponseFormat requests a server-validated final output shape
 // for the assistant turn triggered by the message that carries it.
 // The agent loop (tools, subagents, compaction, retries) runs as
 // usual; the turn only completes once the model produces a final
 // output that validates against the requested schema.
 type ChatResponseFormat struct {
-	Type       ChatResponseFormatType        `json:"type" enums:"text,json_schema"`
-	JSONSchema *ChatResponseFormatJSONSchema `json:"json_schema,omitempty"`
-}
-
-// ChatResponseFormatJSONSchema describes the JSON-schema-constrained
-// final output requested for a turn.
-type ChatResponseFormatJSONSchema struct {
-	// Name identifies the schema for the client. Metadata only; it
-	// does not change the tool the server uses to collect output.
-	Name string `json:"name"`
+	// Schema is a JSON Schema object the turn's final output must
+	// satisfy. The root must have "type":"object"; wrap arrays or
+	// primitives in an object property. Any $ref values must be
+	// fragment-local ("#...").
+	Schema json.RawMessage `json:"schema" swaggertype:"object"`
 	// Description tells the model what the output is for. It is
 	// appended to the server's finalizer tool description.
 	Description string `json:"description,omitempty"`
-	// Schema is a JSON Schema object. The root must have
-	// "type":"object"; wrap arrays or primitives in an object
-	// property. Any $ref values must be fragment-local ("#...").
-	Schema json.RawMessage `json:"schema" swaggertype:"object"`
-	// Strict is accepted for wire compatibility with common
-	// response_format shapes. Only true (or omitted, which
-	// defaults to true) is supported; false is rejected.
-	Strict *bool `json:"strict,omitempty"`
 }
 
 // ChatMessagePart is a structured chunk of a chat message.
