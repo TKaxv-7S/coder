@@ -1237,93 +1237,53 @@ The loop should not terminate just because:
 # Structured output
 
 Callers can request a server-validated structured final answer for a
-single assistant turn by sending `response_format` (type
-`json_schema`) on `CreateChatRequest` or `CreateChatMessageRequest`.
-Omitting the field preserves normal free-form behavior exactly.
+single assistant turn by sending `response_format` (a JSON schema
+plus optional description) on `CreateChatRequest` or
+`CreateChatMessageRequest`. Omitting the field preserves normal
+free-form behavior exactly.
 
-## Request flow
+- The HTTP layer validates the format with
+  `structuredoutput.NewRequest` (16 KiB cap, compilable schema, root
+  `"type":"object"`, fragment-local `$ref` only), rejects it on
+  plan-mode turns, and persists a server-created `response-format`
+  part on the user message. The part survives
+  queueing/promotion/compaction and stays visible in API responses,
+  but never becomes provider prompt content.
+- `prepareGeneration` extracts the format from the full history's
+  latest visible user message (`activeTurnResponseFormat`); older
+  turns' formats never leak into later turns.
+- An active format injects the server-owned `coder_structured_output`
+  finalizer tool (package `structuredoutput`), which wraps the caller
+  schema under a single required `output` parameter and validates
+  arguments against it. The tool is builtin (the name is reserved for
+  dynamic tools at the HTTP layer; shadowing MCP tools are dropped),
+  exclusive (must be called alone), and stop-after (a successful
+  result finishes the turn). Successful results are exempt from
+  tool-result truncation, which would corrupt the canonical JSON
+  while persisting it as a success.
 
-1. The HTTP layer validates the format with
-   `structuredoutput.NewRequest` (name pattern, 16 KiB schema cap,
-   compilable JSON schema, root `"type":"object"`, fragment-local
-   `$ref` only, `strict=false` rejected) and rejects
-   `response_format` on plan-mode turns because plan mode has its own
-   stop-after completion semantics.
-2. On success the handler appends a server-created `response-format`
-   `ChatMessagePart` to the user message content. The part persists
-   with the message, survives queueing/promotion, requires_action
-   resume, and compaction, and stays visible in API responses so
-   clients can correlate the request with its result. It is never
-   converted into provider prompt content (`partsToMessageParts` has
-   no case for it).
-3. `prepareGeneration` calls `activeTurnResponseFormat`, which walks
-   the full generation-state history backward to the latest visible
-   user message and parses its `response-format` part. Older turns'
-   formats never leak into later turns.
+Turn semantics: every step sets `fantasy.ToolChoiceRequired`
+(provider rejections surface as normal generation errors) and all
+other tools work normally, including requires_action pauses. The turn
+finishes successfully only via a non-error finalizer result.
+Validation failures are retryable tool errors within the step budget;
+plain-text steps regenerate only within a short consecutive streak
+(`maxStructuredOutputTextOnlySteps`), after which, or when `MaxSteps`
+runs out, the turn fails terminally with
+`structured_output_not_produced`. The finalizer result is never sent
+back to the provider, so the existing chain-mode safeguard disables
+`previous_response_id` reuse on the follow-up turn.
 
-## Finalizer tool
-
-When a format is active, `prepareGeneration` injects the server-owned
-`coder_structured_output` tool (package
-`coderd/x/chatd/structuredoutput`). The tool:
-
-- wraps the caller schema under a single required `output` parameter
-  (fantasy tool parameters form an implicit root object schema);
-- validates arguments against the compiled schema
-  (kaptinlin/jsonschema) and returns the canonical JSON of the
-  unwrapped `output` value on success, or a model-actionable error
-  on failure;
-- is builtin (injected before the `builtinToolNames` capture, so
-  dynamic-tool collisions resolve in its favor; MCP tools shadowing
-  the name are dropped), exclusive (must be called alone in a
-  batch), and stop-after (a successful result finishes the turn via
-  the existing stop-after machinery);
-- exempts its successful results from chatloop's tool-result
-  truncation (`ResultTruncationExempter`): truncation would corrupt
-  the canonical JSON while persisting it as a success. Validation
-  error results are still truncated like any other tool error.
-
-The tool name is reserved: the HTTP layer rejects dynamic tools named
-`coder_structured_output` even when no `response_format` is present.
-
-## Turn semantics
-
-- Every generation step of a structured turn sets
-  `fantasy.ToolChoiceRequired` (plumbed through
-  `chatloop.GenerateAssistantOptions.ToolChoice`). Provider
-  rejections surface as normal generation errors; there is no
-  silent downgrade.
-- All other tools (builtin, MCP, provider, dynamic) work normally.
-  Dynamic tool calls still pause the turn in requires_action.
-- The turn only finishes successfully via the finalizer's stop-after
-  result. Plain-text steps regenerate, but only within a short
-  consecutive streak (`maxStructuredOutputTextOnlySteps`); a model
-  or proxy that keeps ignoring required tool choice fails fast
-  instead of storming the provider for the whole step budget.
-  Validation failures are retryable tool errors within the step
-  budget (any tool call resets the text-only streak); exhausting
-  `MaxSteps` (or an empty model response) fails the turn terminally
-  with `structured_output_not_produced` instead of succeeding.
-- The finalizer result is never sent back to the provider (the turn
-  stops first), so the existing chain-mode safeguard
-  (`providerHasMissingToolResults`) disables
-  `previous_response_id` reuse on the follow-up turn.
-
-## Result recovery contract
-
-The success signal is a non-error `tool-result` part with
-`tool_name == "coder_structured_output"`; its `result` field carries
-the canonical validated JSON of the unwrapped `output` value (the
-paired `tool-call` part's `args` holds `{"output": ...}` as a
-fallback). `ExtractStructuredOutputValue` implements this contract
-server-side and pins it in tests.
+Result recovery: the success signal is a non-error `tool-result` part
+with `tool_name == "coder_structured_output"`; its `result` field
+carries the canonical validated JSON of the unwrapped `output` value
+(the paired `tool-call` part's `args` holds `{"output": ...}` as a
+fallback).
 
 The server intentionally uses the normal agent loop with a finalizer
 tool instead of `fantasy.ObjectCall`/provider-native `response_format`
-because `ObjectCall` cannot carry tools and the guarantee here is
+because `ObjectCall` cannot carry tools and the guarantee is
 server-side validation, not provider-native constrained decoding.
-
-Current limitations (future work): no first-class structured-output
-message part, no provider-native fast path for no-tool turns, no
-partial-object streaming, root schemas must be objects, and
-`strict=false` is rejected rather than emulated.
+Current limitations: no first-class structured-output message part,
+no provider-native fast path, no partial-object streaming, and root
+schemas must be objects.
