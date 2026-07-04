@@ -1262,7 +1262,7 @@ func (p *Server) ApplyGoalMutation(ctx context.Context, opts ApplyGoalMutationOp
 	}
 
 	var result ApplyGoalMutationResult
-	var publishChat database.Chat
+	var eventChat database.Chat
 	var publishStatusChange bool
 	machine := p.newChatMachine(opts.ChatID)
 	updateErr := machine.Update(ctx, func(tx *chatstate.Tx, store database.Store) error {
@@ -1280,7 +1280,7 @@ func (p *Server) ApplyGoalMutation(ctx context.Context, opts ApplyGoalMutationOp
 		if err != nil {
 			return err
 		}
-		publishChat = lockedChat
+		eventChat = lockedChat
 		if mutation.Action == codersdk.ChatGoalMutationActionComplete && lockedChat.Status == database.ChatStatusRunning {
 			if _, err := tx.Interrupt(chatstate.InterruptInput{Reason: "Chat goal marked complete by user"}); err != nil {
 				return xerrors.Errorf("interrupt completed chat goal run: %w", err)
@@ -1289,7 +1289,7 @@ func (p *Server) ApplyGoalMutation(ctx context.Context, opts ApplyGoalMutationOp
 			if err != nil {
 				return xerrors.Errorf("reload chat after goal mutation interruption: %w", err)
 			}
-			publishChat = latest
+			eventChat = latest
 			publishStatusChange = true
 		}
 		result.Goal = goal
@@ -1298,9 +1298,9 @@ func (p *Server) ApplyGoalMutation(ctx context.Context, opts ApplyGoalMutationOp
 	if updateErr != nil {
 		return ApplyGoalMutationResult{}, updateErr
 	}
-	p.publishChatGoalChange(publishChat, result.Goal)
+	p.publishChatGoalChange(eventChat, result.Goal)
 	if publishStatusChange {
-		p.publishChatPubsubEvent(publishChat, codersdk.ChatWatchEventKindStatusChange, nil)
+		p.publishChatPubsubEvent(eventChat, codersdk.ChatWatchEventKindStatusChange, nil)
 	}
 	return result, nil
 }

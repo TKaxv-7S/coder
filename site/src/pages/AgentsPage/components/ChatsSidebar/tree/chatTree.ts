@@ -74,11 +74,9 @@ export const buildChatTree = (chats: readonly Chat[]): ChatTree => {
 	};
 };
 
-/**
- * The active goal objective shown in place of the title for root-level
- * nodes. isChild reflects render position, not just chat data, because
- * search results can render child chats at the top level.
- */
+// The active goal objective shown in place of the title for chats rendered
+// at the top level. Callers pass isChild because search results can render
+// child chats at the top level.
 export const activeGoalObjective = (
 	chat: Chat,
 	isChild: boolean,

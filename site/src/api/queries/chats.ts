@@ -989,11 +989,13 @@ type UpdateChatGoalVariables = {
 	mutation: TypesGen.ChatGoalMutation;
 };
 
-export const setCachedChatGoal = (
+// Resolves a chat's family root by scanning the cached detail and list
+// queries. Used as a fallback when a goal update carries no goal payload
+// (for example a cleared goal) and so no root_chat_id.
+const cachedChatFamilyId = (
 	queryClient: QueryClient,
 	chatId: string,
-	goal: TypesGen.ChatGoal | undefined,
-) => {
+): string | undefined => {
 	const cachedChatFamilyIDs = new Map<string, string>();
 	const rememberChatFamily = (chat: TypesGen.Chat) => {
 		cachedChatFamilyIDs.set(chat.id, chatRootId(chat));
@@ -1027,9 +1029,17 @@ export const setCachedChatGoal = (
 		}
 	}
 
+	return cachedChatFamilyIDs.get(chatId);
+};
+
+export const setCachedChatGoal = (
+	queryClient: QueryClient,
+	chatId: string,
+	goal: TypesGen.ChatGoal | undefined,
+) => {
 	const cachedGoal = currentChatGoal(goal);
 	const familyId =
-		goal?.root_chat_id ?? cachedChatFamilyIDs.get(chatId) ?? chatId;
+		goal?.root_chat_id ?? cachedChatFamilyId(queryClient, chatId) ?? chatId;
 	const isFamilyChat = (chat: TypesGen.Chat) => chatRootId(chat) === familyId;
 	const applyGoal = (chat: TypesGen.Chat) =>
 		chat.goal === cachedGoal ? chat : { ...chat, goal: cachedGoal };

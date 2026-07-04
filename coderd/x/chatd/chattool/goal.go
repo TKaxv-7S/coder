@@ -80,8 +80,8 @@ type completeGoalResult struct {
 	Summary   string             `json:"summary"`
 }
 
-// CurrentChatGoalByRootChatID loads the current goal for a root chat through
-// the batch query. It returns sql.ErrNoRows when no current goal exists.
+// CurrentChatGoalByRootChatID returns the current goal for rootChatID, or
+// sql.ErrNoRows when no current goal exists.
 func CurrentChatGoalByRootChatID(ctx context.Context, db database.Store, rootChatID uuid.UUID) (database.ChatGoal, error) {
 	goals, err := db.GetCurrentChatGoalsByRootChatIDs(ctx, []uuid.UUID{rootChatID})
 	if err != nil {
