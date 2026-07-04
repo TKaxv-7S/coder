@@ -3,6 +3,7 @@ import {
 	ArrowUpIcon,
 	CheckIcon,
 	ChevronRightIcon,
+	type LucideIcon,
 	MicIcon,
 	MonitorIcon,
 	PaperclipIcon,
@@ -347,6 +348,27 @@ const ToolBadge: FC<{
 		</span>
 	);
 };
+
+const MenuCheckboxItem: FC<{
+	icon: LucideIcon;
+	label: string;
+	checked: boolean;
+	disabled: boolean;
+	onClick: () => void;
+}> = ({ icon: Icon, label, checked, disabled, onClick }) => (
+	<button
+		type="button"
+		role="menuitemcheckbox"
+		aria-checked={checked}
+		onClick={onClick}
+		disabled={disabled}
+		className="group flex h-8 w-full cursor-pointer items-center gap-1.5 border-none bg-transparent px-1 text-xs text-content-secondary shadow-none transition-colors hover:text-content-primary disabled:cursor-not-allowed disabled:opacity-50"
+	>
+		<Icon className="size-3.5 shrink-0" />
+		<span>{label}</span>
+		{checked && <CheckIcon className="ml-auto size-icon-sm shrink-0" />}
+	</button>
+);
 
 export const AgentChatInput: FC<AgentChatInputProps> = ({
 	onSend,
@@ -1341,36 +1363,22 @@ export const AgentChatInput: FC<AgentChatInputProps> = ({
 											</button>
 										)}
 										{onPlanModeToggle && (
-											<button
-												type="button"
-												role="menuitemcheckbox"
-												aria-checked={planModeEnabled}
-												onClick={handlePlanModeToggle}
+											<MenuCheckboxItem
+												icon={PencilIcon}
+												label="Plan first"
+												checked={planModeEnabled}
 												disabled={isDisabled || pursueGoalEnabled}
-												className="group flex h-8 w-full cursor-pointer items-center gap-1.5 border-none bg-transparent px-1 text-xs text-content-secondary shadow-none transition-colors hover:text-content-primary disabled:cursor-not-allowed disabled:opacity-50"
-											>
-												<PencilIcon className="size-3.5 shrink-0" />
-												<span>Plan first</span>
-												{planModeEnabled && (
-													<CheckIcon className="ml-auto size-icon-sm shrink-0" />
-												)}
-											</button>
+												onClick={handlePlanModeToggle}
+											/>
 										)}
 										{showPursueGoal && (
-											<button
-												type="button"
-												role="menuitemcheckbox"
-												aria-checked={pursueGoalEnabled}
-												onClick={handleGoalModeToggle}
+											<MenuCheckboxItem
+												icon={TargetIcon}
+												label="Pursue goal"
+												checked={pursueGoalEnabled}
 												disabled={isDisabled || isGoalModeUnavailable}
-												className="group flex h-8 w-full cursor-pointer items-center gap-1.5 border-none bg-transparent px-1 text-xs text-content-secondary shadow-none transition-colors hover:text-content-primary disabled:cursor-not-allowed disabled:opacity-50"
-											>
-												<TargetIcon className="size-3.5 shrink-0" />
-												<span>Pursue goal</span>
-												{pursueGoalEnabled && (
-													<CheckIcon className="ml-auto size-icon-sm shrink-0" />
-												)}
-											</button>
+												onClick={handleGoalModeToggle}
+											/>
 										)}
 										{workspaceOptions &&
 											onWorkspaceChange &&

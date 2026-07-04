@@ -3633,13 +3633,6 @@ func (q *querier) GetCryptoKeysByFeature(ctx context.Context, feature database.C
 	return q.db.GetCryptoKeysByFeature(ctx, feature)
 }
 
-func (q *querier) GetCurrentChatGoalByRootChatID(ctx context.Context, rootChatID uuid.UUID) (database.ChatGoal, error) {
-	if err := q.authorizeChatGoalRoot(ctx, policy.ActionRead, rootChatID); err != nil {
-		return database.ChatGoal{}, err
-	}
-	return q.db.GetCurrentChatGoalByRootChatID(ctx, rootChatID)
-}
-
 func (q *querier) GetCurrentChatGoalsByRootChatIDs(ctx context.Context, rootChatIDs []uuid.UUID) ([]database.ChatGoal, error) {
 	for _, rootChatID := range rootChatIDs {
 		if err := q.authorizeChatGoalRoot(ctx, policy.ActionRead, rootChatID); err != nil {
@@ -6805,9 +6798,9 @@ func (q *querier) MarkChatsContextDirtyByAgent(ctx context.Context, arg database
 	return q.db.MarkChatsContextDirtyByAgent(ctx, arg)
 }
 
-func (q *querier) MarkCurrentChatGoalReplacedByRootChatID(ctx context.Context, rootChatID uuid.UUID) ([]database.ChatGoal, error) {
+func (q *querier) MarkCurrentChatGoalReplacedByRootChatID(ctx context.Context, rootChatID uuid.UUID) error {
 	if err := q.authorizeChatGoalRoot(ctx, policy.ActionUpdate, rootChatID); err != nil {
-		return nil, err
+		return err
 	}
 	return q.db.MarkCurrentChatGoalReplacedByRootChatID(ctx, rootChatID)
 }

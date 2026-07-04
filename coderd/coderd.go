@@ -1361,7 +1361,6 @@ func New(options *Options) *API {
 				r.Patch("/", api.patchChat)
 				r.Group(func(r chi.Router) {
 					r.Use(httpmw.RequireExperimentWithDevBypass(api.Experiments, codersdk.ExperimentChatGoals))
-					r.Get("/goal", api.chatGoal)
 					r.Patch("/goal", api.patchChatGoal)
 				})
 				r.Get("/messages", api.getChatMessages)

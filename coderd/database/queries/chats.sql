@@ -414,12 +414,14 @@ LIMIT
     COALESCE(NULLIF(@limit_val::int, 0), 50);
 
 -- name: GetChatGoalMessageIDsByChatAndMessageIDs :many
+-- Goals are only created from root-chat messages, so scoping by
+-- root_chat_id both authorizes the lookup and excludes other chats.
 SELECT DISTINCT
     created_from_message_id::bigint AS message_id
 FROM
     chat_goals
 WHERE
-    created_from_chat_id = @chat_id::uuid
+    root_chat_id = @chat_id::uuid
     AND created_from_message_id = ANY(@message_ids::bigint[]);
 
 -- name: GetChatUserPromptsByChatID :many
@@ -2117,26 +2119,6 @@ SELECT *
 FROM chats_expanded;
 
 
--- name: GetCurrentChatGoalByRootChatID :one
-SELECT
-    chat_goals.*
-FROM
-    chat_goals
-WHERE
-    id = (
-        SELECT
-            id
-        FROM
-            chat_goals
-        WHERE
-            root_chat_id = @root_chat_id::uuid
-        ORDER BY
-            created_at DESC,
-            goal_order DESC
-        LIMIT 1
-    )
-    AND status IN ('active', 'paused', 'complete');
-
 -- name: GetCurrentChatGoalsByRootChatIDs :many
 WITH latest_goal_ids AS (
     SELECT DISTINCT ON (root_chat_id)
@@ -2158,7 +2140,7 @@ JOIN latest_goal_ids ON latest_goal_ids.id = chat_goals.id
 WHERE
     chat_goals.status IN ('active', 'paused', 'complete');
 
--- name: MarkCurrentChatGoalReplacedByRootChatID :many
+-- name: MarkCurrentChatGoalReplacedByRootChatID :exec
 UPDATE
     chat_goals
 SET
@@ -2167,20 +2149,17 @@ SET
     replaced_at = NOW()
 WHERE
     root_chat_id = @root_chat_id::uuid
-    AND status IN ('active', 'paused')
-RETURNING *;
+    AND status IN ('active', 'paused');
 
 -- name: InsertActiveChatGoal :one
 INSERT INTO chat_goals (
     root_chat_id,
-    created_from_chat_id,
     created_from_message_id,
     objective,
     status,
     created_by_user_id
 ) VALUES (
     @root_chat_id::uuid,
-    sqlc.narg('created_from_chat_id')::uuid,
     sqlc.narg('created_from_message_id')::bigint,
     @objective::text,
     'active',

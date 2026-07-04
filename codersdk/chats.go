@@ -122,14 +122,12 @@ const (
 	ChatGoalStatusPaused   ChatGoalStatus = "paused"
 	ChatGoalStatusComplete ChatGoalStatus = "complete"
 	ChatGoalStatusCleared  ChatGoalStatus = "cleared"
-	ChatGoalStatusReplaced ChatGoalStatus = "replaced"
 )
 
 // ChatGoal is a durable objective associated with a root chat.
 type ChatGoal struct {
 	ID                uuid.UUID      `json:"id" format:"uuid"`
 	RootChatID        uuid.UUID      `json:"root_chat_id" format:"uuid"`
-	CreatedFromChatID *uuid.UUID     `json:"created_from_chat_id,omitempty" format:"uuid"`
 	Objective         string         `json:"objective"`
 	Status            ChatGoalStatus `json:"status"`
 	CompletionSummary *string        `json:"completion_summary,omitempty"`
@@ -140,7 +138,6 @@ type ChatGoal struct {
 	UpdatedAt         time.Time      `json:"updated_at" format:"date-time"`
 	CompletedAt       *time.Time     `json:"completed_at,omitempty" format:"date-time"`
 	ClearedAt         *time.Time     `json:"cleared_at,omitempty" format:"date-time"`
-	ReplacedAt        *time.Time     `json:"replaced_at,omitempty" format:"date-time"`
 }
 
 // ChatGoalMutationAction identifies a goal lifecycle mutation.
@@ -3221,20 +3218,6 @@ func (c *ExperimentalClient) RefreshChatContext(ctx context.Context, chatID uuid
 	}
 	var chat Chat
 	return chat, json.NewDecoder(res.Body).Decode(&chat)
-}
-
-// GetChatGoal returns the current durable goal for a chat's root.
-func (c *ExperimentalClient) GetChatGoal(ctx context.Context, chatID uuid.UUID) (ChatGoalResponse, error) {
-	res, err := c.Request(ctx, http.MethodGet, fmt.Sprintf("/api/experimental/chats/%s/goal", chatID), nil)
-	if err != nil {
-		return ChatGoalResponse{}, err
-	}
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		return ChatGoalResponse{}, ReadBodyAsError(res)
-	}
-	var resp ChatGoalResponse
-	return resp, json.NewDecoder(res.Body).Decode(&resp)
 }
 
 // UpdateChatGoal applies a metadata-only chat goal mutation.

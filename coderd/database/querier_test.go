@@ -35,6 +35,7 @@ import (
 	"github.com/coder/coder/v2/coderd/rbac/policy"
 	"github.com/coder/coder/v2/coderd/util/slice"
 	"github.com/coder/coder/v2/coderd/x/chatd/chatprompt"
+	"github.com/coder/coder/v2/coderd/x/chatd/chattool"
 	"github.com/coder/coder/v2/codersdk"
 	"github.com/coder/coder/v2/provisionersdk"
 	"github.com/coder/coder/v2/testutil"
@@ -12442,8 +12443,7 @@ func TestChatGoals(t *testing.T) {
 			Role:      database.ChatMessageRoleUser,
 		})
 		goal, err := store.InsertActiveChatGoal(ctx, database.InsertActiveChatGoalParams{
-			RootChatID:        chat.ID,
-			CreatedFromChatID: uuid.NullUUID{UUID: chat.ID, Valid: true},
+			RootChatID: chat.ID,
 			CreatedFromMessageID: sql.NullInt64{
 				Int64: message.ID,
 				Valid: true,
@@ -12535,7 +12535,7 @@ func TestChatGoals(t *testing.T) {
 		store, _, ctx, owner, chat := setup(t)
 		goal := insertGoal(t, store, ctx, chat, owner, "complete the task")
 
-		current, err := store.GetCurrentChatGoalByRootChatID(ctx, chat.ID)
+		current, err := chattool.CurrentChatGoalByRootChatID(ctx, store, chat.ID)
 		require.NoError(t, err)
 		require.Equal(t, goal.ID, current.ID)
 
@@ -12582,7 +12582,7 @@ func TestChatGoals(t *testing.T) {
 		require.True(t, completed.CompletedAt.Valid)
 		require.Equal(t, owner.ID, completed.CompletedByUserID.UUID)
 
-		current, err = store.GetCurrentChatGoalByRootChatID(ctx, chat.ID)
+		current, err = chattool.CurrentChatGoalByRootChatID(ctx, store, chat.ID)
 		require.NoError(t, err)
 		require.Equal(t, database.ChatGoalStatusComplete, current.Status)
 		require.Equal(t, goal.ID, current.ID)
@@ -12599,7 +12599,7 @@ func TestChatGoals(t *testing.T) {
 		require.False(t, cleared.CompletedByAgent)
 		require.True(t, cleared.ClearedAt.Valid)
 
-		_, err = store.GetCurrentChatGoalByRootChatID(ctx, chat.ID)
+		_, err = chattool.CurrentChatGoalByRootChatID(ctx, store, chat.ID)
 		require.ErrorIs(t, err, sql.ErrNoRows)
 	})
 
@@ -12620,13 +12620,13 @@ func TestChatGoals(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, database.ChatGoalStatusComplete, completed.Status)
 
-		current, err := store.GetCurrentChatGoalByRootChatID(ctx, chat.ID)
+		current, err := chattool.CurrentChatGoalByRootChatID(ctx, store, chat.ID)
 		require.NoError(t, err)
 		require.Equal(t, first.ID, current.ID)
 		require.Equal(t, database.ChatGoalStatusComplete, current.Status)
 
 		second := insertGoal(t, store, ctx, chat, owner, "next goal")
-		current, err = store.GetCurrentChatGoalByRootChatID(ctx, chat.ID)
+		current, err = chattool.CurrentChatGoalByRootChatID(ctx, store, chat.ID)
 		require.NoError(t, err)
 		require.Equal(t, second.ID, current.ID)
 		require.Equal(t, database.ChatGoalStatusActive, current.Status)
@@ -12637,7 +12637,7 @@ func TestChatGoals(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		_, err = store.GetCurrentChatGoalByRootChatID(ctx, chat.ID)
+		_, err = chattool.CurrentChatGoalByRootChatID(ctx, store, chat.ID)
 		require.ErrorIs(t, err, sql.ErrNoRows)
 	})
 
@@ -12656,7 +12656,7 @@ func TestChatGoals(t *testing.T) {
 		second := insertGoal(t, store, ctx, chat, owner, "second tied goal")
 		setGoalCreatedAt(t, sqlDB, ctx, dbtime.Now(), first, second)
 
-		current, err := store.GetCurrentChatGoalByRootChatID(ctx, chat.ID)
+		current, err := chattool.CurrentChatGoalByRootChatID(ctx, store, chat.ID)
 		require.NoError(t, err)
 		require.Equal(t, second.ID, current.ID)
 		require.Equal(t, database.ChatGoalStatusActive, current.Status)
@@ -12682,7 +12682,7 @@ func TestChatGoals(t *testing.T) {
 		require.NoError(t, err)
 
 		setGoalCreatedAt(t, sqlDB, ctx, dbtime.Now(), first, second)
-		_, err = store.GetCurrentChatGoalByRootChatID(ctx, chat.ID)
+		_, err = chattool.CurrentChatGoalByRootChatID(ctx, store, chat.ID)
 		require.ErrorIs(t, err, sql.ErrNoRows)
 	})
 
@@ -12734,18 +12734,21 @@ func TestChatGoals(t *testing.T) {
 	t.Run("ReplaceCurrentGoal", func(t *testing.T) {
 		t.Parallel()
 
-		store, _, ctx, owner, chat := setup(t)
+		store, sqlDB, ctx, owner, chat := setup(t)
 		first := insertGoal(t, store, ctx, chat, owner, "old goal")
 
-		replaced, err := store.MarkCurrentChatGoalReplacedByRootChatID(ctx, chat.ID)
+		err := store.MarkCurrentChatGoalReplacedByRootChatID(ctx, chat.ID)
 		require.NoError(t, err)
-		require.Len(t, replaced, 1)
-		require.Equal(t, first.ID, replaced[0].ID)
-		require.Equal(t, database.ChatGoalStatusReplaced, replaced[0].Status)
-		require.True(t, replaced[0].ReplacedAt.Valid)
+
+		var replacedStatus database.ChatGoalStatus
+		var replacedAt sql.NullTime
+		row := sqlDB.QueryRowContext(ctx, "SELECT status, replaced_at FROM chat_goals WHERE id = $1", first.ID)
+		require.NoError(t, row.Scan(&replacedStatus, &replacedAt))
+		require.Equal(t, database.ChatGoalStatusReplaced, replacedStatus)
+		require.True(t, replacedAt.Valid)
 
 		second := insertGoal(t, store, ctx, chat, owner, "replacement goal")
-		current, err := store.GetCurrentChatGoalByRootChatID(ctx, chat.ID)
+		current, err := chattool.CurrentChatGoalByRootChatID(ctx, store, chat.ID)
 		require.NoError(t, err)
 		require.Equal(t, second.ID, current.ID)
 		require.Equal(t, database.ChatGoalStatusActive, current.Status)

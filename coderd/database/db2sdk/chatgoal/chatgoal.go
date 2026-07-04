@@ -17,10 +17,6 @@ func ToSDK(goal database.ChatGoal) codersdk.ChatGoal {
 		CreatedAt:        goal.CreatedAt,
 		UpdatedAt:        goal.UpdatedAt,
 	}
-	if goal.CreatedFromChatID.Valid {
-		createdFromChatID := goal.CreatedFromChatID.UUID
-		converted.CreatedFromChatID = &createdFromChatID
-	}
 	if goal.CompletionSummary.Valid {
 		converted.CompletionSummary = &goal.CompletionSummary.String
 	}
@@ -35,10 +31,6 @@ func ToSDK(goal database.ChatGoal) codersdk.ChatGoal {
 	if goal.ClearedAt.Valid {
 		clearedAt := goal.ClearedAt.Time
 		converted.ClearedAt = &clearedAt
-	}
-	if goal.ReplacedAt.Valid {
-		replacedAt := goal.ReplacedAt.Time
-		converted.ReplacedAt = &replacedAt
 	}
 	return converted
 }

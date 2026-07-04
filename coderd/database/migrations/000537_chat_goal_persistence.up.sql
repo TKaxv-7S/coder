@@ -10,7 +10,6 @@ CREATE TABLE chat_goals (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     goal_order BIGINT GENERATED ALWAYS AS IDENTITY NOT NULL,
     root_chat_id UUID NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
-    created_from_chat_id UUID REFERENCES chats(id) ON DELETE SET NULL,
     created_from_message_id BIGINT REFERENCES chat_messages(id) ON DELETE SET NULL,
     objective TEXT NOT NULL,
     status chat_goal_status NOT NULL,

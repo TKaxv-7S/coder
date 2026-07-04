@@ -679,12 +679,10 @@ func TestChatGoal(t *testing.T) {
 	t.Parallel()
 
 	now := dbtime.Now()
-	createdFromChatID := uuid.New()
 	completedByUserID := uuid.New()
 	goal := database.ChatGoal{
 		ID:                uuid.New(),
 		RootChatID:        uuid.New(),
-		CreatedFromChatID: uuid.NullUUID{UUID: createdFromChatID, Valid: true},
 		Objective:         "ship goals",
 		Status:            database.ChatGoalStatusComplete,
 		CompletionSummary: sql.NullString{String: "done", Valid: true},
@@ -695,14 +693,12 @@ func TestChatGoal(t *testing.T) {
 		UpdatedAt:         now,
 		CompletedAt:       sql.NullTime{Time: now, Valid: true},
 		ClearedAt:         sql.NullTime{Time: now, Valid: true},
-		ReplacedAt:        sql.NullTime{Time: now, Valid: true},
 	}
 
 	converted := db2sdk.ChatGoal(goal)
 
 	require.Equal(t, goal.ID, converted.ID)
 	require.Equal(t, goal.RootChatID, converted.RootChatID)
-	require.Equal(t, createdFromChatID, *converted.CreatedFromChatID)
 	require.Equal(t, goal.Objective, converted.Objective)
 	require.Equal(t, codersdk.ChatGoalStatusComplete, converted.Status)
 	require.Equal(t, "done", *converted.CompletionSummary)
@@ -713,7 +709,6 @@ func TestChatGoal(t *testing.T) {
 	require.Equal(t, now, converted.UpdatedAt)
 	require.Equal(t, now, *converted.CompletedAt)
 	require.Equal(t, now, *converted.ClearedAt)
-	require.Equal(t, now, *converted.ReplacedAt)
 }
 
 func TestChat_AllFieldsPopulated(t *testing.T) {

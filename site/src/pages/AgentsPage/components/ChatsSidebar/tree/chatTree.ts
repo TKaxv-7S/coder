@@ -74,8 +74,16 @@ export const buildChatTree = (chats: readonly Chat[]): ChatTree => {
 	};
 };
 
-const activeGoalObjective = (chat: Chat): string | undefined =>
-	!getParentChatID(chat) && chat.goal?.status === "active"
+/**
+ * The active goal objective shown in place of the title for root-level
+ * nodes. isChild reflects render position, not just chat data, because
+ * search results can render child chats at the top level.
+ */
+export const activeGoalObjective = (
+	chat: Chat,
+	isChild: boolean,
+): string | undefined =>
+	!isChild && chat.goal?.status === "active"
 		? asNonEmptyString(chat.goal.objective)
 		: undefined;
 
@@ -83,7 +91,11 @@ const chatMatchesSearch = (chat: Chat, search: string): boolean => {
 	if (chat.title.toLowerCase().includes(search)) {
 		return true;
 	}
-	return activeGoalObjective(chat)?.toLowerCase().includes(search) ?? false;
+	return (
+		activeGoalObjective(chat, Boolean(getParentChatID(chat)))
+			?.toLowerCase()
+			.includes(search) ?? false
+	);
 };
 
 export const collectVisibleChatIDs = ({

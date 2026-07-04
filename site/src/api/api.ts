@@ -3384,13 +3384,6 @@ class ExperimentalApiMethods {
 		);
 		return response.data;
 	};
-	getChatGoal = async (chatId: string): Promise<TypesGen.ChatGoalResponse> => {
-		const response = await this.axios.get<TypesGen.ChatGoalResponse>(
-			`/api/experimental/chats/${chatId}/goal`,
-		);
-		return response.data;
-	};
-
 	updateChatGoal = async (
 		chatId: string,
 		req: TypesGen.ChatGoalMutation,

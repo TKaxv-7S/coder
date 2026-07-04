@@ -507,39 +507,6 @@
 			}
 		},
 		"/api/experimental/chats/{chat}/goal": {
-			"get": {
-				"description": "Experimental: this endpoint is subject to change.",
-				"produces": ["application/json"],
-				"tags": ["Chats"],
-				"summary": "Get current chat goal",
-				"operationId": "get-current-chat-goal",
-				"parameters": [
-					{
-						"type": "string",
-						"format": "uuid",
-						"description": "Chat ID",
-						"name": "chat",
-						"in": "path",
-						"required": true
-					}
-				],
-				"responses": {
-					"200": {
-						"description": "OK",
-						"schema": {
-							"$ref": "#/definitions/codersdk.ChatGoalResponse"
-						}
-					}
-				},
-				"security": [
-					{
-						"CoderSessionToken": []
-					}
-				],
-				"x-apidocgen": {
-					"skip": true
-				}
-			},
 			"patch": {
 				"description": "Experimental: this endpoint is subject to change.",
 				"consumes": ["application/json"],
@@ -15473,20 +15440,12 @@
 					"type": "string",
 					"format": "uuid"
 				},
-				"created_from_chat_id": {
-					"type": "string",
-					"format": "uuid"
-				},
 				"id": {
 					"type": "string",
 					"format": "uuid"
 				},
 				"objective": {
 					"type": "string"
-				},
-				"replaced_at": {
-					"type": "string",
-					"format": "date-time"
 				},
 				"root_chat_id": {
 					"type": "string",
@@ -15545,13 +15504,12 @@
 		},
 		"codersdk.ChatGoalStatus": {
 			"type": "string",
-			"enum": ["active", "paused", "complete", "cleared", "replaced"],
+			"enum": ["active", "paused", "complete", "cleared"],
 			"x-enum-varnames": [
 				"ChatGoalStatusActive",
 				"ChatGoalStatusPaused",
 				"ChatGoalStatusComplete",
-				"ChatGoalStatusCleared",
-				"ChatGoalStatusReplaced"
+				"ChatGoalStatusCleared"
 			]
 		},
 		"codersdk.ChatGroup": {

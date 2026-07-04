@@ -100,10 +100,8 @@ Experimental: this endpoint is subject to change.
       "completion_summary": "string",
       "created_at": "2019-08-24T14:15:22Z",
       "created_by_user_id": "209f54c4-4c33-43bc-9c6a-ef4c65ad7473",
-      "created_from_chat_id": "2ef814a8-f0ae-48bb-ba3f-d85d007ba956",
       "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
       "objective": "string",
-      "replaced_at": "2019-08-24T14:15:22Z",
       "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
       "status": "active",
       "updated_at": "2019-08-24T14:15:22Z"
@@ -216,10 +214,8 @@ Status Code **200**
 | `»» completion_summary`   | string                                                                             | false    |              |                                                                                                                                                                                                                                                                            |
 | `»» created_at`           | string(date-time)                                                                  | false    |              |                                                                                                                                                                                                                                                                            |
 | `»» created_by_user_id`   | string(uuid)                                                                       | false    |              |                                                                                                                                                                                                                                                                            |
-| `»» created_from_chat_id` | string(uuid)                                                                       | false    |              |                                                                                                                                                                                                                                                                            |
 | `»» id`                   | string(uuid)                                                                       | false    |              |                                                                                                                                                                                                                                                                            |
 | `»» objective`            | string                                                                             | false    |              |                                                                                                                                                                                                                                                                            |
-| `»» replaced_at`          | string(date-time)                                                                  | false    |              |                                                                                                                                                                                                                                                                            |
 | `»» root_chat_id`         | string(uuid)                                                                       | false    |              |                                                                                                                                                                                                                                                                            |
 | `»» status`               | [codersdk.ChatGoalStatus](schemas.md#codersdkchatgoalstatus)                       | false    |              |                                                                                                                                                                                                                                                                            |
 | `»» updated_at`           | string(date-time)                                                                  | false    |              |                                                                                                                                                                                                                                                                            |
@@ -258,7 +254,7 @@ Status Code **200**
 |---------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `client_type` | `api`, `ui`                                                                                                                                                                                              |
 | `kind`        | `auth`, `config`, `generic`, `instruction_file`, `mcp_config`, `mcp_server`, `missing_key`, `overloaded`, `provider_disabled`, `rate_limit`, `skill`, `stream_silence_timeout`, `timeout`, `usage_limit` |
-| `status`      | `active`, `cleared`, `complete`, `completed`, `error`, `excluded`, `interrupting`, `invalid`, `ok`, `oversize`, `paused`, `pending`, `replaced`, `requires_action`, `running`, `unreadable`, `waiting`   |
+| `status`      | `active`, `cleared`, `complete`, `completed`, `error`, `excluded`, `interrupting`, `invalid`, `ok`, `oversize`, `paused`, `pending`, `requires_action`, `running`, `unreadable`, `waiting`               |
 | `plan_mode`   | `plan`                                                                                                                                                                                                   |
 
 To perform this operation, you must be authenticated. [Learn more](authentication.md).
@@ -409,10 +405,8 @@ Experimental: this endpoint is subject to change.
         "completion_summary": "string",
         "created_at": "2019-08-24T14:15:22Z",
         "created_by_user_id": "209f54c4-4c33-43bc-9c6a-ef4c65ad7473",
-        "created_from_chat_id": "2ef814a8-f0ae-48bb-ba3f-d85d007ba956",
         "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
         "objective": "string",
-        "replaced_at": "2019-08-24T14:15:22Z",
         "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
         "status": "active",
         "updated_at": "2019-08-24T14:15:22Z"
@@ -517,10 +511,8 @@ Experimental: this endpoint is subject to change.
     "completion_summary": "string",
     "created_at": "2019-08-24T14:15:22Z",
     "created_by_user_id": "209f54c4-4c33-43bc-9c6a-ef4c65ad7473",
-    "created_from_chat_id": "2ef814a8-f0ae-48bb-ba3f-d85d007ba956",
     "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
     "objective": "string",
-    "replaced_at": "2019-08-24T14:15:22Z",
     "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
     "status": "active",
     "updated_at": "2019-08-24T14:15:22Z"
@@ -782,10 +774,8 @@ Experimental: this endpoint is subject to change.
       "completion_summary": "string",
       "created_at": "2019-08-24T14:15:22Z",
       "created_by_user_id": "209f54c4-4c33-43bc-9c6a-ef4c65ad7473",
-      "created_from_chat_id": "2ef814a8-f0ae-48bb-ba3f-d85d007ba956",
       "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
       "objective": "string",
-      "replaced_at": "2019-08-24T14:15:22Z",
       "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
       "status": "active",
       "updated_at": "2019-08-24T14:15:22Z"
@@ -944,10 +934,8 @@ Experimental: this endpoint is subject to change.
         "completion_summary": "string",
         "created_at": "2019-08-24T14:15:22Z",
         "created_by_user_id": "209f54c4-4c33-43bc-9c6a-ef4c65ad7473",
-        "created_from_chat_id": "2ef814a8-f0ae-48bb-ba3f-d85d007ba956",
         "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
         "objective": "string",
-        "replaced_at": "2019-08-24T14:15:22Z",
         "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
         "status": "active",
         "updated_at": "2019-08-24T14:15:22Z"
@@ -1052,10 +1040,8 @@ Experimental: this endpoint is subject to change.
     "completion_summary": "string",
     "created_at": "2019-08-24T14:15:22Z",
     "created_by_user_id": "209f54c4-4c33-43bc-9c6a-ef4c65ad7473",
-    "created_from_chat_id": "2ef814a8-f0ae-48bb-ba3f-d85d007ba956",
     "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
     "objective": "string",
-    "replaced_at": "2019-08-24T14:15:22Z",
     "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
     "status": "active",
     "updated_at": "2019-08-24T14:15:22Z"
@@ -1251,10 +1237,8 @@ Experimental: this endpoint is subject to change.
         "completion_summary": "string",
         "created_at": "2019-08-24T14:15:22Z",
         "created_by_user_id": "209f54c4-4c33-43bc-9c6a-ef4c65ad7473",
-        "created_from_chat_id": "2ef814a8-f0ae-48bb-ba3f-d85d007ba956",
         "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
         "objective": "string",
-        "replaced_at": "2019-08-24T14:15:22Z",
         "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
         "status": "active",
         "updated_at": "2019-08-24T14:15:22Z"
@@ -1359,10 +1343,8 @@ Experimental: this endpoint is subject to change.
     "completion_summary": "string",
     "created_at": "2019-08-24T14:15:22Z",
     "created_by_user_id": "209f54c4-4c33-43bc-9c6a-ef4c65ad7473",
-    "created_from_chat_id": "2ef814a8-f0ae-48bb-ba3f-d85d007ba956",
     "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
     "objective": "string",
-    "replaced_at": "2019-08-24T14:15:22Z",
     "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
     "status": "active",
     "updated_at": "2019-08-24T14:15:22Z"
@@ -1556,10 +1538,8 @@ Experimental: this endpoint is subject to change.
         "completion_summary": "string",
         "created_at": "2019-08-24T14:15:22Z",
         "created_by_user_id": "209f54c4-4c33-43bc-9c6a-ef4c65ad7473",
-        "created_from_chat_id": "2ef814a8-f0ae-48bb-ba3f-d85d007ba956",
         "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
         "objective": "string",
-        "replaced_at": "2019-08-24T14:15:22Z",
         "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
         "status": "active",
         "updated_at": "2019-08-24T14:15:22Z"
@@ -1664,10 +1644,8 @@ Experimental: this endpoint is subject to change.
     "completion_summary": "string",
     "created_at": "2019-08-24T14:15:22Z",
     "created_by_user_id": "209f54c4-4c33-43bc-9c6a-ef4c65ad7473",
-    "created_from_chat_id": "2ef814a8-f0ae-48bb-ba3f-d85d007ba956",
     "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
     "objective": "string",
-    "replaced_at": "2019-08-24T14:15:22Z",
     "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
     "status": "active",
     "updated_at": "2019-08-24T14:15:22Z"
@@ -1983,10 +1961,8 @@ Experimental: this endpoint is subject to change.
     "completion_summary": "string",
     "created_at": "2019-08-24T14:15:22Z",
     "created_by_user_id": "209f54c4-4c33-43bc-9c6a-ef4c65ad7473",
-    "created_from_chat_id": "2ef814a8-f0ae-48bb-ba3f-d85d007ba956",
     "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
     "objective": "string",
-    "replaced_at": "2019-08-24T14:15:22Z",
     "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
     "status": "active",
     "updated_at": "2019-08-24T14:15:22Z"
@@ -2453,10 +2429,8 @@ Experimental: this endpoint is subject to change.
         "completion_summary": "string",
         "created_at": "2019-08-24T14:15:22Z",
         "created_by_user_id": "209f54c4-4c33-43bc-9c6a-ef4c65ad7473",
-        "created_from_chat_id": "2ef814a8-f0ae-48bb-ba3f-d85d007ba956",
         "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
         "objective": "string",
-        "replaced_at": "2019-08-24T14:15:22Z",
         "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
         "status": "active",
         "updated_at": "2019-08-24T14:15:22Z"
@@ -2561,10 +2535,8 @@ Experimental: this endpoint is subject to change.
     "completion_summary": "string",
     "created_at": "2019-08-24T14:15:22Z",
     "created_by_user_id": "209f54c4-4c33-43bc-9c6a-ef4c65ad7473",
-    "created_from_chat_id": "2ef814a8-f0ae-48bb-ba3f-d85d007ba956",
     "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
     "objective": "string",
-    "replaced_at": "2019-08-24T14:15:22Z",
     "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
     "status": "active",
     "updated_at": "2019-08-24T14:15:22Z"
@@ -3084,10 +3056,8 @@ Experimental: this endpoint is subject to change.
         "completion_summary": "string",
         "created_at": "2019-08-24T14:15:22Z",
         "created_by_user_id": "209f54c4-4c33-43bc-9c6a-ef4c65ad7473",
-        "created_from_chat_id": "2ef814a8-f0ae-48bb-ba3f-d85d007ba956",
         "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
         "objective": "string",
-        "replaced_at": "2019-08-24T14:15:22Z",
         "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
         "status": "active",
         "updated_at": "2019-08-24T14:15:22Z"
@@ -3192,10 +3162,8 @@ Experimental: this endpoint is subject to change.
     "completion_summary": "string",
     "created_at": "2019-08-24T14:15:22Z",
     "created_by_user_id": "209f54c4-4c33-43bc-9c6a-ef4c65ad7473",
-    "created_from_chat_id": "2ef814a8-f0ae-48bb-ba3f-d85d007ba956",
     "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
     "objective": "string",
-    "replaced_at": "2019-08-24T14:15:22Z",
     "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
     "status": "active",
     "updated_at": "2019-08-24T14:15:22Z"

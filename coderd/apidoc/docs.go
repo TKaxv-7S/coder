@@ -578,43 +578,6 @@ const docTemplate = `{
             }
         },
         "/api/experimental/chats/{chat}/goal": {
-            "get": {
-                "description": "Experimental: this endpoint is subject to change.",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Chats"
-                ],
-                "summary": "Get current chat goal",
-                "operationId": "get-current-chat-goal",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "format": "uuid",
-                        "description": "Chat ID",
-                        "name": "chat",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/codersdk.ChatGoalResponse"
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "CoderSessionToken": []
-                    }
-                ],
-                "x-apidocgen": {
-                    "skip": true
-                }
-            },
             "patch": {
                 "description": "Experimental: this endpoint is subject to change.",
                 "consumes": [
@@ -17202,20 +17165,12 @@ const docTemplate = `{
                     "type": "string",
                     "format": "uuid"
                 },
-                "created_from_chat_id": {
-                    "type": "string",
-                    "format": "uuid"
-                },
                 "id": {
                     "type": "string",
                     "format": "uuid"
                 },
                 "objective": {
                     "type": "string"
-                },
-                "replaced_at": {
-                    "type": "string",
-                    "format": "date-time"
                 },
                 "root_chat_id": {
                     "type": "string",
@@ -17290,15 +17245,13 @@ const docTemplate = `{
                 "active",
                 "paused",
                 "complete",
-                "cleared",
-                "replaced"
+                "cleared"
             ],
             "x-enum-varnames": [
                 "ChatGoalStatusActive",
                 "ChatGoalStatusPaused",
                 "ChatGoalStatusComplete",
-                "ChatGoalStatusCleared",
-                "ChatGoalStatusReplaced"
+                "ChatGoalStatusCleared"
             ]
         },
         "codersdk.ChatGroup": {

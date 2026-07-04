@@ -517,16 +517,6 @@ func sdkChatRootID(chat codersdk.Chat) uuid.UUID {
 	return chat.ID
 }
 
-func dbChatRootID(chat database.Chat) uuid.UUID {
-	if chat.RootChatID.Valid {
-		return chat.RootChatID.UUID
-	}
-	if chat.ParentChatID.Valid {
-		return chat.ParentChatID.UUID
-	}
-	return chat.ID
-}
-
 func (api *API) hydrateChatGoals(ctx context.Context, chats []codersdk.Chat) error {
 	if len(chats) == 0 {
 		return nil
@@ -2261,41 +2251,6 @@ func (api *API) getChat(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpapi.Write(ctx, rw, http.StatusOK, hydrated[0])
-}
-
-// EXPERIMENTAL: this endpoint is experimental and is subject to change.
-//
-// @Summary Get current chat goal
-// @ID get-current-chat-goal
-// @Security CoderSessionToken
-// @Tags Chats
-// @Produce json
-// @Param chat path string true "Chat ID" format(uuid)
-// @Success 200 {object} codersdk.ChatGoalResponse
-// @Router /api/experimental/chats/{chat}/goal [get]
-// @x-apidocgen {"skip": true}
-// @Description Experimental: this endpoint is subject to change.
-func (api *API) chatGoal(rw http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	chat := httpmw.ChatParam(r)
-
-	if !api.requireChatGoalsEnabled(ctx, rw) {
-		return
-	}
-
-	goal, err := api.Database.GetCurrentChatGoalByRootChatID(ctx, dbChatRootID(chat))
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			httpapi.Write(ctx, rw, http.StatusOK, codersdk.ChatGoalResponse{})
-			return
-		}
-		httpapi.Write(ctx, rw, http.StatusInternalServerError, codersdk.Response{
-			Message: "Failed to load chat goal.",
-			Detail:  err.Error(),
-		})
-		return
-	}
-	httpapi.Write(ctx, rw, http.StatusOK, chatGoalResponse(&goal))
 }
 
 // EXPERIMENTAL: this endpoint is experimental and is subject to change.

@@ -24,9 +24,6 @@ export const chatMessagesKey = (chatId: string) =>
 export const chatPromptsKey = (chatId: string) =>
 	["chats", chatId, "prompts"] as const;
 
-export const chatGoalKey = (chatId: string) =>
-	["chats", chatId, "goal"] as const;
-
 export const chatACLKey = (chatId: string) => ["chats", chatId, "acl"] as const;
 
 export type ChatListPRStatusFilter = "draft" | "open" | "merged" | "closed";
@@ -613,11 +610,6 @@ const isChatDetailQuery = (query: {
 	);
 };
 
-const isChatGoalQuery = (query: { queryKey: readonly unknown[] }): boolean => {
-	const key = query.queryKey;
-	return key.length === 3 && typeof key[1] === "string" && key[2] === "goal";
-};
-
 const chatRootId = (chat: TypesGen.Chat): string =>
 	chat.root_chat_id ?? chat.parent_chat_id ?? chat.id;
 
@@ -763,11 +755,6 @@ export const chatSearch = (q: string) =>
 export const chat = (chatId: string) => ({
 	queryKey: chatKey(chatId),
 	queryFn: () => API.experimental.getChat(chatId),
-});
-
-export const chatGoal = (chatId: string) => ({
-	queryKey: chatGoalKey(chatId),
-	queryFn: () => API.experimental.getChatGoal(chatId),
 });
 
 export const chatACL = (chatId: string) => ({
@@ -1043,12 +1030,6 @@ export const setCachedChatGoal = (
 	const cachedGoal = currentChatGoal(goal);
 	const familyId =
 		goal?.root_chat_id ?? cachedChatFamilyIDs.get(chatId) ?? chatId;
-	const cachedFamilyChatIDs = new Set<string>([chatId, familyId]);
-	for (const [cachedChatID, cachedFamilyID] of cachedChatFamilyIDs) {
-		if (cachedFamilyID === familyId) {
-			cachedFamilyChatIDs.add(cachedChatID);
-		}
-	}
 	const isFamilyChat = (chat: TypesGen.Chat) => chatRootId(chat) === familyId;
 	const applyGoal = (chat: TypesGen.Chat) =>
 		chat.goal === cachedGoal ? chat : { ...chat, goal: cachedGoal };
@@ -1087,27 +1068,6 @@ export const setCachedChatGoal = (
 		(previousChat) =>
 			previousChat ? applyGoalToTree(previousChat) : previousChat,
 	);
-	queryClient.setQueriesData<TypesGen.ChatGoalResponse>(
-		{
-			queryKey: chatsKey,
-			predicate: (query) => {
-				if (!isChatGoalQuery(query)) {
-					return false;
-				}
-				const keyChatId = query.queryKey[1];
-				if (keyChatId === chatId) {
-					return false;
-				}
-				return (
-					typeof keyChatId === "string" && cachedFamilyChatIDs.has(keyChatId)
-				);
-			},
-		},
-		() => ({ goal: cachedGoal }),
-	);
-	queryClient.setQueryData<TypesGen.ChatGoalResponse>(chatGoalKey(chatId), {
-		goal: cachedGoal,
-	});
 };
 
 export const updateChatGoal = (queryClient: QueryClient) => ({
@@ -1121,10 +1081,6 @@ export const updateChatGoal = (queryClient: QueryClient) => ({
 			predicate: isChatListQuery,
 		});
 		await queryClient.cancelQueries({ queryKey: chatKey(chatId), exact: true });
-		await queryClient.cancelQueries({
-			queryKey: chatGoalKey(chatId),
-			exact: true,
-		});
 	},
 	onSuccess: (
 		response: TypesGen.ChatGoalResponse,
@@ -1140,10 +1096,6 @@ export const updateChatGoal = (queryClient: QueryClient) => ({
 		// Refetch so the caches converge on server state even if a
 		// concurrent update won a race with the optimistic cache writes.
 		queryClient.invalidateQueries({ queryKey: chatKey(chatId), exact: true });
-		queryClient.invalidateQueries({
-			queryKey: chatGoalKey(chatId),
-			exact: true,
-		});
 	},
 });
 

@@ -3582,21 +3582,6 @@ func (mr *MockStoreMockRecorder) GetCryptoKeysByFeature(ctx, feature any) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCryptoKeysByFeature", reflect.TypeOf((*MockStore)(nil).GetCryptoKeysByFeature), ctx, feature)
 }
 
-// GetCurrentChatGoalByRootChatID mocks base method.
-func (m *MockStore) GetCurrentChatGoalByRootChatID(ctx context.Context, rootChatID uuid.UUID) (database.ChatGoal, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetCurrentChatGoalByRootChatID", ctx, rootChatID)
-	ret0, _ := ret[0].(database.ChatGoal)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetCurrentChatGoalByRootChatID indicates an expected call of GetCurrentChatGoalByRootChatID.
-func (mr *MockStoreMockRecorder) GetCurrentChatGoalByRootChatID(ctx, rootChatID any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentChatGoalByRootChatID", reflect.TypeOf((*MockStore)(nil).GetCurrentChatGoalByRootChatID), ctx, rootChatID)
-}
-
 // GetCurrentChatGoalsByRootChatIDs mocks base method.
 func (m *MockStore) GetCurrentChatGoalsByRootChatIDs(ctx context.Context, rootChatIds []uuid.UUID) ([]database.ChatGoal, error) {
 	m.ctrl.T.Helper()
@@ -9159,12 +9144,11 @@ func (mr *MockStoreMockRecorder) MarkChatsContextDirtyByAgent(ctx, arg any) *gom
 }
 
 // MarkCurrentChatGoalReplacedByRootChatID mocks base method.
-func (m *MockStore) MarkCurrentChatGoalReplacedByRootChatID(ctx context.Context, rootChatID uuid.UUID) ([]database.ChatGoal, error) {
+func (m *MockStore) MarkCurrentChatGoalReplacedByRootChatID(ctx context.Context, rootChatID uuid.UUID) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "MarkCurrentChatGoalReplacedByRootChatID", ctx, rootChatID)
-	ret0, _ := ret[0].([]database.ChatGoal)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // MarkCurrentChatGoalReplacedByRootChatID indicates an expected call of MarkCurrentChatGoalReplacedByRootChatID.

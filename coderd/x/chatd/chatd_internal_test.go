@@ -2017,7 +2017,6 @@ func TestApplyGoalMutationCompleteInterruptsRunningChat(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result.Goal)
 	require.Equal(t, database.ChatGoalStatusComplete, result.Goal.Status)
-	require.Equal(t, database.ChatStatusInterrupting, result.Chat.Status)
 
 	latest, err := f.db.GetChatByID(dbauthz.AsSystemRestricted(ctx), chat.ID)
 	require.NoError(t, err)

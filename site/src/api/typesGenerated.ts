@@ -2276,7 +2276,6 @@ export const ChatGitWatchWorkspaceNotFoundMessage = "Chat workspace not found.";
 export interface ChatGoal {
 	readonly id: string;
 	readonly root_chat_id: string;
-	readonly created_from_chat_id?: string;
 	readonly objective: string;
 	readonly status: ChatGoalStatus;
 	readonly completion_summary?: string;
@@ -2287,7 +2286,6 @@ export interface ChatGoal {
 	readonly updated_at: string;
 	readonly completed_at?: string;
 	readonly cleared_at?: string;
-	readonly replaced_at?: string;
 }
 
 // From codersdk/chats.go
@@ -2326,19 +2324,13 @@ export interface ChatGoalResponse {
 }
 
 // From codersdk/chats.go
-export type ChatGoalStatus =
-	| "active"
-	| "cleared"
-	| "complete"
-	| "paused"
-	| "replaced";
+export type ChatGoalStatus = "active" | "cleared" | "complete" | "paused";
 
 export const ChatGoalStatuses: ChatGoalStatus[] = [
 	"active",
 	"cleared",
 	"complete",
 	"paused",
-	"replaced",
 ];
 
 // From codersdk/chats.go

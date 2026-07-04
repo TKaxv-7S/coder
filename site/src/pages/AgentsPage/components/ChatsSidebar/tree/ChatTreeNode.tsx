@@ -30,7 +30,7 @@ import { ChatActionsMenuItems } from "../../ChatActionsMenuItems";
 import { asNonEmptyString } from "../../ChatConversation/blockUtils";
 import { normalizeLocationSearch } from "../locationSearch";
 import { useChatTree } from "./ChatTreeContext";
-import { getParentChatID } from "./chatTree";
+import { activeGoalObjective, getParentChatID } from "./chatTree";
 import { getModelDisplayName } from "./modelDisplayName";
 import { getChatDisplayConfig } from "./statusConfig";
 
@@ -82,11 +82,8 @@ export const ChatTreeNode: FC<ChatTreeNodeProps> = ({ chat, isChildNode }) => {
 			? chatErrorReasons[chat.id] || chat.last_error?.message || undefined
 			: undefined;
 	const lastTurnSummary = asNonEmptyString(chat.last_turn_summary);
-	const activeGoalObjective =
-		!isChildNode && chat.goal?.status === "active"
-			? asNonEmptyString(chat.goal.objective)
-			: undefined;
-	const displayTitle = activeGoalObjective ?? chat.title;
+	const goalObjective = activeGoalObjective(chat, isChildNode);
+	const displayTitle = goalObjective ?? chat.title;
 	const isStreaming = chat.status === "running" || chat.status === "pending";
 	const streamingSubtitle = isStreaming ? `${modelName} streaming…` : undefined;
 	const staleTurnSummaryReleaseMs = 10_000;
@@ -229,7 +226,7 @@ export const ChatTreeNode: FC<ChatTreeNodeProps> = ({ chat, isChildNode }) => {
 							{({ isActive }) => (
 								<div className="min-w-0 flex-1 overflow-hidden text-left">
 									<div className="flex min-w-0 items-center gap-1.5 overflow-hidden">
-										{activeGoalObjective && (
+										{goalObjective && (
 											<TargetIcon
 												className="size-3.5 shrink-0 text-content-secondary"
 												aria-label="Active goal"

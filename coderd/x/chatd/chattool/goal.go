@@ -80,13 +80,26 @@ type completeGoalResult struct {
 	Summary   string             `json:"summary"`
 }
 
+// CurrentChatGoalByRootChatID loads the current goal for a root chat through
+// the batch query. It returns sql.ErrNoRows when no current goal exists.
+func CurrentChatGoalByRootChatID(ctx context.Context, db database.Store, rootChatID uuid.UUID) (database.ChatGoal, error) {
+	goals, err := db.GetCurrentChatGoalsByRootChatIDs(ctx, []uuid.UUID{rootChatID})
+	if err != nil {
+		return database.ChatGoal{}, err
+	}
+	if len(goals) == 0 {
+		return database.ChatGoal{}, sql.ErrNoRows
+	}
+	return goals[0], nil
+}
+
 // GetGoal returns a read-only tool for inspecting the current root goal.
 func GetGoal(db database.Store, options GoalToolOptions) fantasy.AgentTool {
 	return fantasy.NewAgentTool(
 		GetGoalToolName,
 		"Inspect the current durable goal for this root chat. Returns null when no current goal exists.",
 		func(ctx context.Context, _ getGoalArgs, _ fantasy.ToolCall) (fantasy.ToolResponse, error) {
-			goal, err := db.GetCurrentChatGoalByRootChatID(ctx, options.RootChatID)
+			goal, err := CurrentChatGoalByRootChatID(ctx, db, options.RootChatID)
 			if err != nil {
 				if errors.Is(err, sql.ErrNoRows) {
 					return marshalToolResponse(goalResult{}), nil
@@ -136,7 +149,7 @@ func CompleteGoal(db database.Store, options GoalToolOptions) fantasy.AgentTool 
 				if err := verifyGoalToolFence(ctx, tx, options.ChatID, options.Fence); err != nil {
 					return err
 				}
-				current, err := tx.GetCurrentChatGoalByRootChatID(ctx, options.RootChatID)
+				current, err := CurrentChatGoalByRootChatID(ctx, tx, options.RootChatID)
 				if err != nil {
 					if errors.Is(err, sql.ErrNoRows) {
 						return sql.ErrNoRows

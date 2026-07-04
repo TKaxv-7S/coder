@@ -75,7 +75,7 @@ func TestGoalTools(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(completeResp.Content), &payload))
 	require.True(t, payload.Completed)
 
-	completedGoal, err := db.GetCurrentChatGoalByRootChatID(dbauthz.AsSystemRestricted(ctx), chat.ID)
+	completedGoal, err := chattool.CurrentChatGoalByRootChatID(dbauthz.AsSystemRestricted(ctx), db, chat.ID)
 	require.NoError(t, err)
 	require.Equal(t, goal.ID, completedGoal.ID)
 	require.Equal(t, database.ChatGoalStatusComplete, completedGoal.Status)
@@ -126,7 +126,7 @@ func TestCompleteGoalRejectsFenceMismatch(t *testing.T) {
 	require.True(t, resp.IsError)
 	require.Contains(t, resp.Content, "the goal was not modified")
 
-	current, err := db.GetCurrentChatGoalByRootChatID(dbauthz.AsSystemRestricted(ctx), chat.ID)
+	current, err := chattool.CurrentChatGoalByRootChatID(dbauthz.AsSystemRestricted(ctx), db, chat.ID)
 	require.NoError(t, err)
 	require.Equal(t, database.ChatGoalStatusActive, current.Status)
 }

@@ -5001,7 +5001,6 @@ type ChatGoal struct {
 	ID                   uuid.UUID      `db:"id" json:"id"`
 	GoalOrder            int64          `db:"goal_order" json:"goal_order"`
 	RootChatID           uuid.UUID      `db:"root_chat_id" json:"root_chat_id"`
-	CreatedFromChatID    uuid.NullUUID  `db:"created_from_chat_id" json:"created_from_chat_id"`
 	CreatedFromMessageID sql.NullInt64  `db:"created_from_message_id" json:"created_from_message_id"`
 	Objective            string         `db:"objective" json:"objective"`
 	Status               ChatGoalStatus `db:"status" json:"status"`

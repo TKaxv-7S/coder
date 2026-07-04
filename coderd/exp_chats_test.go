@@ -348,16 +348,12 @@ func TestChatGoalsRequireExperiment(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, chat.Goal)
 
-	_, err = client.GetChatGoal(ctx, chat.ID)
-	sdkErr := requireSDKError(t, err, http.StatusForbidden)
-	require.Contains(t, sdkErr.Message, "Chat goals are not enabled")
-
 	goalID := uuid.New()
 	_, err = client.UpdateChatGoal(ctx, chat.ID, codersdk.ChatGoalMutation{
 		Action: codersdk.ChatGoalMutationActionPause,
 		GoalID: &goalID,
 	})
-	sdkErr = requireSDKError(t, err, http.StatusForbidden)
+	sdkErr := requireSDKError(t, err, http.StatusForbidden)
 	require.Contains(t, sdkErr.Message, "Chat goals are not enabled")
 
 	_, err = client.CreateChat(ctx, codersdk.CreateChatRequest{
@@ -435,10 +431,10 @@ func TestChatGoalAPI(t *testing.T) {
 	require.Len(t, sentAsGoal, 1)
 	require.Equal(t, codersdk.ChatMessageRoleUser, sentAsGoal[0].Role)
 
-	goalResp, err := client.GetChatGoal(ctx, chat.ID)
+	gotChat, err := client.GetChat(ctx, chat.ID)
 	require.NoError(t, err)
-	require.NotNil(t, goalResp.Goal)
-	require.Equal(t, chat.Goal.ID, goalResp.Goal.ID)
+	require.NotNil(t, gotChat.Goal)
+	require.Equal(t, chat.Goal.ID, gotChat.Goal.ID)
 
 	paused, err := client.UpdateChatGoal(ctx, chat.ID, codersdk.ChatGoalMutation{
 		Action: codersdk.ChatGoalMutationActionPause,
@@ -447,7 +443,7 @@ func TestChatGoalAPI(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, paused.Goal)
 	require.Equal(t, codersdk.ChatGoalStatusPaused, paused.Goal.Status)
-	gotChat, err := client.GetChat(ctx, chat.ID)
+	gotChat, err = client.GetChat(ctx, chat.ID)
 	require.NoError(t, err)
 	require.NotNil(t, gotChat.Goal)
 	require.Equal(t, codersdk.ChatGoalStatusPaused, gotChat.Goal.Status)
@@ -470,11 +466,6 @@ func TestChatGoalAPI(t *testing.T) {
 	require.NotNil(t, completed.Goal.CompletionSummary)
 	require.Equal(t, "Marked complete by user.", *completed.Goal.CompletionSummary)
 
-	current, err := client.GetChatGoal(ctx, chat.ID)
-	require.NoError(t, err)
-	require.NotNil(t, current.Goal)
-	require.Equal(t, codersdk.ChatGoalStatusComplete, current.Goal.Status)
-
 	gotChat, err = client.GetChat(ctx, chat.ID)
 	require.NoError(t, err)
 	require.NotNil(t, gotChat.Goal)
@@ -487,10 +478,6 @@ func TestChatGoalAPI(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, cleared.Goal)
 	require.Equal(t, codersdk.ChatGoalStatusCleared, cleared.Goal.Status)
-
-	current, err = client.GetChatGoal(ctx, chat.ID)
-	require.NoError(t, err)
-	require.Nil(t, current.Goal)
 
 	gotChat, err = client.GetChat(ctx, chat.ID)
 	require.NoError(t, err)
@@ -557,11 +544,11 @@ func TestChatGoalAPI(t *testing.T) {
 	require.ErrorAs(t, err, &sdkErr)
 	require.Equal(t, http.StatusConflict, sdkErr.StatusCode())
 
-	// The stale completed goal keeps its completion metadata.
-	current, err = client.GetChatGoal(ctx, chat.ID)
+	// The newer goal stays current after the stale clear attempt.
+	gotChat, err = client.GetChat(ctx, chat.ID)
 	require.NoError(t, err)
-	require.NotNil(t, current.Goal)
-	require.Equal(t, newerResponse.Goal.ID, current.Goal.ID)
+	require.NotNil(t, gotChat.Goal)
+	require.Equal(t, newerResponse.Goal.ID, gotChat.Goal.ID)
 }
 
 func TestPatchChatGoalRequiresOwnerForSharedSiteOwner(t *testing.T) {
@@ -608,10 +595,10 @@ func TestPatchChatGoalRequiresOwnerForSharedSiteOwner(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	gotGoal, err := sharedOwnerClient.GetChatGoal(ctx, chat.ID)
+	sharedChat, err := sharedOwnerClient.GetChat(ctx, chat.ID)
 	require.NoError(t, err)
-	require.NotNil(t, gotGoal.Goal)
-	require.Equal(t, chat.Goal.ID, gotGoal.Goal.ID)
+	require.NotNil(t, sharedChat.Goal)
+	require.Equal(t, chat.Goal.ID, sharedChat.Goal.ID)
 
 	_, err = sharedOwnerClient.UpdateChatGoal(ctx, chat.ID, codersdk.ChatGoalMutation{
 		Action: codersdk.ChatGoalMutationActionPause,
@@ -620,10 +607,10 @@ func TestPatchChatGoalRequiresOwnerForSharedSiteOwner(t *testing.T) {
 	sdkErr := requireSDKError(t, err, http.StatusForbidden)
 	require.Contains(t, sdkErr.Message, "Only the chat owner")
 
-	current, err := ownerClient.GetChatGoal(ctx, chat.ID)
+	ownerChat, err := ownerClient.GetChat(ctx, chat.ID)
 	require.NoError(t, err)
-	require.NotNil(t, current.Goal)
-	require.Equal(t, codersdk.ChatGoalStatusActive, current.Goal.Status)
+	require.NotNil(t, ownerChat.Goal)
+	require.Equal(t, codersdk.ChatGoalStatusActive, ownerChat.Goal.Status)
 }
 
 func TestPostChats(t *testing.T) {

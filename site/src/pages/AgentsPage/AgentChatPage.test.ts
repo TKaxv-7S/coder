@@ -223,90 +223,47 @@ describe("runGoalAction", () => {
 	});
 
 	it.each([
-		"active",
-		"paused",
-	] as const)("sends clear mutations for %s goals", async (status) => {
+		{ status: "active", action: "clear", completionSummary: undefined },
+		{ status: "paused", action: "clear", completionSummary: undefined },
+		{ status: "paused", action: "resume", completionSummary: undefined },
+		{ status: "complete", action: "clear", completionSummary: undefined },
+		{
+			status: "active",
+			action: "complete",
+			completionSummary: "Shipped and verified.",
+		},
+	] as const)("sends $action mutations for $status goals", async ({
+		status,
+		action,
+		completionSummary,
+	}) => {
 		const updateGoal = vi.fn(async () => undefined);
 
 		await runGoalAction({
 			agentId: "chat-1",
 			goal: makeGoal(status),
-			action: "clear",
+			action,
+			completionSummary,
 			updateGoal,
 		});
 
 		expect(updateGoal).toHaveBeenCalledWith({
 			chatId: "chat-1",
 			mutation: {
-				action: "clear",
+				action,
 				goal_id: "goal-1",
-				completion_summary: undefined,
+				completion_summary: completionSummary,
 			},
 		});
 	});
 
-	it("sends resume mutations for paused goals", async () => {
-		const updateGoal = vi.fn(async () => undefined);
-
-		await runGoalAction({
-			agentId: "chat-1",
-			goal: makeGoal("paused"),
-			action: "resume",
-			updateGoal,
-		});
-
-		expect(updateGoal).toHaveBeenCalledWith({
-			chatId: "chat-1",
-			mutation: {
-				action: "resume",
-				goal_id: "goal-1",
-				completion_summary: undefined,
-			},
-		});
-	});
-
-	it("forwards completion summaries", async () => {
-		const updateGoal = vi.fn(async () => undefined);
-
-		await runGoalAction({
-			agentId: "chat-1",
-			goal: makeGoal("active"),
-			action: "complete",
-			completionSummary: "Shipped and verified.",
-			updateGoal,
-		});
-
-		expect(updateGoal).toHaveBeenCalledWith({
-			chatId: "chat-1",
-			mutation: {
-				action: "complete",
-				goal_id: "goal-1",
-				completion_summary: "Shipped and verified.",
-			},
-		});
-	});
-
-	it("sends clear mutations for completed goals", async () => {
-		const updateGoal = vi.fn(async () => undefined);
-
-		await runGoalAction({
-			agentId: "chat-1",
-			goal: makeGoal("complete"),
-			action: "clear",
-			updateGoal,
-		});
-
-		expect(updateGoal).toHaveBeenCalledWith({
-			chatId: "chat-1",
-			mutation: {
-				action: "clear",
-				goal_id: "goal-1",
-				completion_summary: undefined,
-			},
-		});
-	});
-
-	it("notifies when pausing a running goal", async () => {
+	it.each([
+		{ liveChatStatus: "running", notified: true },
+		{ liveChatStatus: "waiting", notified: false },
+	] as const)("notifies on pause only for running goals (status $liveChatStatus)", async ({
+		liveChatStatus,
+		notified,
+	}) => {
 		const updateGoal = vi.fn(async () => undefined);
 		const onPausedRunningGoal = vi.fn();
 
@@ -315,27 +272,11 @@ describe("runGoalAction", () => {
 			goal: makeGoal("active"),
 			action: "pause",
 			updateGoal,
-			liveChatStatus: "running",
+			liveChatStatus,
 			onPausedRunningGoal,
 		});
 
-		expect(onPausedRunningGoal).toHaveBeenCalledOnce();
-	});
-
-	it("does not notify when pausing a waiting goal", async () => {
-		const updateGoal = vi.fn(async () => undefined);
-		const onPausedRunningGoal = vi.fn();
-
-		await runGoalAction({
-			agentId: "chat-1",
-			goal: makeGoal("active"),
-			action: "pause",
-			updateGoal,
-			liveChatStatus: "waiting",
-			onPausedRunningGoal,
-		});
-
-		expect(onPausedRunningGoal).not.toHaveBeenCalled();
+		expect(onPausedRunningGoal).toHaveBeenCalledTimes(notified ? 1 : 0);
 	});
 
 	it("does not send lifecycle mutations without a current goal", async () => {

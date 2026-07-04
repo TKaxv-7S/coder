@@ -1244,9 +1244,8 @@ type ApplyGoalMutationOptions struct {
 	Mutation  codersdk.ChatGoalMutation
 }
 
-// ApplyGoalMutationResult contains the updated chat and current goal state.
+// ApplyGoalMutationResult contains the current goal state after a mutation.
 type ApplyGoalMutationResult struct {
-	Chat database.Chat
 	Goal *database.ChatGoal
 }
 
@@ -1263,6 +1262,7 @@ func (p *Server) ApplyGoalMutation(ctx context.Context, opts ApplyGoalMutationOp
 	}
 
 	var result ApplyGoalMutationResult
+	var publishChat database.Chat
 	var publishStatusChange bool
 	machine := p.newChatMachine(opts.ChatID)
 	updateErr := machine.Update(ctx, func(tx *chatstate.Tx, store database.Store) error {
@@ -1276,11 +1276,11 @@ func (p *Server) ApplyGoalMutation(ctx context.Context, opts ApplyGoalMutationOp
 		if !isRootChat(lockedChat) {
 			return ErrChatGoalNotRoot
 		}
-		goal, err := applyGoalMutation(ctx, store, lockedChat.ID, lockedChat.ID, 0, opts.CreatedBy, mutation)
+		goal, err := applyGoalMutation(ctx, store, lockedChat.ID, 0, opts.CreatedBy, mutation)
 		if err != nil {
 			return err
 		}
-		result.Chat = lockedChat
+		publishChat = lockedChat
 		if mutation.Action == codersdk.ChatGoalMutationActionComplete && lockedChat.Status == database.ChatStatusRunning {
 			if _, err := tx.Interrupt(chatstate.InterruptInput{Reason: "Chat goal marked complete by user"}); err != nil {
 				return xerrors.Errorf("interrupt completed chat goal run: %w", err)
@@ -1289,7 +1289,7 @@ func (p *Server) ApplyGoalMutation(ctx context.Context, opts ApplyGoalMutationOp
 			if err != nil {
 				return xerrors.Errorf("reload chat after goal mutation interruption: %w", err)
 			}
-			result.Chat = latest
+			publishChat = latest
 			publishStatusChange = true
 		}
 		result.Goal = goal
@@ -1298,9 +1298,9 @@ func (p *Server) ApplyGoalMutation(ctx context.Context, opts ApplyGoalMutationOp
 	if updateErr != nil {
 		return ApplyGoalMutationResult{}, updateErr
 	}
-	p.publishChatGoalChange(result.Chat, result.Goal)
+	p.publishChatGoalChange(publishChat, result.Goal)
 	if publishStatusChange {
-		p.publishChatPubsubEvent(result.Chat, codersdk.ChatWatchEventKindStatusChange, nil)
+		p.publishChatPubsubEvent(publishChat, codersdk.ChatWatchEventKindStatusChange, nil)
 	}
 	return result, nil
 }
@@ -1320,7 +1320,7 @@ func chatRootID(chat database.Chat) uuid.UUID {
 }
 
 func currentChatGoal(ctx context.Context, db database.Store, rootChatID uuid.UUID) (*database.ChatGoal, error) {
-	goal, err := db.GetCurrentChatGoalByRootChatID(ctx, rootChatID)
+	goal, err := chattool.CurrentChatGoalByRootChatID(ctx, db, rootChatID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			//nolint:nilnil // A missing current goal is represented as nil.
@@ -1439,22 +1439,17 @@ func applyGoalMutation(
 	ctx context.Context,
 	tx database.Store,
 	rootChatID uuid.UUID,
-	createdFromChatID uuid.UUID,
 	createdFromMessageID int64,
 	createdBy uuid.UUID,
 	mutation codersdk.ChatGoalMutation,
 ) (*database.ChatGoal, error) {
 	switch mutation.Action {
 	case codersdk.ChatGoalMutationActionSet:
-		if _, err := tx.MarkCurrentChatGoalReplacedByRootChatID(ctx, rootChatID); err != nil {
+		if err := tx.MarkCurrentChatGoalReplacedByRootChatID(ctx, rootChatID); err != nil {
 			return nil, xerrors.Errorf("replace current chat goal: %w", err)
 		}
 		goal, err := tx.InsertActiveChatGoal(ctx, database.InsertActiveChatGoalParams{
 			RootChatID: rootChatID,
-			CreatedFromChatID: uuid.NullUUID{
-				UUID:  createdFromChatID,
-				Valid: createdFromChatID != uuid.Nil,
-			},
 			CreatedFromMessageID: sql.NullInt64{
 				Int64: createdFromMessageID,
 				Valid: createdFromMessageID > 0,
@@ -1703,7 +1698,7 @@ func (p *Server) CreateChat(ctx context.Context, opts CreateOptions) (database.C
 			if initialUserMessageID == 0 {
 				return xerrors.New("initial user message not found for goal mutation")
 			}
-			goal, err := applyGoalMutation(ctx, store, chat.ID, chat.ID, initialUserMessageID, opts.OwnerID, *goalMutation)
+			goal, err := applyGoalMutation(ctx, store, chat.ID, initialUserMessageID, opts.OwnerID, *goalMutation)
 			if err != nil {
 				return err
 			}
@@ -1863,7 +1858,7 @@ func (p *Server) SendMessage(
 			// last in the inserted slice.
 			result.Message = sendResult.InsertedMessages[len(sendResult.InsertedMessages)-1]
 			if goalMutation != nil {
-				goal, err := applyGoalMutation(ctx, store, lockedChat.ID, lockedChat.ID, result.Message.ID, messageCreatedBy, *goalMutation)
+				goal, err := applyGoalMutation(ctx, store, lockedChat.ID, result.Message.ID, messageCreatedBy, *goalMutation)
 				if err != nil {
 					return err
 				}

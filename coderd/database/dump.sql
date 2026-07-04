@@ -1894,7 +1894,6 @@ CREATE TABLE chat_goals (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     goal_order bigint NOT NULL,
     root_chat_id uuid NOT NULL,
-    created_from_chat_id uuid,
     created_from_message_id bigint,
     objective text NOT NULL,
     status chat_goal_status NOT NULL,
@@ -5063,9 +5062,6 @@ ALTER TABLE ONLY chat_goals
 
 ALTER TABLE ONLY chat_goals
     ADD CONSTRAINT chat_goals_created_by_user_id_fkey FOREIGN KEY (created_by_user_id) REFERENCES users(id);
-
-ALTER TABLE ONLY chat_goals
-    ADD CONSTRAINT chat_goals_created_from_chat_id_fkey FOREIGN KEY (created_from_chat_id) REFERENCES chats(id) ON DELETE SET NULL;
 
 ALTER TABLE ONLY chat_goals
     ADD CONSTRAINT chat_goals_created_from_message_id_fkey FOREIGN KEY (created_from_message_id) REFERENCES chat_messages(id) ON DELETE SET NULL;

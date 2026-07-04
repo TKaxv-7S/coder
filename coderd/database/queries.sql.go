@@ -6174,7 +6174,7 @@ WHERE
     root_chat_id = $1::uuid
     AND id = $2::uuid
     AND status IN ('active', 'paused', 'complete')
-RETURNING id, goal_order, root_chat_id, created_from_chat_id, created_from_message_id, objective, status, completion_summary, created_by_user_id, completed_by_user_id, completed_by_agent, created_at, updated_at, completed_at, cleared_at, replaced_at
+RETURNING id, goal_order, root_chat_id, created_from_message_id, objective, status, completion_summary, created_by_user_id, completed_by_user_id, completed_by_agent, created_at, updated_at, completed_at, cleared_at, replaced_at
 `
 
 type ClearChatGoalByIDParams struct {
@@ -6189,7 +6189,6 @@ func (q *sqlQuerier) ClearChatGoalByID(ctx context.Context, arg ClearChatGoalByI
 		&i.ID,
 		&i.GoalOrder,
 		&i.RootChatID,
-		&i.CreatedFromChatID,
 		&i.CreatedFromMessageID,
 		&i.Objective,
 		&i.Status,
@@ -6233,7 +6232,7 @@ WHERE
     root_chat_id = $4::uuid
     AND id = $5::uuid
     AND status = 'active'
-RETURNING id, goal_order, root_chat_id, created_from_chat_id, created_from_message_id, objective, status, completion_summary, created_by_user_id, completed_by_user_id, completed_by_agent, created_at, updated_at, completed_at, cleared_at, replaced_at
+RETURNING id, goal_order, root_chat_id, created_from_message_id, objective, status, completion_summary, created_by_user_id, completed_by_user_id, completed_by_agent, created_at, updated_at, completed_at, cleared_at, replaced_at
 `
 
 type CompleteChatGoalByIDParams struct {
@@ -6257,7 +6256,6 @@ func (q *sqlQuerier) CompleteChatGoalByID(ctx context.Context, arg CompleteChatG
 		&i.ID,
 		&i.GoalOrder,
 		&i.RootChatID,
-		&i.CreatedFromChatID,
 		&i.CreatedFromMessageID,
 		&i.Objective,
 		&i.Status,
@@ -7560,7 +7558,7 @@ SELECT DISTINCT
 FROM
     chat_goals
 WHERE
-    created_from_chat_id = $1::uuid
+    root_chat_id = $1::uuid
     AND created_from_message_id = ANY($2::bigint[])
 `
 
@@ -7569,6 +7567,8 @@ type GetChatGoalMessageIDsByChatAndMessageIDsParams struct {
 	MessageIds []int64   `db:"message_ids" json:"message_ids"`
 }
 
+// Goals are only created from root-chat messages, so scoping by
+// root_chat_id both authorizes the lookup and excludes other chats.
 func (q *sqlQuerier) GetChatGoalMessageIDsByChatAndMessageIDs(ctx context.Context, arg GetChatGoalMessageIDsByChatAndMessageIDsParams) ([]int64, error) {
 	rows, err := q.db.QueryContext(ctx, getChatGoalMessageIDsByChatAndMessageIDs, arg.ChatID, pq.Array(arg.MessageIds))
 	if err != nil {
@@ -9390,51 +9390,6 @@ func (q *sqlQuerier) GetChildChatsByParentIDs(ctx context.Context, arg GetChildC
 	return items, nil
 }
 
-const getCurrentChatGoalByRootChatID = `-- name: GetCurrentChatGoalByRootChatID :one
-SELECT
-    chat_goals.id, chat_goals.goal_order, chat_goals.root_chat_id, chat_goals.created_from_chat_id, chat_goals.created_from_message_id, chat_goals.objective, chat_goals.status, chat_goals.completion_summary, chat_goals.created_by_user_id, chat_goals.completed_by_user_id, chat_goals.completed_by_agent, chat_goals.created_at, chat_goals.updated_at, chat_goals.completed_at, chat_goals.cleared_at, chat_goals.replaced_at
-FROM
-    chat_goals
-WHERE
-    id = (
-        SELECT
-            id
-        FROM
-            chat_goals
-        WHERE
-            root_chat_id = $1::uuid
-        ORDER BY
-            created_at DESC,
-            goal_order DESC
-        LIMIT 1
-    )
-    AND status IN ('active', 'paused', 'complete')
-`
-
-func (q *sqlQuerier) GetCurrentChatGoalByRootChatID(ctx context.Context, rootChatID uuid.UUID) (ChatGoal, error) {
-	row := q.db.QueryRowContext(ctx, getCurrentChatGoalByRootChatID, rootChatID)
-	var i ChatGoal
-	err := row.Scan(
-		&i.ID,
-		&i.GoalOrder,
-		&i.RootChatID,
-		&i.CreatedFromChatID,
-		&i.CreatedFromMessageID,
-		&i.Objective,
-		&i.Status,
-		&i.CompletionSummary,
-		&i.CreatedByUserID,
-		&i.CompletedByUserID,
-		&i.CompletedByAgent,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.CompletedAt,
-		&i.ClearedAt,
-		&i.ReplacedAt,
-	)
-	return i, err
-}
-
 const getCurrentChatGoalsByRootChatIDs = `-- name: GetCurrentChatGoalsByRootChatIDs :many
 WITH latest_goal_ids AS (
     SELECT DISTINCT ON (root_chat_id)
@@ -9449,7 +9404,7 @@ WITH latest_goal_ids AS (
         goal_order DESC
 )
 SELECT
-    chat_goals.id, chat_goals.goal_order, chat_goals.root_chat_id, chat_goals.created_from_chat_id, chat_goals.created_from_message_id, chat_goals.objective, chat_goals.status, chat_goals.completion_summary, chat_goals.created_by_user_id, chat_goals.completed_by_user_id, chat_goals.completed_by_agent, chat_goals.created_at, chat_goals.updated_at, chat_goals.completed_at, chat_goals.cleared_at, chat_goals.replaced_at
+    chat_goals.id, chat_goals.goal_order, chat_goals.root_chat_id, chat_goals.created_from_message_id, chat_goals.objective, chat_goals.status, chat_goals.completion_summary, chat_goals.created_by_user_id, chat_goals.completed_by_user_id, chat_goals.completed_by_agent, chat_goals.created_at, chat_goals.updated_at, chat_goals.completed_at, chat_goals.cleared_at, chat_goals.replaced_at
 FROM
     chat_goals
 JOIN latest_goal_ids ON latest_goal_ids.id = chat_goals.id
@@ -9470,7 +9425,6 @@ func (q *sqlQuerier) GetCurrentChatGoalsByRootChatIDs(ctx context.Context, rootC
 			&i.ID,
 			&i.GoalOrder,
 			&i.RootChatID,
-			&i.CreatedFromChatID,
 			&i.CreatedFromMessageID,
 			&i.Objective,
 			&i.Status,
@@ -9786,25 +9740,22 @@ func (q *sqlQuerier) IncrementChatGenerationAttempt(ctx context.Context, id uuid
 const insertActiveChatGoal = `-- name: InsertActiveChatGoal :one
 INSERT INTO chat_goals (
     root_chat_id,
-    created_from_chat_id,
     created_from_message_id,
     objective,
     status,
     created_by_user_id
 ) VALUES (
     $1::uuid,
-    $2::uuid,
-    $3::bigint,
-    $4::text,
+    $2::bigint,
+    $3::text,
     'active',
-    $5::uuid
+    $4::uuid
 )
-RETURNING id, goal_order, root_chat_id, created_from_chat_id, created_from_message_id, objective, status, completion_summary, created_by_user_id, completed_by_user_id, completed_by_agent, created_at, updated_at, completed_at, cleared_at, replaced_at
+RETURNING id, goal_order, root_chat_id, created_from_message_id, objective, status, completion_summary, created_by_user_id, completed_by_user_id, completed_by_agent, created_at, updated_at, completed_at, cleared_at, replaced_at
 `
 
 type InsertActiveChatGoalParams struct {
 	RootChatID           uuid.UUID     `db:"root_chat_id" json:"root_chat_id"`
-	CreatedFromChatID    uuid.NullUUID `db:"created_from_chat_id" json:"created_from_chat_id"`
 	CreatedFromMessageID sql.NullInt64 `db:"created_from_message_id" json:"created_from_message_id"`
 	Objective            string        `db:"objective" json:"objective"`
 	CreatedByUserID      uuid.UUID     `db:"created_by_user_id" json:"created_by_user_id"`
@@ -9813,7 +9764,6 @@ type InsertActiveChatGoalParams struct {
 func (q *sqlQuerier) InsertActiveChatGoal(ctx context.Context, arg InsertActiveChatGoalParams) (ChatGoal, error) {
 	row := q.db.QueryRowContext(ctx, insertActiveChatGoal,
 		arg.RootChatID,
-		arg.CreatedFromChatID,
 		arg.CreatedFromMessageID,
 		arg.Objective,
 		arg.CreatedByUserID,
@@ -9823,7 +9773,6 @@ func (q *sqlQuerier) InsertActiveChatGoal(ctx context.Context, arg InsertActiveC
 		&i.ID,
 		&i.GoalOrder,
 		&i.RootChatID,
-		&i.CreatedFromChatID,
 		&i.CreatedFromMessageID,
 		&i.Objective,
 		&i.Status,
@@ -10687,7 +10636,7 @@ func (q *sqlQuerier) MarkChatsContextDirtyByAgent(ctx context.Context, arg MarkC
 	return items, nil
 }
 
-const markCurrentChatGoalReplacedByRootChatID = `-- name: MarkCurrentChatGoalReplacedByRootChatID :many
+const markCurrentChatGoalReplacedByRootChatID = `-- name: MarkCurrentChatGoalReplacedByRootChatID :exec
 UPDATE
     chat_goals
 SET
@@ -10697,47 +10646,11 @@ SET
 WHERE
     root_chat_id = $1::uuid
     AND status IN ('active', 'paused')
-RETURNING id, goal_order, root_chat_id, created_from_chat_id, created_from_message_id, objective, status, completion_summary, created_by_user_id, completed_by_user_id, completed_by_agent, created_at, updated_at, completed_at, cleared_at, replaced_at
 `
 
-func (q *sqlQuerier) MarkCurrentChatGoalReplacedByRootChatID(ctx context.Context, rootChatID uuid.UUID) ([]ChatGoal, error) {
-	rows, err := q.db.QueryContext(ctx, markCurrentChatGoalReplacedByRootChatID, rootChatID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []ChatGoal
-	for rows.Next() {
-		var i ChatGoal
-		if err := rows.Scan(
-			&i.ID,
-			&i.GoalOrder,
-			&i.RootChatID,
-			&i.CreatedFromChatID,
-			&i.CreatedFromMessageID,
-			&i.Objective,
-			&i.Status,
-			&i.CompletionSummary,
-			&i.CreatedByUserID,
-			&i.CompletedByUserID,
-			&i.CompletedByAgent,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.CompletedAt,
-			&i.ClearedAt,
-			&i.ReplacedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+func (q *sqlQuerier) MarkCurrentChatGoalReplacedByRootChatID(ctx context.Context, rootChatID uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, markCurrentChatGoalReplacedByRootChatID, rootChatID)
+	return err
 }
 
 const pauseChatGoalByID = `-- name: PauseChatGoalByID :one
@@ -10750,7 +10663,7 @@ WHERE
     root_chat_id = $1::uuid
     AND id = $2::uuid
     AND status = 'active'
-RETURNING id, goal_order, root_chat_id, created_from_chat_id, created_from_message_id, objective, status, completion_summary, created_by_user_id, completed_by_user_id, completed_by_agent, created_at, updated_at, completed_at, cleared_at, replaced_at
+RETURNING id, goal_order, root_chat_id, created_from_message_id, objective, status, completion_summary, created_by_user_id, completed_by_user_id, completed_by_agent, created_at, updated_at, completed_at, cleared_at, replaced_at
 `
 
 type PauseChatGoalByIDParams struct {
@@ -10765,7 +10678,6 @@ func (q *sqlQuerier) PauseChatGoalByID(ctx context.Context, arg PauseChatGoalByI
 		&i.ID,
 		&i.GoalOrder,
 		&i.RootChatID,
-		&i.CreatedFromChatID,
 		&i.CreatedFromMessageID,
 		&i.Objective,
 		&i.Status,
@@ -10991,7 +10903,7 @@ WHERE
     root_chat_id = $1::uuid
     AND id = $2::uuid
     AND status = 'paused'
-RETURNING id, goal_order, root_chat_id, created_from_chat_id, created_from_message_id, objective, status, completion_summary, created_by_user_id, completed_by_user_id, completed_by_agent, created_at, updated_at, completed_at, cleared_at, replaced_at
+RETURNING id, goal_order, root_chat_id, created_from_message_id, objective, status, completion_summary, created_by_user_id, completed_by_user_id, completed_by_agent, created_at, updated_at, completed_at, cleared_at, replaced_at
 `
 
 type ResumeChatGoalByIDParams struct {
@@ -11006,7 +10918,6 @@ func (q *sqlQuerier) ResumeChatGoalByID(ctx context.Context, arg ResumeChatGoalB
 		&i.ID,
 		&i.GoalOrder,
 		&i.RootChatID,
-		&i.CreatedFromChatID,
 		&i.CreatedFromMessageID,
 		&i.Objective,
 		&i.Status,

@@ -1937,14 +1937,6 @@ func (m queryMetricsStore) GetCryptoKeysByFeature(ctx context.Context, feature d
 	return r0, r1
 }
 
-func (m queryMetricsStore) GetCurrentChatGoalByRootChatID(ctx context.Context, rootChatID uuid.UUID) (database.ChatGoal, error) {
-	start := time.Now()
-	r0, r1 := m.s.GetCurrentChatGoalByRootChatID(ctx, rootChatID)
-	m.queryLatencies.WithLabelValues("GetCurrentChatGoalByRootChatID").Observe(time.Since(start).Seconds())
-	m.queryCounts.WithLabelValues(httpmw.ExtractHTTPRoute(ctx), httpmw.ExtractHTTPMethod(ctx), "GetCurrentChatGoalByRootChatID").Inc()
-	return r0, r1
-}
-
 func (m queryMetricsStore) GetCurrentChatGoalsByRootChatIDs(ctx context.Context, rootChatIds []uuid.UUID) ([]database.ChatGoal, error) {
 	start := time.Now()
 	r0, r1 := m.s.GetCurrentChatGoalsByRootChatIDs(ctx, rootChatIds)
@@ -4865,12 +4857,12 @@ func (m queryMetricsStore) MarkChatsContextDirtyByAgent(ctx context.Context, arg
 	return r0, r1
 }
 
-func (m queryMetricsStore) MarkCurrentChatGoalReplacedByRootChatID(ctx context.Context, rootChatID uuid.UUID) ([]database.ChatGoal, error) {
+func (m queryMetricsStore) MarkCurrentChatGoalReplacedByRootChatID(ctx context.Context, rootChatID uuid.UUID) error {
 	start := time.Now()
-	r0, r1 := m.s.MarkCurrentChatGoalReplacedByRootChatID(ctx, rootChatID)
+	r0 := m.s.MarkCurrentChatGoalReplacedByRootChatID(ctx, rootChatID)
 	m.queryLatencies.WithLabelValues("MarkCurrentChatGoalReplacedByRootChatID").Observe(time.Since(start).Seconds())
 	m.queryCounts.WithLabelValues(httpmw.ExtractHTTPRoute(ctx), httpmw.ExtractHTTPMethod(ctx), "MarkCurrentChatGoalReplacedByRootChatID").Inc()
-	return r0, r1
+	return r0
 }
 
 func (m queryMetricsStore) OIDCClaimFieldValues(ctx context.Context, arg database.OIDCClaimFieldValuesParams) ([]string, error) {
