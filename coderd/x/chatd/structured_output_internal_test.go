@@ -4,12 +4,10 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/sqlc-dev/pqtype"
 	"github.com/stretchr/testify/require"
 
 	"cdr.dev/slog/v3"
 	"github.com/coder/coder/v2/coderd/database"
-	"github.com/coder/coder/v2/coderd/x/chatd/chatprompt"
 	"github.com/coder/coder/v2/coderd/x/chatd/structuredoutput"
 	"github.com/coder/coder/v2/codersdk"
 )
@@ -27,47 +25,34 @@ func testResponseFormat() codersdk.ChatResponseFormat {
 	}
 }
 
-func chatMessageWithParts(t *testing.T, id int64, role database.ChatMessageRole, parts []codersdk.ChatMessagePart) database.ChatMessage {
-	t.Helper()
-	raw, err := json.Marshal(parts)
-	require.NoError(t, err)
-	return database.ChatMessage{
-		ID:             id,
-		Role:           role,
-		Visibility:     database.ChatMessageVisibilityBoth,
-		Content:        pqtype.NullRawMessage{RawMessage: raw, Valid: true},
-		ContentVersion: chatprompt.CurrentContentVersion,
-	}
-}
-
 func userMessageWithFormat(t *testing.T, id int64, text string, format *codersdk.ChatResponseFormat) database.ChatMessage {
 	t.Helper()
 	parts := []codersdk.ChatMessagePart{codersdk.ChatMessageText(text)}
 	if format != nil {
 		parts = append(parts, codersdk.ChatMessageResponseFormat(*format))
 	}
-	return chatMessageWithParts(t, id, database.ChatMessageRoleUser, parts)
+	return dbMessage(t, id, database.ChatMessageRoleUser, false, parts...)
 }
 
 func textAssistantMessage(t *testing.T, id int64, text string) database.ChatMessage {
 	t.Helper()
-	return chatMessageWithParts(t, id, database.ChatMessageRoleAssistant, []codersdk.ChatMessagePart{
+	return dbMessage(t, id, database.ChatMessageRoleAssistant, false,
 		codersdk.ChatMessageText(text),
-	})
+	)
 }
 
 func finalizerCallMessage(t *testing.T, id int64, callID string, args string) database.ChatMessage {
 	t.Helper()
-	return chatMessageWithParts(t, id, database.ChatMessageRoleAssistant, []codersdk.ChatMessagePart{
+	return dbMessage(t, id, database.ChatMessageRoleAssistant, false,
 		codersdk.ChatMessageToolCall(callID, structuredoutput.ToolName, json.RawMessage(args)),
-	})
+	)
 }
 
 func finalizerResultMessage(t *testing.T, id int64, callID string, result string, isError bool) database.ChatMessage {
 	t.Helper()
-	return chatMessageWithParts(t, id, database.ChatMessageRoleTool, []codersdk.ChatMessagePart{
+	return dbMessage(t, id, database.ChatMessageRoleTool, false,
 		codersdk.ChatMessageToolResult(callID, structuredoutput.ToolName, json.RawMessage(result), isError, false),
-	})
+	)
 }
 
 func TestActiveTurnResponseFormat(t *testing.T) {
@@ -152,11 +137,11 @@ func TestActiveTurnResponseFormat(t *testing.T) {
 		t.Parallel()
 		second := testResponseFormat()
 		second.Description = "second format"
-		msg := chatMessageWithParts(t, 1, database.ChatMessageRoleUser, []codersdk.ChatMessagePart{
+		msg := dbMessage(t, 1, database.ChatMessageRoleUser, false,
 			codersdk.ChatMessageText("hello"),
 			codersdk.ChatMessageResponseFormat(format),
 			codersdk.ChatMessageResponseFormat(second),
-		})
+		)
 		req := activeTurnResponseFormat(ctx, logger, []database.ChatMessage{msg})
 		require.NotNil(t, req)
 		require.Equal(t, "second format", req.Description)
@@ -302,12 +287,12 @@ func TestDecideGenerationActionStructuredOutput(t *testing.T) {
 		decision, err := decideGenerationAction(generationDecisionInput{
 			messages: []database.ChatMessage{
 				userMessageWithFormat(t, 1, "plain", nil),
-				chatMessageWithParts(t, 2, database.ChatMessageRoleAssistant, []codersdk.ChatMessagePart{
+				dbMessage(t, 2, database.ChatMessageRoleAssistant, false,
 					codersdk.ChatMessageToolCall("call_1", "read_file", json.RawMessage(`{}`)),
-				}),
-				chatMessageWithParts(t, 3, database.ChatMessageRoleTool, []codersdk.ChatMessagePart{
+				),
+				dbMessage(t, 3, database.ChatMessageRoleTool, false,
 					codersdk.ChatMessageToolResult("call_1", "read_file", json.RawMessage(`{}`), false, false),
-				}),
+				),
 			},
 			maxSteps: 1,
 		})
