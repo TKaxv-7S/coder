@@ -52,13 +52,17 @@ func newStructuredOutputE2E(t *testing.T, streamFn func(req *chattest.OpenAIRequ
 		return streamFn(req)
 	})
 	user, org, model := seedChatDependenciesWithProvider(t, db, "openai-compat", openAIURL)
+	factory := chattest.NewMockAIBridgeTransport(t, openAIURL)
+	server := newActiveTestServer(t, db, ps, func(cfg *chatd.Config) {
+		cfg.AIBridgeTransportFactory = chatAIGatewayTransportFactoryPointer(factory)
+	})
 	return &structuredOutputE2E{
 		ctx:    testutil.Context(t, testutil.WaitLong),
 		db:     db,
 		user:   user,
 		org:    org,
 		model:  model,
-		server: newActiveTestServer(t, db, ps),
+		server: server,
 	}
 }
 
@@ -294,7 +298,7 @@ func TestActiveServer_StructuredOutput(t *testing.T) {
 		// still persist intact because truncation would corrupt the
 		// canonical JSON while reporting success.
 		smallContextModel := dbgen.ChatModelConfig(t, e2e.db, database.ChatModelConfig{
-			Provider:     "openai-compat",
+			AIProviderID: e2e.model.AIProviderID,
 			ContextLimit: 4096,
 		})
 		chat := e2e.createChat(t, "structured-output-oversized", func(opts *chatd.CreateOptions) {

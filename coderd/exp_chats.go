@@ -116,6 +116,22 @@ func maybeWriteLimitErr(ctx context.Context, rw http.ResponseWriter, err error) 
 	return false
 }
 
+// requireChatDaemon reports whether the chat daemon exists, writing a 503
+// Service Unavailable with a remediation message when it does not. The
+// daemon is nil when the in-memory AI Gateway is disabled by deployment
+// config. Operations that depend on it (creating, mutating, or streaming a
+// chat) must call this; pure reads (e.g. getChat) do not.
+func (api *API) requireChatDaemon(ctx context.Context, rw http.ResponseWriter) bool {
+	if api.chatDaemon != nil {
+		return true
+	}
+	httpapi.Write(ctx, rw, http.StatusServiceUnavailable, codersdk.Response{
+		Message: "AI Gateway must be enabled for Coder Agents functionality. Please contact your deployment administrator.",
+		Detail:  "Set CODER_AI_GATEWAY_ENABLED=true (or ai-gateway-enabled in deployment YAML) to enable.",
+	})
+	return false
+}
+
 func publishChatConfigEvent(logger slog.Logger, ps dbpubsub.Pubsub, kind pubsub.ChatConfigEventKind, entityID uuid.UUID) {
 	payload, err := json.Marshal(pubsub.ChatConfigEvent{
 		Kind:     kind,
@@ -803,7 +819,7 @@ func (api *API) chatPersonalModelOverrideDeploymentDefaults(
 type userChatModelAvailability struct {
 	configuredProviders  []chatprovider.ConfiguredProvider
 	configuredModels     []chatprovider.ConfiguredModel
-	enabledModels        []database.ChatModelConfig
+	enabledModels        []database.GetEnabledChatModelConfigsRow
 	providerStatus       map[string]chatprovider.ProviderAvailability
 	providerStatusByID   map[uuid.UUID]chatprovider.ProviderAvailability
 	enabledProviderNames map[string]struct{}
@@ -915,8 +931,8 @@ func (api *API) getUserChatProviderAvailability(
 		if normalizedProvider == "" {
 			continue
 		}
-		if model.AIProviderID.Valid {
-			status, ok := availability.providerStatusByID[model.AIProviderID.UUID]
+		if model.ChatModelConfig.AIProviderID.Valid {
+			status, ok := availability.providerStatusByID[model.ChatModelConfig.AIProviderID.UUID]
 			if ok {
 				mergeProviderStatus(modelStatusByType, normalizedProvider, status)
 			}
@@ -933,8 +949,8 @@ func (api *API) getUserChatProviderAvailability(
 
 	for _, model := range enabledModels {
 		normalizedProvider := chatprovider.NormalizeProvider(model.Provider)
-		if model.AIProviderID.Valid {
-			status, ok := availability.providerStatusByID[model.AIProviderID.UUID]
+		if model.ChatModelConfig.AIProviderID.Valid {
+			status, ok := availability.providerStatusByID[model.ChatModelConfig.AIProviderID.UUID]
 			if !ok {
 				continue
 			}
@@ -944,8 +960,8 @@ func (api *API) getUserChatProviderAvailability(
 		}
 		availability.configuredModels = append(availability.configuredModels, chatprovider.ConfiguredModel{
 			Provider:    model.Provider,
-			Model:       model.Model,
-			DisplayName: model.DisplayName,
+			Model:       model.ChatModelConfig.Model,
+			DisplayName: model.ChatModelConfig.DisplayName,
 		})
 	}
 	return availability, nil
@@ -995,21 +1011,10 @@ func (api *API) userCanUseChatModelConfig(
 		}
 		return chatModelConfigAvailable, nil
 	}
-	provider, _, err := chatprovider.ResolveModelWithProviderHint(model.Model, model.Provider)
-	if err != nil {
-		return chatModelConfigUnavailableProviderDisabled, nil
-	}
-	if _, ok := availability.enabledProviderNames[provider]; !ok {
-		return chatModelConfigUnavailableProviderDisabled, nil
-	}
-	providerStatus, ok := availability.providerStatus[provider]
-	if !ok {
-		return chatModelConfigUnavailableProviderDisabled, nil
-	}
-	if !providerStatus.Available {
-		return chatModelConfigUnavailableCredentialsMissing, nil
-	}
-	return chatModelConfigAvailable, nil
+	// Active configs always carry a provider FK (CHECK
+	// chat_model_configs_ai_provider_required_when_active), so an unset FK
+	// means the config is not usable.
+	return chatModelConfigUnavailableModelNotFoundOrDisabled, nil
 }
 
 func (api *API) validateUserChatModelConfigAvailable(
@@ -1067,6 +1072,10 @@ func (api *API) validateUserChatModelConfigAvailable(
 func (api *API) postChats(rw http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	apiKey := httpmw.APIKey(r)
+
+	if !api.requireChatDaemon(ctx, rw) {
+		return
+	}
 
 	// Cap the raw request body to prevent excessive memory use
 	// from large dynamic tool schemas.
@@ -2708,6 +2717,10 @@ func (api *API) refreshChatContext(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !api.requireChatDaemon(ctx, rw) {
+		return
+	}
+
 	updated, err := api.chatDaemon.RefreshChatContext(ctx, chat)
 	if err != nil {
 		httpapi.Write(ctx, rw, http.StatusInternalServerError, codersdk.Response{
@@ -2758,6 +2771,10 @@ func (api *API) patchChat(rw http.ResponseWriter, r *http.Request) {
 
 	if !api.Authorize(r, policy.ActionUpdate, chat.RBACObject()) {
 		httpapi.ResourceNotFound(rw)
+		return
+	}
+
+	if !api.requireChatDaemon(ctx, rw) {
 		return
 	}
 
@@ -3083,6 +3100,10 @@ func (api *API) postChatMessages(rw http.ResponseWriter, r *http.Request) {
 	chat := httpmw.ChatParam(r)
 	chatID := chat.ID
 
+	if !api.requireChatDaemon(ctx, rw) {
+		return
+	}
+
 	// Sending a message triggers LLM inference, requiring update
 	// permission on the org-scoped chat resource.
 	if !api.Authorize(r, policy.ActionUpdate, chat.RBACObject()) {
@@ -3307,6 +3328,10 @@ func (api *API) patchChatMessage(rw http.ResponseWriter, r *http.Request) {
 	apiKey := httpmw.APIKey(r)
 	chat := httpmw.ChatParam(r)
 
+	if !api.requireChatDaemon(ctx, rw) {
+		return
+	}
+
 	if !api.Authorize(r, policy.ActionUpdate, chat.RBACObject()) {
 		httpapi.ResourceNotFound(rw)
 		return
@@ -3428,6 +3453,10 @@ func (api *API) deleteChatQueuedMessage(rw http.ResponseWriter, r *http.Request)
 	chat := httpmw.ChatParam(r)
 	chatID := chat.ID
 
+	if !api.requireChatDaemon(ctx, rw) {
+		return
+	}
+
 	if !api.Authorize(r, policy.ActionUpdate, chat.RBACObject()) {
 		httpapi.ResourceNotFound(rw)
 		return
@@ -3477,6 +3506,10 @@ func (api *API) promoteChatQueuedMessage(rw http.ResponseWriter, r *http.Request
 	apiKey := httpmw.APIKey(r)
 	chat := httpmw.ChatParam(r)
 	chatID := chat.ID
+
+	if !api.requireChatDaemon(ctx, rw) {
+		return
+	}
 
 	// Promoting a queued message triggers LLM inference,
 	// requiring update permission on the org-scoped chat resource.
@@ -3602,6 +3635,10 @@ func (api *API) streamChat(rw http.ResponseWriter, r *http.Request) {
 	chat := httpmw.ChatParam(r)
 	chatID := chat.ID
 	logger := api.Logger.Named("chat_streamer").With(slog.F("chat_id", chatID))
+
+	if !api.requireChatDaemon(ctx, rw) {
+		return
+	}
 
 	var afterMessageID int64
 	if v := r.URL.Query().Get("after_id"); v != "" {
@@ -3740,6 +3777,10 @@ func (api *API) interruptChat(rw http.ResponseWriter, r *http.Request) {
 	chatID := chat.ID
 	logger := api.Logger.Named("chat_interrupt").With(slog.F("chat_id", chatID))
 
+	if !api.requireChatDaemon(ctx, rw) {
+		return
+	}
+
 	if !api.Authorize(r, policy.ActionUpdate, chat.RBACObject()) {
 		httpapi.ResourceNotFound(rw)
 		return
@@ -3789,6 +3830,10 @@ func (api *API) reconcileInvalidChatState(rw http.ResponseWriter, r *http.Reques
 	chatID := chat.ID
 	logger := api.Logger.Named("chat_reconcile_invalid").With(slog.F("chat_id", chatID))
 
+	if !api.requireChatDaemon(ctx, rw) {
+		return
+	}
+
 	if !api.Authorize(r, policy.ActionUpdate, chat.RBACObject()) {
 		httpapi.ResourceNotFound(rw)
 		return
@@ -3836,6 +3881,10 @@ func (api *API) regenerateChatTitle(rw http.ResponseWriter, r *http.Request) {
 	apiKey := httpmw.APIKey(r)
 	chat := httpmw.ChatParam(r)
 
+	if !api.requireChatDaemon(ctx, rw) {
+		return
+	}
+
 	if !api.Authorize(r, policy.ActionUpdate, chat.RBACObject()) {
 		httpapi.ResourceNotFound(rw)
 		return
@@ -3881,6 +3930,10 @@ func (api *API) proposeChatTitle(rw http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	apiKey := httpmw.APIKey(r)
 	chat := httpmw.ChatParam(r)
+
+	if !api.requireChatDaemon(ctx, rw) {
+		return
+	}
 
 	if !api.Authorize(r, policy.ActionUpdate, chat.RBACObject()) {
 		httpapi.ResourceNotFound(rw)
@@ -6892,7 +6945,12 @@ func (api *API) listChatModelConfigs(rw http.ResponseWriter, r *http.Request) {
 		configs, err = api.Database.GetChatModelConfigs(ctx)
 	} else {
 		//nolint:gocritic // All authenticated users need to read enabled model configs to use the chat feature.
-		configs, err = api.Database.GetEnabledChatModelConfigs(dbauthz.AsChatd(ctx))
+		rows, rowsErr := api.Database.GetEnabledChatModelConfigs(dbauthz.AsChatd(ctx))
+		err = rowsErr
+		configs = make([]database.ChatModelConfig, 0, len(rows))
+		for _, row := range rows {
+			configs = append(configs, row.ChatModelConfig)
+		}
 	}
 	if err != nil {
 		httpapi.Write(ctx, rw, http.StatusInternalServerError, codersdk.Response{
@@ -6964,7 +7022,6 @@ func (api *API) createChatModelConfig(rw http.ResponseWriter, r *http.Request) {
 		httpapi.Write(ctx, rw, http.StatusPreconditionFailed, codersdk.Response{Message: "AI provider is disabled."})
 		return
 	}
-	provider := string(aiProvider.Type)
 	aiProviderID := uuid.NullUUID{UUID: aiProvider.ID, Valid: true}
 
 	model := strings.TrimSpace(req.Model)
@@ -7020,7 +7077,6 @@ func (api *API) createChatModelConfig(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	insertParams := database.InsertChatModelConfigParams{
-		Provider:             provider,
 		Model:                model,
 		DisplayName:          strings.TrimSpace(req.DisplayName),
 		Enabled:              enabled,
@@ -7046,7 +7102,6 @@ func (api *API) createChatModelConfig(rw http.ResponseWriter, r *http.Request) {
 		if !lockedAIProvider.Enabled {
 			return errChatProviderNotConfigured
 		}
-		insertParams.Provider = string(lockedAIProvider.Type)
 		if err := validateChatModelConfigProviderModel(lockedAIProvider, insertParams.Model); err != nil {
 			return err
 		}
@@ -7151,19 +7206,6 @@ func (api *API) updateChatModelConfig(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if strings.TrimSpace(req.Provider) != "" && req.AIProviderID == nil {
-		requestedProvider := chatprovider.NormalizeProvider(req.Provider)
-		if requestedProvider == "" {
-			httpapi.Write(ctx, rw, http.StatusBadRequest, codersdk.Response{Message: "Invalid provider."})
-			return
-		}
-		if requestedProvider != existing.Provider {
-			httpapi.Write(ctx, rw, http.StatusBadRequest, codersdk.Response{Message: "AI provider ID is required when updating provider."})
-			return
-		}
-	}
-
-	provider := existing.Provider
 	aiProviderID := existing.AIProviderID
 	if req.AIProviderID != nil {
 		//nolint:gocritic // The route already authorized chat model config updates.
@@ -7183,7 +7225,6 @@ func (api *API) updateChatModelConfig(rw http.ResponseWriter, r *http.Request) {
 			httpapi.Write(ctx, rw, http.StatusPreconditionFailed, codersdk.Response{Message: "AI provider is disabled."})
 			return
 		}
-		provider = string(aiProvider.Type)
 		aiProviderID = uuid.NullUUID{UUID: aiProvider.ID, Valid: true}
 	}
 
@@ -7243,7 +7284,6 @@ func (api *API) updateChatModelConfig(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	updateParams := database.UpdateChatModelConfigParams{
-		Provider:             provider,
 		Model:                model,
 		DisplayName:          displayName,
 		Enabled:              enabled,
@@ -7272,7 +7312,6 @@ func (api *API) updateChatModelConfig(rw http.ResponseWriter, r *http.Request) {
 			if !aiProvider.Enabled {
 				return errChatProviderNotConfigured
 			}
-			updateParams.Provider = string(aiProvider.Type)
 			if err := validateChatModelConfigProviderModel(aiProvider, updateParams.Model); err != nil {
 				return err
 			}
@@ -7452,7 +7491,6 @@ func chatModelConfigToUpdateParams(
 	config database.ChatModelConfig,
 ) database.UpdateChatModelConfigParams {
 	return database.UpdateChatModelConfigParams{
-		Provider:             config.Provider,
 		Model:                config.Model,
 		DisplayName:          config.DisplayName,
 		Enabled:              config.Enabled,
@@ -7522,14 +7560,11 @@ func parseChatModelConfigID(rw http.ResponseWriter, r *http.Request) (uuid.UUID,
 }
 
 func convertChatModelConfig(config database.ChatModelConfig) codersdk.ChatModelConfig {
-	var aiProviderID *uuid.UUID
-	if config.AIProviderID.Valid {
-		aiProviderID = &config.AIProviderID.UUID
-	}
+	// Active configs always carry a non-null ai_provider_id (CHECK
+	// chat_model_configs_ai_provider_required_when_active).
 	return codersdk.ChatModelConfig{
 		ID:                   config.ID,
-		Provider:             config.Provider,
-		AIProviderID:         aiProviderID,
+		AIProviderID:         config.AIProviderID.UUID,
 		Model:                config.Model,
 		DisplayName:          config.DisplayName,
 		Enabled:              config.Enabled,
@@ -7698,6 +7733,10 @@ func (api *API) postChatToolResults(rw http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	chat := httpmw.ChatParam(r)
 	apiKey := httpmw.APIKey(r)
+
+	if !api.requireChatDaemon(ctx, rw) {
+		return
+	}
 
 	// Submitting tool results resumes LLM inference,
 	// requiring update permission on the org-scoped chat resource.
@@ -7905,6 +7944,9 @@ func (api *API) getChatDebugRun(rw http.ResponseWriter, r *http.Request) {
 func (api *API) streamChatParts(rw http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	chat := httpmw.ChatParam(r)
+	if !api.requireChatDaemon(ctx, rw) {
+		return
+	}
 	if err := api.chatDaemon.ServeStreamPartsAuthorized(rw, r, chat); err != nil {
 		api.Logger.Named("chat_stream_parts").Debug(ctx, "chat stream parts closed", slog.Error(err))
 	}
