@@ -687,7 +687,7 @@ WHERE
             -- Message body FTS. The WHERE clause must repeat the partial
             -- predicate of idx_chat_messages_search_tsv exactly so the
             -- planner can use it. Rows pending backfill
-            -- (search_tsv IS NULL) match nothing by design.
+            -- (search_tsv IS NULL) match nothing.
             OR EXISTS (
                 SELECT 1
                 FROM chat_messages cm
@@ -699,8 +699,8 @@ WHERE
                     AND cm.search_tsv @@ websearch_to_tsquery('simple', @search)
             )
             -- PR number exact match for all-digit searches. The length
-            -- cap keeps the ::bigint cast from overflowing on absurd
-            -- digit strings; such searches simply match nothing.
+            -- cap keeps the ::bigint cast from overflowing on oversized
+            -- digit strings; those searches match nothing.
             OR (
                 @search ~ '^[0-9]{1,18}$'
                 AND EXISTS (

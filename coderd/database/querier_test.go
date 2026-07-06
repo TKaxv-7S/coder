@@ -15379,8 +15379,8 @@ func TestGetChatsSearch(t *testing.T) {
 	toolMsg := insertMsg(ineligibleChat.ID, database.ChatMessageRoleTool, database.ChatMessageVisibilityBoth, "forbidden secret token")
 	modelMsg := insertMsg(ineligibleChat.ID, database.ChatMessageRoleUser, database.ChatMessageVisibilityModel, "forbidden secret token")
 
-	// Backfill search_tsv through the real pipeline. Eligible rows above get
-	// indexed; ineligible rows keep search_tsv NULL.
+	// Backfill search_tsv through the real pipeline. The backfill indexes
+	// eligible rows; ineligible rows keep search_tsv NULL.
 	_, err = store.BackfillChatMessagesSearchTsv(ctx, 1000)
 	require.NoError(t, err)
 
@@ -15393,8 +15393,8 @@ func TestGetChatsSearch(t *testing.T) {
 	pendingChat := createRoot("plain four")
 	insertMsg(pendingChat.ID, database.ChatMessageRoleUser, database.ChatMessageVisibilityBoth, "elasticsearch indexing")
 
-	// Force search_tsv onto ineligible rows to prove role/visibility
-	// predicates exclude them regardless of the vector's presence.
+	// Force search_tsv onto ineligible rows to prove the role and
+	// visibility predicates exclude them even when the vector is set.
 	_, err = sqlDB.ExecContext(ctx,
 		`UPDATE chat_messages SET search_tsv = to_tsvector('simple', 'forbidden secret token') WHERE id = ANY($1)`,
 		pq.Array([]int64{toolMsg.ID, modelMsg.ID}))
