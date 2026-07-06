@@ -5,7 +5,6 @@ import {
 	SettingsSidebarNavItem as SidebarNavItem,
 } from "#/components/Sidebar/Sidebar";
 import type { Permissions } from "#/modules/permissions";
->>>>>>> 244569afed (feat(site): promote OAuth2 Applications sidebar item to GA visibility)
 
 interface DeploymentSidebarViewProps {
 	/** Site-wide permissions. */
@@ -47,15 +46,6 @@ export const DeploymentSidebarView: FC<DeploymentSidebarViewProps> = ({
 						External Authentication
 					</SidebarNavItem>
 				)}
-<<<<<<< HEAD
-				{permissions.viewDeploymentConfig &&
-					(experiments.includes("oauth2") ||
-						getPrereleaseFlag(buildInfo) === "devel") && (
-						<SidebarNavItem href="/deployment/oauth2-provider/apps">
-							OAuth2 Applications
-						</SidebarNavItem>
-					)}
-=======
 				{permissions.viewDeploymentConfig && (
 					<SidebarNavItem href="/deployment/oauth2-provider/apps">
 						OAuth2 Applications
