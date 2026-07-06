@@ -692,13 +692,13 @@ var (
 				Identifier:  rbac.RoleIdentifier{Name: "dbpurge"},
 				DisplayName: "DB Purge Daemon",
 				Site: rbac.Permissions(map[string][]policy.Action{
-					// ActionUpdate covers the chat message search_tsv backfill sweep.
-					rbac.ResourceSystem.Type:                      {policy.ActionDelete, policy.ActionUpdate},
+					rbac.ResourceSystem.Type:                      {policy.ActionDelete},
 					rbac.ResourceNotificationMessage.Type:         {policy.ActionDelete},
 					rbac.ResourceApiKey.Type:                      {policy.ActionDelete},
 					rbac.ResourceAibridgeInterception.Type:        {policy.ActionDelete},
 					rbac.ResourceWorkspaceBuildOrchestration.Type: {policy.ActionDelete},
-					// Chat auto-archive sets archived=true on inactive chats.
+					// Chat auto-archive sets archived=true on inactive chats; the
+					// search_tsv backfill sweep also updates chat messages.
 					rbac.ResourceChat.Type: {policy.ActionRead, policy.ActionUpdate},
 					// Purge old boundary logs past the retention period.
 					rbac.ResourceBoundaryLog.Type: {policy.ActionDelete},
@@ -7034,7 +7034,7 @@ func (q *querier) SoftDeleteWorkspaceAgentsByWorkspaceID(ctx context.Context, wo
 }
 
 func (q *querier) SweepChatMessagesSearchTsv(ctx context.Context, batchSize int32) (int64, error) {
-	if err := q.authorizeContext(ctx, policy.ActionUpdate, rbac.ResourceSystem); err != nil {
+	if err := q.authorizeContext(ctx, policy.ActionUpdate, rbac.ResourceChat); err != nil {
 		return 0, err
 	}
 	return q.db.SweepChatMessagesSearchTsv(ctx, batchSize)
