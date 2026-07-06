@@ -29,7 +29,6 @@ chats_expanded AS (
         updated_chats.agent_id,
         updated_chats.pin_order,
         updated_chats.last_read_message_id,
-        updated_chats.last_injected_context,
         updated_chats.dynamic_tools,
         updated_chats.organization_id,
         updated_chats.plan_mode,
@@ -96,7 +95,6 @@ chats_expanded AS (
         updated_chats.agent_id,
         updated_chats.pin_order,
         updated_chats.last_read_message_id,
-        updated_chats.last_injected_context,
         updated_chats.dynamic_tools,
         updated_chats.organization_id,
         updated_chats.plan_mode,
@@ -762,7 +760,6 @@ chats_expanded AS (
         inserted_chat.agent_id,
         inserted_chat.pin_order,
         inserted_chat.last_read_message_id,
-        inserted_chat.last_injected_context,
         inserted_chat.dynamic_tools,
         inserted_chat.organization_id,
         inserted_chat.plan_mode,
@@ -911,7 +908,6 @@ chats_expanded AS (
         updated_chat.agent_id,
         updated_chat.pin_order,
         updated_chat.last_read_message_id,
-        updated_chat.last_injected_context,
         updated_chat.dynamic_tools,
         updated_chat.organization_id,
         updated_chat.plan_mode,
@@ -978,7 +974,6 @@ chats_expanded AS (
         updated_chat.agent_id,
         updated_chat.pin_order,
         updated_chat.last_read_message_id,
-        updated_chat.last_injected_context,
         updated_chat.dynamic_tools,
         updated_chat.organization_id,
         updated_chat.plan_mode,
@@ -1043,7 +1038,6 @@ chats_expanded AS (
         updated_chat.agent_id,
         updated_chat.pin_order,
         updated_chat.last_read_message_id,
-        updated_chat.last_injected_context,
         updated_chat.dynamic_tools,
         updated_chat.organization_id,
         updated_chat.plan_mode,
@@ -1108,7 +1102,6 @@ chats_expanded AS (
         updated_chat.agent_id,
         updated_chat.pin_order,
         updated_chat.last_read_message_id,
-        updated_chat.last_injected_context,
         updated_chat.dynamic_tools,
         updated_chat.organization_id,
         updated_chat.plan_mode,
@@ -1173,7 +1166,6 @@ chats_expanded AS (
         updated_chat.agent_id,
         updated_chat.pin_order,
         updated_chat.last_read_message_id,
-        updated_chat.last_injected_context,
         updated_chat.dynamic_tools,
         updated_chat.organization_id,
         updated_chat.plan_mode,
@@ -1237,7 +1229,6 @@ chats_expanded AS (
         updated_chat.agent_id,
         updated_chat.pin_order,
         updated_chat.last_read_message_id,
-        updated_chat.last_injected_context,
         updated_chat.dynamic_tools,
         updated_chat.organization_id,
         updated_chat.plan_mode,
@@ -1301,73 +1292,6 @@ chats_expanded AS (
         updated_chat.agent_id,
         updated_chat.pin_order,
         updated_chat.last_read_message_id,
-        updated_chat.last_injected_context,
-        updated_chat.dynamic_tools,
-        updated_chat.organization_id,
-        updated_chat.plan_mode,
-        updated_chat.client_type,
-        updated_chat.last_turn_summary,
-        updated_chat.snapshot_version,
-        updated_chat.history_version,
-        updated_chat.queue_version,
-        updated_chat.generation_attempt,
-        updated_chat.retry_state,
-        updated_chat.retry_state_version,
-        updated_chat.runner_id,
-        updated_chat.requires_action_deadline_at,
-        COALESCE(root.user_acl, updated_chat.user_acl) AS user_acl,
-        COALESCE(root.group_acl, updated_chat.group_acl) AS group_acl,
-        owner.username AS owner_username,
-        owner.name AS owner_name,
-        updated_chat.context_aggregate_hash,
-        updated_chat.context_dirty_since,
-        updated_chat.context_dirty_resources,
-        updated_chat.context_error
-    FROM
-        updated_chat
-    LEFT JOIN chats root ON root.id = COALESCE(updated_chat.root_chat_id, updated_chat.parent_chat_id)
-    JOIN visible_users owner ON owner.id = updated_chat.owner_id
-)
-SELECT *
-FROM chats_expanded;
-
--- name: UpdateChatLastInjectedContext :one
-WITH updated_chat AS (
--- Updates the cached injected context parts (AGENTS.md +
--- skills) on the chat row. Called only when context changes
--- (first workspace attach or agent change). updated_at is
--- intentionally not touched to avoid reordering the chat list.
-UPDATE chats SET
-    last_injected_context = sqlc.narg('last_injected_context')::jsonb
-WHERE
-    id = @id::uuid
-RETURNING *
-),
-chats_expanded AS (
-    SELECT
-        updated_chat.id,
-        updated_chat.owner_id,
-        updated_chat.workspace_id,
-        updated_chat.title,
-        updated_chat.status,
-        updated_chat.worker_id,
-        updated_chat.started_at,
-        updated_chat.heartbeat_at,
-        updated_chat.created_at,
-        updated_chat.updated_at,
-        updated_chat.parent_chat_id,
-        updated_chat.root_chat_id,
-        updated_chat.last_model_config_id,
-        updated_chat.archived,
-        updated_chat.last_error,
-        updated_chat.mode,
-        updated_chat.mcp_server_ids,
-        updated_chat.labels,
-        updated_chat.build_id,
-        updated_chat.agent_id,
-        updated_chat.pin_order,
-        updated_chat.last_read_message_id,
-        updated_chat.last_injected_context,
         updated_chat.dynamic_tools,
         updated_chat.organization_id,
         updated_chat.plan_mode,
@@ -1449,7 +1373,6 @@ chats_expanded AS (
         updated_chat.agent_id,
         updated_chat.pin_order,
         updated_chat.last_read_message_id,
-        updated_chat.last_injected_context,
         updated_chat.dynamic_tools,
         updated_chat.organization_id,
         updated_chat.plan_mode,
@@ -1666,7 +1589,6 @@ chats_expanded AS (
         acquired_chats.agent_id,
         acquired_chats.pin_order,
         acquired_chats.last_read_message_id,
-        acquired_chats.last_injected_context,
         acquired_chats.dynamic_tools,
         acquired_chats.organization_id,
         acquired_chats.plan_mode,
@@ -1735,7 +1657,6 @@ chats_expanded AS (
         updated_chat.agent_id,
         updated_chat.pin_order,
         updated_chat.last_read_message_id,
-        updated_chat.last_injected_context,
         updated_chat.dynamic_tools,
         updated_chat.organization_id,
         updated_chat.plan_mode,
@@ -1804,7 +1725,6 @@ chats_expanded AS (
         updated_chat.agent_id,
         updated_chat.pin_order,
         updated_chat.last_read_message_id,
-        updated_chat.last_injected_context,
         updated_chat.dynamic_tools,
         updated_chat.organization_id,
         updated_chat.plan_mode,
@@ -2080,7 +2000,6 @@ chats_expanded AS (
         locked_chat.agent_id,
         locked_chat.pin_order,
         locked_chat.last_read_message_id,
-        locked_chat.last_injected_context,
         locked_chat.dynamic_tools,
         locked_chat.organization_id,
         locked_chat.plan_mode,
@@ -2141,7 +2060,6 @@ chats_expanded AS (
         shared_chat.agent_id,
         shared_chat.pin_order,
         shared_chat.last_read_message_id,
-        shared_chat.last_injected_context,
         shared_chat.dynamic_tools,
         shared_chat.organization_id,
         shared_chat.plan_mode,
@@ -2302,7 +2220,7 @@ WHERE
 SELECT
     cmc.id AS model_config_id,
     cmc.display_name,
-    cmc.provider,
+    COALESCE(ap.type::text, '')::text AS provider,
     cmc.model,
     COALESCE(SUM(cm.total_cost_micros), 0)::bigint AS total_cost_micros,
     COUNT(*) FILTER (
@@ -2323,13 +2241,15 @@ JOIN
     chats c ON c.id = cm.chat_id
 JOIN
     chat_model_configs cmc ON cmc.id = cm.model_config_id
+LEFT JOIN
+    ai_providers ap ON ap.id = cmc.ai_provider_id
 WHERE
     c.owner_id = @owner_id::uuid
     AND cm.role = 'assistant'
     AND cm.created_at >= @start_date::timestamptz
     AND cm.created_at < @end_date::timestamptz
 GROUP BY
-    cmc.id, cmc.display_name, cmc.provider, cmc.model
+    cmc.id, cmc.display_name, ap.type, cmc.model
 ORDER BY
     total_cost_micros DESC;
 
@@ -2662,9 +2582,11 @@ GROUP BY cm.chat_id;
 
 -- name: GetChatModelConfigsForTelemetry :many
 -- Returns all model configurations for telemetry snapshot collection.
-SELECT id, provider, model, context_limit, enabled, is_default
-FROM chat_model_configs
-WHERE deleted = false;
+-- deleted = false guarantees ai_provider_id is non-null, so INNER JOIN is safe.
+SELECT cmc.id, ap.type::text AS provider, cmc.model, cmc.context_limit, cmc.enabled, cmc.is_default
+FROM chat_model_configs cmc
+JOIN ai_providers ap ON ap.id = cmc.ai_provider_id
+WHERE cmc.deleted = false;
 -- name: GetActiveChatsByAgentID :many
 SELECT *
 FROM chats_expanded
@@ -2821,7 +2743,6 @@ chats_expanded AS (
         bumped_chat.agent_id,
         bumped_chat.pin_order,
         bumped_chat.last_read_message_id,
-        bumped_chat.last_injected_context,
         bumped_chat.dynamic_tools,
         bumped_chat.organization_id,
         bumped_chat.plan_mode,
@@ -2893,7 +2814,6 @@ chats_expanded AS (
         updated_chat.agent_id,
         updated_chat.pin_order,
         updated_chat.last_read_message_id,
-        updated_chat.last_injected_context,
         updated_chat.dynamic_tools,
         updated_chat.organization_id,
         updated_chat.plan_mode,
@@ -2957,7 +2877,6 @@ chats_expanded AS (
         updated_chat.agent_id,
         updated_chat.pin_order,
         updated_chat.last_read_message_id,
-        updated_chat.last_injected_context,
         updated_chat.dynamic_tools,
         updated_chat.organization_id,
         updated_chat.plan_mode,

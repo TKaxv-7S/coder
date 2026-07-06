@@ -6,9 +6,11 @@ import * as Yup from "yup";
 import type { AIProviderType } from "#/api/typesGenerated";
 import { ErrorAlert } from "#/components/Alert/ErrorAlert";
 import { Button } from "#/components/Button/Button";
+import { CodeExample } from "#/components/CodeExample/CodeExample";
 import { ConfirmDialog } from "#/components/Dialogs/ConfirmDialog/ConfirmDialog";
 import { Form, FormFields } from "#/components/Form/Form";
 import { FormField } from "#/components/FormField/FormField";
+import { Label } from "#/components/Label/Label";
 import { Link as DocsLink } from "#/components/Link/Link";
 import { Spinner } from "#/components/Spinner/Spinner";
 import { useUnsavedChangesPrompt } from "#/hooks/useUnsavedChangesPrompt";
@@ -25,6 +27,7 @@ export type ProviderFormValues = {
 	smallFastModel: string;
 	accessKey: string;
 	accessKeySecret: string;
+	roleArn: string;
 	apiKey: string;
 	enabled: boolean;
 };
@@ -66,6 +69,7 @@ const defaultInitialValues: ProviderFormValues = {
 	smallFastModel: "",
 	accessKey: "",
 	accessKeySecret: "",
+	roleArn: "",
 	apiKey: "",
 	enabled: true,
 };
@@ -240,6 +244,8 @@ type ProviderFormProps = {
 	editing?: boolean;
 	/** When editing Bedrock and the API already has keys, show masked placeholders until cleared. */
 	bedrockSavedAccessCredentials?: boolean;
+	/** Server-generated STS external ID, shown read-only when a role is assumed. */
+	bedrockExternalId?: string;
 	/** When editing openai/anthropic and a key is on file, show a masked placeholder until cleared. */
 	openAiAnthropicSavedApiKey?: boolean;
 	/** Masked rendering of the saved openai/anthropic key (e.g. `sk-***...ABCD`). Falls back to a generic mask when omitted. */
@@ -269,6 +275,7 @@ const baseUrlPlaceholder = (provider: string) =>
 export const ProviderForm: FC<ProviderFormProps> = ({
 	editing = false,
 	bedrockSavedAccessCredentials = false,
+	bedrockExternalId,
 	openAiAnthropicSavedApiKey = false,
 	openAiAnthropicMaskedApiKey,
 	initialValues,
@@ -526,11 +533,32 @@ export const ProviderForm: FC<ProviderFormProps> = ({
 								View docs
 							</DocsLink>
 						</p>
+						<FormField
+							field={getFieldHelpers("roleArn")}
+							label="Role ARN"
+							className="w-full"
+							placeholder="arn:aws:iam::123456789012:role/BedrockRole"
+						/>
+						<p className="text-xs text-content-secondary m-0">
+							Optional. When a role ARN is set, the gateway assumes that role
+							(using the base identity) before calling Bedrock.
+						</p>
+						{editing && bedrockExternalId && (
+							<div className="flex flex-col gap-2">
+								<Label>External ID</Label>
+								<CodeExample secret={false} code={bedrockExternalId} />
+								<p className="text-xs text-content-secondary m-0">
+									Server-generated. Add it to the assumed role's trust policy as
+									an <code>sts:ExternalId</code> condition so only this
+									deployment can assume the role.
+								</p>
+							</div>
+						)}
 					</>
 				)}
 
 				<div className="flex justify-end gap-4">
-					<Link to="/ai/settings">
+					<Link to="/ai/settings/providers">
 						<Button variant="outline" type="button">
 							Cancel
 						</Button>

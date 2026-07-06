@@ -39,8 +39,7 @@ func (server *Server) prepareGeneration(
 	var (
 		model            fantasy.LanguageModel
 		modelConfig      database.ChatModelConfig
-		providerKeys     chatprovider.ProviderAPIKeys
-		modelRoute       resolvedModelRoute
+		modelRoute       aiGatewayModelRoute
 		modelOpts        modelBuildOptions
 		callConfig       codersdk.ChatModelCallConfig
 		promptRows       []database.ChatMessage
@@ -86,7 +85,7 @@ func (server *Server) prepareGeneration(
 	ctx = withActiveTurnAPIKeyID(ctx, modelOpts)
 
 	var err error
-	model, modelConfig, providerKeys, modelRoute, debugEnabled, resolvedProvider, debugModel, err = server.resolveChatModel(ctx, chat, modelOpts)
+	model, modelConfig, modelRoute, debugEnabled, resolvedProvider, debugModel, err = server.resolveChatModel(ctx, chat, modelOpts)
 	if err != nil {
 		return generationPrepared{}, err
 	}
@@ -118,6 +117,8 @@ func (server *Server) prepareGeneration(
 
 	planModeInstructions := server.loadPlanModeInstructions(ctx, currentPlanMode, logger)
 	advisorCfg := server.loadAdvisorConfig(ctx, logger)
+	// Force Enabled from the experiment; the stored DB value is ignored.
+	advisorCfg.Enabled = server.experiments.Enabled(codersdk.ExperimentChatAdvisor)
 
 	var advisorRuntime *chatadvisor.Runtime
 	if advisorCfg.Enabled && isRootChat && !isPlanModeTurn && !isExploreSubagent {
@@ -128,7 +129,6 @@ func (server *Server) prepareGeneration(
 			advisorCfg,
 			model,
 			callConfig,
-			providerKeys,
 			modelOpts,
 			logger,
 		)
@@ -213,10 +213,16 @@ func (server *Server) prepareGeneration(
 		workspaceSkills    []chattool.SkillMeta
 		personalSkills     []skillspkg.Skill
 		resolvedUserPrompt string
+		planPathBlock      string
 	)
 
-	persistedSkills := skillsFromParts(promptRows)
-	hasContextFiles := false
+	// Drop provider-executed tool history produced by a different provider
+	// before building the prompt. A provider that shares another's wire format
+	// (e.g. Bedrock and Anthropic) can still reject the other's
+	// provider-executed blocks, so a mid-chat provider switch must not replay
+	// them.
+	promptRows = server.sanitizeForeignProviderExecutedToolRows(ctx, logger, promptRows, modelConfig.ID)
+
 	if chat.WorkspaceID.Valid {
 		// Resolve the workspace agent so the chat row's AgentID and
 		// BuildID bindings are up to date before the chatworker
@@ -225,24 +231,42 @@ func (server *Server) prepareGeneration(
 		// the bound agent has changed, so this is a cheap metadata
 		// refresh, not a workspace dial. It must not insert chat
 		// history; only metadata is mutated here.
-		_, _ = workspaceCtx.getWorkspaceAgent(ctx)
-		_, found := contextFileAgentID(promptRows)
-		hasContextFiles = found
+		agent, _ := workspaceCtx.getWorkspaceAgent(ctx)
+
+		// API-created chats bind their agent lazily here, after
+		// hydrateChatContextOnCreate ran with no agent. Pin the chat to the
+		// bound agent's pushed snapshot now if it is still unpinned, so the
+		// first turn reads workspace context instead of waiting for the
+		// agent's next push. Idempotent and snapshot-gated; runs before the
+		// pinned context is read below.
+		server.ensureChatContextPinnedOnFirstTurn(ctx, workspaceCtx.currentChatSnapshot())
+
+		var resolveErr error
+		instruction, workspaceSkills, resolveErr = server.resolveTurnWorkspaceContext(ctx, chat, agent)
+		if resolveErr != nil {
+			cleanup()
+			return generationPrepared{}, resolveErr
+		}
 	}
 
 	var g2 errgroup.Group
 	g2.Go(func() error {
 		var err error
-		prompt, err = chatprompt.ConvertMessagesWithFiles(ctx, promptRows, server.chatFileResolver(modelConfig.Provider), logger)
+		// Key the file-part acceptance on model.Provider() (the fantasy
+		// transport identity), not the configured provider, because
+		// aibridge routing rewrites the provider (e.g. Bedrock to the
+		// Anthropic transport). The conversion that actually drops or
+		// accepts a file part is the one for model.Provider().
+		acceptsFilePart := func(mediaType string) bool {
+			return chatprovider.AcceptsFilePartMediaType(model.Provider(), model.Model(), mediaType)
+		}
+		providerType := string(modelRoute.Provider.Type)
+		prompt, err = chatprompt.ConvertMessagesWithFiles(ctx, promptRows, server.chatFileResolver(providerType), logger, acceptsFilePart)
 		if err != nil {
 			return xerrors.Errorf("build chat prompt: %w", err)
 		}
 		return nil
 	})
-	if hasContextFiles {
-		instruction = instructionFromContextFiles(promptRows)
-		workspaceSkills = persistedSkills
-	}
 	g2.Go(func() error {
 		personalSkills = server.fetchPersonalSkillMetadata(ctx, chat.OwnerID, logger)
 		return nil
@@ -268,7 +292,18 @@ func (server *Server) prepareGeneration(
 	}
 	if chat.WorkspaceID.Valid && !isPlanModeTurn && !isExploreSubagent {
 		g2.Go(func() error {
-			workspaceMCPTools = server.discoverWorkspaceMCPTools(ctx, logger, chat.ID, &workspaceCtx)
+			workspaceMCPTools = server.resolveWorkspaceMCPTools(ctx, logger, chat, &workspaceCtx)
+			return nil
+		})
+	}
+	// Resolve the per-chat plan path block in the parallel phase. It dials
+	// the workspace agent to read the home directory, so running it here lets
+	// the cold dial overlap with the rest of turn preparation instead of
+	// blocking system prompt assembly on a sequential dial. Best-effort:
+	// resolvePlanPathBlock logs and returns an empty block on failure.
+	if chat.WorkspaceID.Valid && !chat.ParentChatID.Valid {
+		g2.Go(func() error {
+			planPathBlock = resolvePlanPathBlock(ctx)
 			return nil
 		})
 	}
@@ -323,7 +358,7 @@ func (server *Server) prepareGeneration(
 	if advisorRuntime != nil {
 		prompt = chatprompt.InsertSystem(prompt, chatadvisor.ParentGuidanceBlock)
 	}
-	prompt = renderPlanPathPrompt(prompt, resolvePlanPathBlock(ctx))
+	prompt = renderPlanPathPrompt(prompt, planPathBlock)
 	setAdvisorPromptSnapshot(prompt)
 
 	storeChatAttachment := server.newStoreChatAttachmentFunc(&workspaceCtx)
@@ -360,7 +395,6 @@ func (server *Server) prepareGeneration(
 			resolvePlanPath: resolvePlanPathForTools,
 			storeFile:       storeChatAttachment,
 			isPlanModeTurn:  isPlanModeTurn,
-			primerCtx:       ctx,
 		})
 	}
 
@@ -458,7 +492,6 @@ func (server *Server) prepareGeneration(
 			return generationPrepared{}, xerrors.Errorf("resolve computer use provider route: %w", keyErr)
 		}
 		modelRoute = computerUseRoute
-		providerKeys = computerUseRoute.directProviderKeys()
 		cuModel, cuDebugEnabled, cuResolvedProvider, cuResolvedModel, cuErr := server.resolveComputerUseModel(
 			ctx,
 			chat,
@@ -563,13 +596,10 @@ func (server *Server) prepareGeneration(
 	compactionOptions.StepUsage = latestPromptUsage(promptRows)
 	compactionNeeded := shouldCompactPromptUsage(compactionOptions.StepUsage, modelConfig.ContextLimit, effectiveThreshold)
 
-	workspaceContextEligible := chat.WorkspaceID.Valid && isRootChat && !isPlanModeTurn && !isExploreSubagent
-
 	// workspaceCtx.currentChatSnapshot may carry a freshly persisted
 	// AgentID/BuildID binding from the getWorkspaceAgent call above.
-	// Return that snapshot so the chatworker decision helper sees
-	// the up-to-date metadata when deciding whether to run
-	// persist_workspace_context.
+	// Return that snapshot so downstream consumers see the up-to-date
+	// metadata.
 	refreshedChat := workspaceCtx.currentChatSnapshot()
 	if refreshedChat.ID == uuid.Nil {
 		refreshedChat = chat
@@ -583,7 +613,6 @@ func (server *Server) prepareGeneration(
 		Tools:                tools,
 		ActiveTools:          activeToolNames,
 		ProviderTools:        providerTools,
-		ProviderKeys:         providerKeys,
 		ModelRoute:           modelRoute,
 		ModelBuildOptions:    modelOpts,
 		ResolvedProvider:     resolvedProvider,
@@ -601,9 +630,8 @@ func (server *Server) prepareGeneration(
 			Required: compactionNeeded,
 			Options:  compactionOptions,
 		},
-		Cleanup:                  cleanup,
-		Debug:                    debug,
-		WorkspaceContextEligible: workspaceContextEligible,
+		Cleanup: cleanup,
+		Debug:   debug,
 	}, nil
 }
 
@@ -712,7 +740,7 @@ func (server *Server) deriveFinalTurnRunResult(
 	// built from; they only feed the status-label fallback candidate's labels.
 	modelOpts := modelBuildOptionsFromMessages(promptRows)
 	ctx = withActiveTurnAPIKeyID(ctx, modelOpts)
-	model, _, providerKeys, modelRoute, _, resolvedProvider, resolvedModel, err := server.resolveChatModel(ctx, chat, modelOpts)
+	model, _, modelRoute, _, resolvedProvider, resolvedModel, err := server.resolveChatModel(ctx, chat, modelOpts)
 	if err != nil {
 		// Return what we have; generateFinalTurnStatusLabel falls back to a
 		// generic label when StatusLabelModel is nil.
@@ -727,7 +755,6 @@ func (server *Server) deriveFinalTurnRunResult(
 	return runChatResult{
 		FinalAssistantText:  finalAssistantText,
 		StatusLabelModel:    model,
-		ProviderKeys:        providerKeys,
 		FallbackProvider:    resolvedProvider,
 		FallbackRoute:       modelRoute,
 		FallbackModel:       resolvedModel,

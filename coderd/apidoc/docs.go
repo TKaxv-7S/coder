@@ -1327,6 +1327,335 @@ const docTemplate = `{
                 ]
             }
         },
+        "/api/v2/agent-firewall/sessions/{id}/logs": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Enterprise"
+                ],
+                "summary": "Get agent firewall session logs",
+                "operationId": "get-agent-firewall-session-logs",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Agent firewall session ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Inclusive lower bound on sequence number",
+                        "name": "seq_after",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Exclusive upper bound on sequence number",
+                        "name": "seq_before",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Maximum number of logs to return (default 100)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/codersdk.AgentFirewallSessionLogsResponse"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "CoderSessionToken": []
+                    }
+                ]
+            }
+        },
+        "/api/v2/ai-gateway/clients": {
+            "get": {
+                "description": "Alias: also available at /api/v2/aibridge/clients for backward compatibility.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI Gateway"
+                ],
+                "summary": "List AI Gateway clients",
+                "operationId": "list-ai-gateway-clients",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "CoderSessionToken": []
+                    }
+                ]
+            }
+        },
+        "/api/v2/ai-gateway/keys": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Enterprise"
+                ],
+                "summary": "List AI Gateway keys",
+                "operationId": "list-ai-gateway-keys",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/codersdk.AIGatewayKey"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "CoderSessionToken": []
+                    }
+                ]
+            },
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Enterprise"
+                ],
+                "summary": "Create AI Gateway key",
+                "operationId": "create-ai-gateway-key",
+                "parameters": [
+                    {
+                        "description": "Create AI Gateway key request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/codersdk.CreateAIGatewayKeyRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/codersdk.CreateAIGatewayKeyResponse"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "CoderSessionToken": []
+                    }
+                ]
+            }
+        },
+        "/api/v2/ai-gateway/keys/{key}": {
+            "delete": {
+                "tags": [
+                    "Enterprise"
+                ],
+                "summary": "Delete AI Gateway key",
+                "operationId": "delete-ai-gateway-key",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Key ID",
+                        "name": "key",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "security": [
+                    {
+                        "CoderSessionToken": []
+                    }
+                ]
+            }
+        },
+        "/api/v2/ai-gateway/models": {
+            "get": {
+                "description": "Alias: also available at /api/v2/aibridge/models for backward compatibility.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI Gateway"
+                ],
+                "summary": "List AI Gateway models",
+                "operationId": "list-ai-gateway-models",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "CoderSessionToken": []
+                    }
+                ]
+            }
+        },
+        "/api/v2/ai-gateway/serve": {
+            "get": {
+                "tags": [
+                    "Enterprise"
+                ],
+                "summary": "AI Gateway serve",
+                "operationId": "ai-gateway-serve",
+                "responses": {
+                    "101": {
+                        "description": "Switching Protocols"
+                    }
+                },
+                "security": [
+                    {
+                        "AIGatewayKey": []
+                    }
+                ]
+            }
+        },
+        "/api/v2/ai-gateway/sessions": {
+            "get": {
+                "description": "Alias: also available at /api/v2/aibridge/sessions for backward compatibility.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI Gateway"
+                ],
+                "summary": "List AI Gateway sessions",
+                "operationId": "list-ai-gateway-sessions",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Search query in the format ` + "`" + `key:value` + "`" + `. Available keys are: initiator, provider, provider_name, model, client, session_id, started_after, started_before.",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page limit",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Cursor pagination after session ID (cannot be used with offset)",
+                        "name": "after_session_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Offset pagination (cannot be used with after_session_id)",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/codersdk.AIBridgeListSessionsResponse"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "CoderSessionToken": []
+                    }
+                ]
+            }
+        },
+        "/api/v2/ai-gateway/sessions/{session_id}": {
+            "get": {
+                "description": "Alias: also available at /api/v2/aibridge/sessions/{session_id} for backward compatibility.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI Gateway"
+                ],
+                "summary": "Get AI Gateway session threads",
+                "operationId": "get-ai-gateway-session-threads",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Session ID (client_session_id or interception UUID)",
+                        "name": "session_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Thread pagination cursor (forward/older)",
+                        "name": "after_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Thread pagination cursor (backward/newer)",
+                        "name": "before_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Number of threads per page (default 50)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/codersdk.AIBridgeSessionThreadsResponse"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "CoderSessionToken": []
+                    }
+                ]
+            }
+        },
         "/api/v2/ai/providers": {
             "get": {
                 "produces": [
@@ -1486,259 +1815,6 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/codersdk.AIProvider"
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "CoderSessionToken": []
-                    }
-                ]
-            }
-        },
-        "/api/v2/aibridge/clients": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "AI Bridge"
-                ],
-                "summary": "List AI Bridge clients",
-                "operationId": "list-ai-bridge-clients",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "CoderSessionToken": []
-                    }
-                ]
-            }
-        },
-        "/api/v2/aibridge/keys": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Enterprise"
-                ],
-                "summary": "List AI Gateway keys",
-                "operationId": "list-ai-gateway-keys",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/codersdk.AIGatewayKey"
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "CoderSessionToken": []
-                    }
-                ]
-            },
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Enterprise"
-                ],
-                "summary": "Create AI Gateway key",
-                "operationId": "create-ai-gateway-key",
-                "parameters": [
-                    {
-                        "description": "Create AI Gateway key request",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/codersdk.CreateAIGatewayKeyRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "$ref": "#/definitions/codersdk.CreateAIGatewayKeyResponse"
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "CoderSessionToken": []
-                    }
-                ]
-            }
-        },
-        "/api/v2/aibridge/keys/{key}": {
-            "delete": {
-                "tags": [
-                    "Enterprise"
-                ],
-                "summary": "Delete AI Gateway key",
-                "operationId": "delete-ai-gateway-key",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "format": "uuid",
-                        "description": "Key ID",
-                        "name": "key",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    }
-                },
-                "security": [
-                    {
-                        "CoderSessionToken": []
-                    }
-                ]
-            }
-        },
-        "/api/v2/aibridge/models": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "AI Bridge"
-                ],
-                "summary": "List AI Bridge models",
-                "operationId": "list-ai-bridge-models",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "CoderSessionToken": []
-                    }
-                ]
-            }
-        },
-        "/api/v2/aibridge/sessions": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "AI Bridge"
-                ],
-                "summary": "List AI Bridge sessions",
-                "operationId": "list-ai-bridge-sessions",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Search query in the format ` + "`" + `key:value` + "`" + `. Available keys are: initiator, provider, provider_name, model, client, session_id, started_after, started_before.",
-                        "name": "q",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Page limit",
-                        "name": "limit",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Cursor pagination after session ID (cannot be used with offset)",
-                        "name": "after_session_id",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Offset pagination (cannot be used with after_session_id)",
-                        "name": "offset",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/codersdk.AIBridgeListSessionsResponse"
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "CoderSessionToken": []
-                    }
-                ]
-            }
-        },
-        "/api/v2/aibridge/sessions/{session_id}": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "AI Bridge"
-                ],
-                "summary": "Get AI Bridge session threads",
-                "operationId": "get-ai-bridge-session-threads",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Session ID (client_session_id or interception UUID)",
-                        "name": "session_id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Thread pagination cursor (forward/older)",
-                        "name": "after_id",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Thread pagination cursor (backward/newer)",
-                        "name": "before_id",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Number of threads per page (default 50)",
-                        "name": "limit",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/codersdk.AIBridgeSessionThreadsResponse"
                         }
                     }
                 },
@@ -15088,6 +15164,15 @@ const docTemplate = `{
         "codersdk.AIBridgeThread": {
             "type": "object",
             "properties": {
+                "agent_firewall_sequence_number": {
+                    "description": "AgentFirewallSequenceNumber is the firewall sequence number from\nthe root interception. Used to determine the position of this\nLLM request in the firewall event stream. Nil when the request\ndid not pass through the agent firewall.",
+                    "type": "integer"
+                },
+                "agent_firewall_session_id": {
+                    "description": "AgentFirewallSessionID links this thread to an agent firewall\nconfinement session. Nil when the request did not pass through\nthe agent firewall.",
+                    "type": "string",
+                    "format": "uuid"
+                },
                 "agentic_actions": {
                     "type": "array",
                     "items": {
@@ -15190,7 +15275,7 @@ const docTemplate = `{
                 "key_prefix": {
                     "type": "string"
                 },
-                "last_used_at": {
+                "last_heartbeat_at": {
                     "type": "string",
                     "format": "date-time"
                 },
@@ -15424,6 +15509,7 @@ const docTemplate = `{
                 "ai_gateway_key:create",
                 "ai_gateway_key:delete",
                 "ai_gateway_key:read",
+                "ai_gateway_key:update",
                 "ai_model_price:*",
                 "ai_model_price:read",
                 "ai_model_price:update",
@@ -15658,6 +15744,7 @@ const docTemplate = `{
                 "APIKeyScopeAiGatewayKeyCreate",
                 "APIKeyScopeAiGatewayKeyDelete",
                 "APIKeyScopeAiGatewayKeyRead",
+                "APIKeyScopeAiGatewayKeyUpdate",
                 "APIKeyScopeAiModelPriceAll",
                 "APIKeyScopeAiModelPriceRead",
                 "APIKeyScopeAiModelPriceUpdate",
@@ -15943,6 +16030,45 @@ const docTemplate = `{
                 "AgentDisplayModeAlwaysCollapsed"
             ]
         },
+        "codersdk.AgentFirewallLog": {
+            "type": "object",
+            "properties": {
+                "allowed": {
+                    "type": "boolean"
+                },
+                "captured_at": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "created_at": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "detail": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "matched_rule": {
+                    "type": "string"
+                },
+                "method": {
+                    "type": "string"
+                },
+                "proto": {
+                    "type": "string"
+                },
+                "sequence_number": {
+                    "type": "integer"
+                },
+                "session_id": {
+                    "type": "string",
+                    "format": "uuid"
+                }
+            }
+        },
         "codersdk.AgentFirewallSession": {
             "type": "object",
             "properties": {
@@ -15964,6 +16090,17 @@ const docTemplate = `{
                 "workspace_id": {
                     "type": "string",
                     "format": "uuid"
+                }
+            }
+        },
+        "codersdk.AgentFirewallSessionLogsResponse": {
+            "type": "object",
+            "properties": {
+                "results": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/codersdk.AgentFirewallLog"
+                    }
                 }
             }
         },
@@ -16539,13 +16676,6 @@ const docTemplate = `{
                 "last_error": {
                     "$ref": "#/definitions/codersdk.ChatError"
                 },
-                "last_injected_context": {
-                    "description": "LastInjectedContext holds the most recently persisted\ninjected context parts (AGENTS.md files and skills). It\nis updated only when context changes, on first workspace\nattach or agent change.",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/codersdk.ChatMessagePart"
-                    }
-                },
                 "last_model_config_id": {
                     "type": "string",
                     "format": "uuid"
@@ -16678,6 +16808,100 @@ const docTemplate = `{
                 },
                 "error": {
                     "description": "Error is the snapshot-level error copied from the pinned snapshot\n(empty when healthy).",
+                    "type": "string"
+                },
+                "resources": {
+                    "description": "Resources is the chat's pinned context (instruction files and\nskills) the prompt is built from, metadata only (no bodies). It is\npopulated only on the single-chat GET response; list and watch\npayloads leave it nil to stay lightweight.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/codersdk.ChatContextResource"
+                    }
+                }
+            }
+        },
+        "codersdk.ChatContextResource": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "description": "Error explains a non-ok Status; empty when healthy. May also carry a\nnon-fatal warning when Status is ok.",
+                    "type": "string"
+                },
+                "kind": {
+                    "$ref": "#/definitions/codersdk.ChatContextResourceKind"
+                },
+                "size_bytes": {
+                    "description": "SizeBytes is the original payload size in bytes.",
+                    "type": "integer"
+                },
+                "skill_description": {
+                    "type": "string"
+                },
+                "skill_name": {
+                    "description": "SkillName and SkillDescription are populated only for skill kinds.",
+                    "type": "string"
+                },
+                "source": {
+                    "description": "Source is the resource locator: the canonical file path for an\ninstruction file, the skill directory for a skill, the file path for\nan MCP config, or the server name for an MCP server.",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "Status is the resource's health. Non-ok resources (invalid, unreadable,\noversize, excluded) are still reported so the UI can surface why a\nresource was dropped from the prompt instead of silently omitting it;\ntheir body-specific fields (skill name, tools) are empty.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/codersdk.ChatContextResourceStatus"
+                        }
+                    ]
+                },
+                "tools": {
+                    "description": "Tools lists the tools exposed by an MCP server. Populated only for the\nmcp_server kind; nil otherwise.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/codersdk.ChatContextTool"
+                    }
+                }
+            }
+        },
+        "codersdk.ChatContextResourceKind": {
+            "type": "string",
+            "enum": [
+                "instruction_file",
+                "skill",
+                "mcp_config",
+                "mcp_server"
+            ],
+            "x-enum-varnames": [
+                "ChatContextResourceKindInstructionFile",
+                "ChatContextResourceKindSkill",
+                "ChatContextResourceKindMCPConfig",
+                "ChatContextResourceKindMCPServer"
+            ]
+        },
+        "codersdk.ChatContextResourceStatus": {
+            "type": "string",
+            "enum": [
+                "ok",
+                "oversize",
+                "unreadable",
+                "invalid",
+                "excluded"
+            ],
+            "x-enum-varnames": [
+                "ChatContextResourceStatusOK",
+                "ChatContextResourceStatusOversize",
+                "ChatContextResourceStatusUnreadable",
+                "ChatContextResourceStatusInvalid",
+                "ChatContextResourceStatusExcluded"
+            ]
+        },
+        "codersdk.ChatContextTool": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "description": "Description is the tool's human-readable summary; may be empty.",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "Name is the tool name with the \"\u003cserver\u003e__\" prefix the agent adds\nstripped, so it reads as the server exposes it.",
                     "type": "string"
                 }
             }
@@ -17308,6 +17532,13 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/codersdk.ChatModelProvider"
                     }
+                },
+                "unsupported_providers": {
+                    "description": "UnsupportedProviders lists configured providers the Agents harness\ncannot use, so the UI can explain the empty state.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/codersdk.ChatUnsupportedProvider"
+                    }
                 }
             }
         },
@@ -17562,6 +17793,18 @@ const docTemplate = `{
                 }
             }
         },
+        "codersdk.ChatUnsupportedProvider": {
+            "type": "object",
+            "properties": {
+                "display_name": {
+                    "type": "string"
+                },
+                "provider": {
+                    "description": "Provider is the provider type, e.g. \"copilot\".",
+                    "type": "string"
+                }
+            }
+        },
         "codersdk.ChatUser": {
             "type": "object",
             "required": [
@@ -17634,6 +17877,14 @@ const docTemplate = `{
                 "ChatWatchEventKindActionRequired",
                 "ChatWatchEventKindContextDirty"
             ]
+        },
+        "codersdk.ClusterConfig": {
+            "type": "object",
+            "properties": {
+                "host": {
+                    "type": "string"
+                }
+            }
         },
         "codersdk.ConnectionLatency": {
             "type": "object",
@@ -18234,6 +18485,10 @@ const docTemplate = `{
                     "description": "VersionID is an in-progress or completed job to use as an initial version\nof the template.\n\nThis is required on creation to enable a user-flow of validating a\ntemplate works. There is no reason the data-model cannot support empty\ntemplates, but it doesn't make sense for users.",
                     "type": "string",
                     "format": "uuid"
+                },
+                "time_til_autostop_notify_ms": {
+                    "description": "TimeTilAutostopNotifyMillis allows optionally specifying the duration\nbefore the autostop deadline at which a reminder notification is sent for\nworkspaces created from this template. Defaults to 0 (disabled).",
+                    "type": "integer"
                 }
             }
         },
@@ -18967,6 +19222,9 @@ const docTemplate = `{
                 "cli_upgrade_message": {
                     "type": "string"
                 },
+                "cluster": {
+                    "$ref": "#/definitions/codersdk.ClusterConfig"
+                },
                 "config": {
                     "type": "string"
                 },
@@ -19360,12 +19618,14 @@ const docTemplate = `{
                 "nats_pubsub",
                 "minimum-implicit-member",
                 "ai-gateway-cost-control",
-                "agent-app-tabs"
+                "chat-advisor",
+                "chat-virtual-desktop"
             ],
             "x-enum-comments": {
                 "ExperimentAIGatewayCostControl": "Enables AI Gateway cost control functionality.",
-                "ExperimentAgentAppTabs": "Enables workspace-app and port preview tabs in the Coder Agents right panel.",
                 "ExperimentAutoFillParameters": "This should not be taken out of experiments until we have redesigned the feature.",
+                "ExperimentChatAdvisor": "Enables the advisor tool for root agent chats.",
+                "ExperimentChatVirtualDesktop": "Enables virtual desktop and computer use provider for agents.",
                 "ExperimentExample": "This isn't used for anything.",
                 "ExperimentMCPServerHTTP": "Enables the MCP HTTP server functionality.",
                 "ExperimentMinimumImplicitMember": "Allows organizations to deviate from the default organization-member roles, in support of Gateway Accounts.",
@@ -19386,7 +19646,8 @@ const docTemplate = `{
                 "Enables embedded NATS pubsub.",
                 "Allows organizations to deviate from the default organization-member roles, in support of Gateway Accounts.",
                 "Enables AI Gateway cost control functionality.",
-                "Enables workspace-app and port preview tabs in the Coder Agents right panel."
+                "Enables the advisor tool for root agent chats.",
+                "Enables virtual desktop and computer use provider for agents."
             ],
             "x-enum-varnames": [
                 "ExperimentExample",
@@ -19399,7 +19660,8 @@ const docTemplate = `{
                 "ExperimentNATSPubsub",
                 "ExperimentMinimumImplicitMember",
                 "ExperimentAIGatewayCostControl",
-                "ExperimentAgentAppTabs"
+                "ExperimentChatAdvisor",
+                "ExperimentChatVirtualDesktop"
             ]
         },
         "codersdk.ExternalAPIKeyScopes": {
@@ -21065,6 +21327,10 @@ const docTemplate = `{
                         "type": "string"
                     }
                 },
+                "email_fallback": {
+                    "description": "EmailFallback allows OIDC logins to fall back to email-based matching\nwhen the ` + "`" + `linked_id` + "`" + ` (issuer+subject) does not match an existing user\nlink. INSECURE: weakens the linked_id check. It exists for IdP\nbrokers that do not issue a stable ` + "`" + `sub` + "`" + ` for the same user across\nconnections.",
+                    "type": "boolean"
+                },
                 "email_field": {
                     "type": "string"
                 },
@@ -21110,6 +21376,13 @@ const docTemplate = `{
                 },
                 "organization_mapping": {
                     "type": "object"
+                },
+                "redirect_allowed_hosts": {
+                    "description": "RedirectAllowedHosts is an allowlist of hostnames that may be used as\nthe host of the OIDC redirect_uri. When non-empty, the redirect_uri is\nconstructed from the incoming request's Host header (validated against\nthis list) instead of from AccessURL. Every listed host must also be\nregistered as a valid redirect URI in the OIDC provider. This setting\nis mutually exclusive with RedirectURL: if RedirectURL is set, this\nallowlist is ignored.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "redirect_url": {
                     "description": "RedirectURL is optional, defaulting to 'ACCESS_URL'. Only useful in niche\nsituations where the OIDC callback domain is different from the ACCESS_URL\ndomain.",
@@ -23529,6 +23802,10 @@ const docTemplate = `{
                     "description": "RequireActiveVersion mandates that workspaces are built with the active\ntemplate version.",
                     "type": "boolean"
                 },
+                "time_til_autostop_notify_ms": {
+                    "description": "TimeTilAutostopNotifyMillis is the duration before the workspace's\nautostop deadline at which a reminder notification is sent. 0 disables\nthe notification.",
+                    "type": "integer"
+                },
                 "time_til_dormant_autodelete_ms": {
                     "type": "integer"
                 },
@@ -23679,6 +23956,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "os": {
+                    "type": "string"
+                },
+                "prerequisites": {
                     "type": "string"
                 },
                 "variables": {
@@ -24816,6 +25096,10 @@ const docTemplate = `{
                     "description": "RequireActiveVersion mandates workspaces built using this template\nuse the active version of the template. This option has no\neffect on template admins.",
                     "type": "boolean"
                 },
+                "time_til_autostop_notify_ms": {
+                    "description": "TimeTilAutostopNotifyMillis allows optionally specifying the duration\nbefore the autostop deadline at which a reminder notification is sent for\nworkspaces created from this template. Defaults to 0 (disabled). Omitting\nthe field keeps the existing value.",
+                    "type": "integer"
+                },
                 "time_til_dormant_autodelete_ms": {
                     "type": "integer"
                 },
@@ -24938,6 +25222,11 @@ const docTemplate = `{
                 "username"
             ],
             "properties": {
+                "avatar_url": {
+                    "description": "AvatarURL is only applied for users whose login type is password or\nnone. For other login types the avatar is synced from the identity\nprovider on login, so a submitted value is ignored.",
+                    "type": "string",
+                    "format": "uri"
+                },
                 "name": {
                     "type": "string"
                 },
@@ -28677,6 +28966,11 @@ const docTemplate = `{
         }
     },
     "securityDefinitions": {
+        "AIGatewayKey": {
+            "type": "apiKey",
+            "name": "X-AI-Governance-Gateway-Key",
+            "in": "header"
+        },
         "Authorization": {
             "type": "apiKey",
             "name": "Authorizaiton",
@@ -28687,7 +28981,17 @@ const docTemplate = `{
             "name": "Coder-Session-Token",
             "in": "header"
         }
-    }
+    },
+    "tags": [
+        {
+            "description": "Workspace agent endpoints. These power the workspace agent daemon defined by the ` + "`" + `coder_agent` + "`" + ` Terraform resource. This API is NOT the Coder Agents Chats API. For programmatic access to AI Coder Agents, see the Chats API.",
+            "name": "Agents"
+        },
+        {
+            "description": "Programmatic API for Coder Agents (the user-facing \"Coder Agents\" / \"Chats\" product). Use these endpoints to create, list, and manage AI coding agent sessions.",
+            "name": "Chats"
+        }
+    ]
 }`
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it

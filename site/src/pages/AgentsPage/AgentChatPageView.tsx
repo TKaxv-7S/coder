@@ -22,7 +22,6 @@ import { useProxy } from "#/contexts/ProxyContext";
 import { isWorkspaceAppEmbeddable } from "#/modules/apps/apps";
 import { WorkspaceAppFrame } from "#/modules/apps/WorkspaceAppFrame";
 import { findWorkspaceAppWithAgent } from "#/modules/apps/workspaceApps";
-import { useDashboard } from "#/modules/dashboard/useDashboard";
 import { cn } from "#/utils/cn";
 import { pageTitle } from "#/utils/page";
 import { findWorkspaceAgent } from "#/utils/workspace";
@@ -140,6 +139,8 @@ interface AgentChatPageViewProps {
 	canConfigureAgentSetup: boolean;
 	providerCount?: number;
 	modelCount?: number;
+	unsupportedProviderNames?: readonly string[];
+	aiGatewayDisabled?: boolean;
 	hasModelOptions: boolean;
 	isModelCatalogLoading?: boolean;
 	planModeEnabled?: boolean;
@@ -187,13 +188,16 @@ interface AgentChatPageViewProps {
 	onImplementPlan?: () => Promise<void> | void;
 	onSendAskUserQuestionResponse?: (message: string) => Promise<void> | void;
 
-	// Archive actions.
+	// Chat actions.
 	handleArchiveAgentAction: () => void;
 	handleUnarchiveAgentAction: () => void;
 	handleArchiveAndDeleteWorkspaceAction: () => void;
-	handleRegenerateTitle?: () => void;
-	isRegeneratingTitle?: boolean;
-	isRegenerateTitleDisabled?: boolean;
+	handlePinAgentAction?: () => void;
+	handleUnpinAgentAction?: () => void;
+	handleOpenRenameDialogAction?: () => void;
+	isPinned?: boolean;
+	isChildChat?: boolean;
+	isArchivingThisChat?: boolean;
 
 	// Scroll container ref.
 	scrollContainerRef: RefObject<HTMLDivElement | null>;
@@ -216,7 +220,7 @@ interface AgentChatPageViewProps {
 	// Desktop chat ID (optional).
 	desktopChatId?: string;
 
-	lastInjectedContext?: readonly TypesGen.ChatMessagePart[];
+	chatContext?: TypesGen.ChatContext;
 }
 
 const UnavailableTabMessage: FC<{ message: string }> = ({ message }) => (
@@ -328,6 +332,8 @@ export const AgentChatPageView: FC<AgentChatPageViewProps> = ({
 	canConfigureAgentSetup,
 	providerCount,
 	modelCount,
+	unsupportedProviderNames,
+	aiGatewayDisabled,
 	hasModelOptions,
 	isModelCatalogLoading = false,
 	planModeEnabled,
@@ -359,9 +365,12 @@ export const AgentChatPageView: FC<AgentChatPageViewProps> = ({
 	handleArchiveAgentAction,
 	handleUnarchiveAgentAction,
 	handleArchiveAndDeleteWorkspaceAction,
-	handleRegenerateTitle,
-	isRegeneratingTitle,
-	isRegenerateTitleDisabled,
+	handlePinAgentAction,
+	handleUnpinAgentAction,
+	handleOpenRenameDialogAction,
+	isPinned,
+	isChildChat,
+	isArchivingThisChat,
 	scrollContainerRef,
 	scrollToBottomRef,
 	hasMoreMessages,
@@ -374,12 +383,11 @@ export const AgentChatPageView: FC<AgentChatPageViewProps> = ({
 	onMCPSelectionChange,
 	onMCPAuthComplete,
 	desktopChatId,
-	lastInjectedContext,
+	chatContext,
 }) => {
 	const queryClient = useQueryClient();
 	const { proxy } = useProxy();
 	const wildcardHostname = proxy.preferredWildcardHostname;
-	const { experiments } = useDashboard();
 
 	const canOpenChatSharing = canShareChat && organizationId !== undefined;
 
@@ -486,19 +494,10 @@ export const AgentChatPageView: FC<AgentChatPageViewProps> = ({
 	const availableDesktopChatId =
 		workspace && workspaceAgent ? desktopChatId : undefined;
 
-	// Workspace app and port preview tabs are gated behind the agent-app-tabs
-	// experiment. Terminal tabs are generally available. Derived after all hook
-	// calls so the React Compiler keeps the tab list and the tab-open handlers
-	// below in a single memoization scope.
-	const userAppTabsEnabled = experiments.includes("agent-app-tabs");
-
-	// When app and port tabs are gated off, persisted tabs of those kinds
-	// are hidden rather than deleted; the save effect persists the raw tab
-	// state, so they reappear if the gate lifts.
 	const validatedUserRightPanelTabs = validateUserRightPanelTabs(
 		userRightPanelTabs,
 		{ workspace, workspaceAgent, wildcardHostname },
-	).filter((tab) => userAppTabsEnabled || tab.kind === "terminal");
+	);
 
 	const hasBuiltInTerminal = Boolean(
 		workspace && workspaceAgent && !defaultTerminalHidden,
@@ -842,11 +841,12 @@ export const AgentChatPageView: FC<AgentChatPageViewProps> = ({
 								onArchiveAndDeleteWorkspace={
 									handleArchiveAndDeleteWorkspaceAction
 								}
-								{...(handleRegenerateTitle
-									? { onRegenerateTitle: handleRegenerateTitle }
-									: {})}
-								isRegeneratingTitle={isRegeneratingTitle}
-								isRegenerateTitleDisabled={isRegenerateTitleDisabled}
+								onPinAgent={handlePinAgentAction}
+								onUnpinAgent={handleUnpinAgentAction}
+								onOpenRenameDialog={handleOpenRenameDialogAction}
+								isPinned={isPinned}
+								isChildChat={isChildChat}
+								isArchiving={isArchivingThisChat}
 								hasWorkspace={Boolean(workspace)}
 								isArchived={isArchived}
 								diffStatusData={diffStatusData}
@@ -901,7 +901,7 @@ export const AgentChatPageView: FC<AgentChatPageViewProps> = ({
 							onFetchMoreMessages={onFetchMoreMessages}
 							messageCount={messageCount}
 						>
-							<div className="px-4">
+							<div className="px-4" data-chat-scroll-content>
 								<ChatPageTimeline
 									store={store}
 									persistedError={persistedError}
@@ -941,6 +941,8 @@ export const AgentChatPageView: FC<AgentChatPageViewProps> = ({
 								canConfigureAgentSetup={canConfigureAgentSetup}
 								providerCount={providerCount}
 								modelCount={modelCount}
+								unsupportedProviderNames={unsupportedProviderNames}
+								aiGatewayDisabled={aiGatewayDisabled}
 								selectedModel={effectiveSelectedModel}
 								onModelChange={setSelectedModel}
 								modelOptions={modelOptions}
@@ -970,7 +972,7 @@ export const AgentChatPageView: FC<AgentChatPageViewProps> = ({
 								selectedMCPServerIds={selectedMCPServerIds}
 								onMCPSelectionChange={onMCPSelectionChange}
 								onMCPAuthComplete={onMCPAuthComplete}
-								lastInjectedContext={lastInjectedContext}
+								chatContext={chatContext}
 								workspace={workspace}
 								workspaceAgent={workspaceAgent}
 								chatId={agentId}
@@ -995,7 +997,6 @@ export const AgentChatPageView: FC<AgentChatPageViewProps> = ({
 							tabs={sidebarTabs}
 							addTabControl={
 								<RightPanelAddTabControl
-									appExperimentEnabled={userAppTabsEnabled}
 									workspace={workspace}
 									agent={workspaceAgent}
 									host={wildcardHostname}
@@ -1084,7 +1085,6 @@ export const AgentChatPageLoadingView: FC<AgentChatPageLoadingViewProps> = ({
 					}}
 					onArchiveAgent={() => {}}
 					onUnarchiveAgent={() => {}}
-					onRegenerateTitle={() => {}}
 					onArchiveAndDeleteWorkspace={() => {}}
 					hasWorkspace={false}
 					isSidebarCollapsed={isSidebarCollapsed}
@@ -1162,7 +1162,6 @@ export const AgentChatPageNotFoundView: FC<AgentChatPageNotFoundViewProps> = ({
 				}}
 				onArchiveAgent={() => {}}
 				onUnarchiveAgent={() => {}}
-				onRegenerateTitle={() => {}}
 				onArchiveAndDeleteWorkspace={() => {}}
 				hasWorkspace={false}
 				isSidebarCollapsed={isSidebarCollapsed}

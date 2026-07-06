@@ -5,10 +5,10 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"flag"
 	"slices"
 	"strings"
 	"sync/atomic"
-	"testing"
 	"time"
 
 	"github.com/google/uuid"
@@ -486,6 +486,7 @@ var (
 					rbac.ResourceOauth2AppSecret.Type:        {policy.ActionCreate, policy.ActionRead, policy.ActionUpdate, policy.ActionDelete},
 					rbac.ResourceChat.Type:                   {policy.ActionCreate, policy.ActionRead, policy.ActionUpdate, policy.ActionDelete},
 					rbac.ResourceAIProvider.Type:             {policy.ActionCreate, policy.ActionRead, policy.ActionUpdate, policy.ActionDelete},
+					rbac.ResourceAIGatewayKey.Type:           {policy.ActionRead, policy.ActionUpdate},
 				}),
 				User:    []rbac.Permission{},
 				ByOrgID: map[string]rbac.OrgPermissions{},
@@ -637,12 +638,12 @@ var (
 	// See aibridged package.
 	subjectAibridged = rbac.Subject{
 		Type:         rbac.SubjectAibridged,
-		FriendlyName: "AI Bridge Daemon",
+		FriendlyName: "AI Gateway Daemon",
 		ID:           uuid.Nil.String(),
 		Roles: rbac.Roles([]rbac.Role{
 			{
 				Identifier:  rbac.RoleIdentifier{Name: "aibridged"},
-				DisplayName: "AI Bridge Daemon",
+				DisplayName: "AI Gateway Daemon",
 				Site: rbac.Permissions(map[string][]policy.Action{
 					rbac.ResourceUser.Type: {
 						policy.ActionRead,         // Required to validate API key owner is active.
@@ -1723,13 +1724,6 @@ func (q *querier) AutoArchiveInactiveChats(ctx context.Context, arg database.Aut
 	return q.db.AutoArchiveInactiveChats(ctx, arg)
 }
 
-func (q *querier) BackfillChatModelConfigProvider(ctx context.Context, arg database.BackfillChatModelConfigProviderParams) (sql.Result, error) {
-	if err := q.authorizeContext(ctx, policy.ActionUpdate, rbac.ResourceDeploymentConfig); err != nil {
-		return nil, err
-	}
-	return q.db.BackfillChatModelConfigProvider(ctx, arg)
-}
-
 func (q *querier) BackoffChatDiffStatus(ctx context.Context, arg database.BackoffChatDiffStatusParams) error {
 	// This is a system-level operation used by the gitsync
 	// background worker to reschedule failed refreshes. Same
@@ -2110,13 +2104,6 @@ func (q *querier) DeleteChatModelConfigsByAIProviderID(ctx context.Context, aiPr
 		return err
 	}
 	return q.db.DeleteChatModelConfigsByAIProviderID(ctx, aiProviderID)
-}
-
-func (q *querier) DeleteChatModelConfigsByProvider(ctx context.Context, provider string) error {
-	if err := q.authorizeContext(ctx, policy.ActionUpdate, rbac.ResourceDeploymentConfig); err != nil {
-		return err
-	}
-	return q.db.DeleteChatModelConfigsByProvider(ctx, provider)
 }
 
 func (q *querier) DeleteChatQueuedMessage(ctx context.Context, arg database.DeleteChatQueuedMessageParams) error {
@@ -2611,7 +2598,7 @@ func (q *querier) DeleteWorkspaceSubAgentByID(ctx context.Context, id uuid.UUID)
 }
 
 func (q *querier) DisableForeignKeysAndTriggers(ctx context.Context) error {
-	if !testing.Testing() {
+	if flag.Lookup("test.v") == nil {
 		return xerrors.Errorf("DisableForeignKeysAndTriggers is only allowed in tests")
 	}
 	return q.db.DisableForeignKeysAndTriggers(ctx)
@@ -2751,6 +2738,16 @@ func (q *querier) GetAIBridgeUserPromptsByInterceptionID(ctx context.Context, in
 		return nil, err
 	}
 	return q.db.GetAIBridgeUserPromptsByInterceptionID(ctx, interceptionID)
+}
+
+// Authenticates a standalone AI Gateway replica by its hashed key secret, returning the matched key.
+func (q *querier) GetAIGatewayKeyByHashedSecret(ctx context.Context, hashedSecret []byte) (database.AIGatewayKey, error) {
+	// Standalone AI Gateway has no Coder identity, so this runs under the
+	// system actor reading the AI Gateway key it authenticates against.
+	if err := q.authorizeContext(ctx, policy.ActionRead, rbac.ResourceAIGatewayKey); err != nil {
+		return database.AIGatewayKey{}, err
+	}
+	return q.db.GetAIGatewayKeyByHashedSecret(ctx, hashedSecret)
 }
 
 func (q *querier) GetAIModelPriceByProviderModel(ctx context.Context, arg database.GetAIModelPriceByProviderModelParams) (database.AIModelPrice, error) {
@@ -3666,7 +3663,7 @@ func (q *querier) GetEnabledChatModelConfigByID(ctx context.Context, id uuid.UUI
 	return q.db.GetEnabledChatModelConfigByID(ctx, id)
 }
 
-func (q *querier) GetEnabledChatModelConfigs(ctx context.Context) ([]database.ChatModelConfig, error) {
+func (q *querier) GetEnabledChatModelConfigs(ctx context.Context) ([]database.GetEnabledChatModelConfigsRow, error) {
 	if err := q.authorizeContext(ctx, policy.ActionRead, rbac.ResourceDeploymentConfig); err != nil {
 		return nil, err
 	}
@@ -4874,6 +4871,13 @@ func (q *querier) GetUserAISeatStates(ctx context.Context, userIDs []uuid.UUID) 
 	return q.db.GetUserAISeatStates(ctx, userIDs)
 }
 
+func (q *querier) GetUserAISpendSince(ctx context.Context, arg database.GetUserAISpendSinceParams) (database.GetUserAISpendSinceRow, error) {
+	if _, err := q.GetUserByID(ctx, arg.UserID); err != nil { // AuthZ check
+		return database.GetUserAISpendSinceRow{}, err
+	}
+	return q.db.GetUserAISpendSince(ctx, arg)
+}
+
 func (q *querier) GetUserActivityInsights(ctx context.Context, arg database.GetUserActivityInsightsParams) ([]database.GetUserActivityInsightsRow, error) {
 	// Used by insights endpoints. Need to check both for auditors and for regular users with template acl perms.
 	if err := q.authorizeContext(ctx, policy.ActionViewInsights, rbac.ResourceTemplate); err != nil {
@@ -5686,8 +5690,8 @@ func (q *querier) GetWorkspacesByTemplateID(ctx context.Context, templateID uuid
 	return q.db.GetWorkspacesByTemplateID(ctx, templateID)
 }
 
-func (q *querier) GetWorkspacesEligibleForTransition(ctx context.Context, now time.Time) ([]database.GetWorkspacesEligibleForTransitionRow, error) {
-	return q.db.GetWorkspacesEligibleForTransition(ctx, now)
+func (q *querier) GetWorkspacesEligibleForLifecycleAction(ctx context.Context, now time.Time) ([]database.GetWorkspacesEligibleForLifecycleActionRow, error) {
+	return q.db.GetWorkspacesEligibleForLifecycleAction(ctx, now)
 }
 
 func (q *querier) GetWorkspacesForWorkspaceMetrics(ctx context.Context) ([]database.GetWorkspacesForWorkspaceMetricsRow, error) {
@@ -5695,6 +5699,16 @@ func (q *querier) GetWorkspacesForWorkspaceMetrics(ctx context.Context) ([]datab
 		return nil, err
 	}
 	return q.db.GetWorkspacesForWorkspaceMetrics(ctx)
+}
+
+func (q *querier) HasTemplateVersionsUsingCachedModuleFileInOrg(ctx context.Context, arg database.HasTemplateVersionsUsingCachedModuleFileInOrgParams) (bool, error) {
+	// This query authorizes provisioner module-file downloads. The caller
+	// must be able to read files in the target organization; the actual
+	// tenant isolation comes from the organization_id filter in the query.
+	if err := q.authorizeContext(ctx, policy.ActionRead, rbac.ResourceFile.InOrg(arg.OrganizationID)); err != nil {
+		return false, err
+	}
+	return q.db.HasTemplateVersionsUsingCachedModuleFileInOrg(ctx, arg)
 }
 
 func (q *querier) HydrateAgentChatsContext(ctx context.Context, arg database.HydrateAgentChatsContextParams) error {
@@ -5717,6 +5731,13 @@ func (q *querier) IncrementChatGenerationAttempt(ctx context.Context, id uuid.UU
 	}
 	_ = chat
 	return q.db.IncrementChatGenerationAttempt(ctx, id)
+}
+
+func (q *querier) IncrementUserAIDailySpend(ctx context.Context, arg database.IncrementUserAIDailySpendParams) (database.AIUserDailySpend, error) {
+	if err := q.authorizeContext(ctx, policy.ActionUpdate, rbac.ResourceAibridgeInterception); err != nil {
+		return database.AIUserDailySpend{}, err
+	}
+	return q.db.IncrementUserAIDailySpend(ctx, arg)
 }
 
 func (q *querier) InsertAIBridgeInterception(ctx context.Context, arg database.InsertAIBridgeInterceptionParams) (database.AIBridgeInterception, error) {
@@ -7012,6 +7033,16 @@ func (q *querier) UpdateAIBridgeInterceptionEnded(ctx context.Context, params da
 	return q.db.UpdateAIBridgeInterceptionEnded(ctx, params)
 }
 
+// Records heartbeat liveness for a key used in active DRPC session between coderd and standalone AI Gateway.
+func (q *querier) UpdateAIGatewayKeyLastHeartbeatAt(ctx context.Context, id uuid.UUID) (int64, error) {
+	// Standalone AI Gateway has no Coder identity, so this runs under the
+	// system actor recording connection liveness on the AI Gateway key.
+	if err := q.authorizeContext(ctx, policy.ActionUpdate, rbac.ResourceAIGatewayKey); err != nil {
+		return 0, err
+	}
+	return q.db.UpdateAIGatewayKeyLastHeartbeatAt(ctx, id)
+}
+
 func (q *querier) UpdateAIProvider(ctx context.Context, arg database.UpdateAIProviderParams) (database.AIProvider, error) {
 	if err := q.authorizeContext(ctx, policy.ActionUpdate, rbac.ResourceAIProvider); err != nil {
 		return database.AIProvider{}, err
@@ -7121,17 +7152,6 @@ func (q *querier) UpdateChatLabelsByID(ctx context.Context, arg database.UpdateC
 		return database.Chat{}, err
 	}
 	return q.db.UpdateChatLabelsByID(ctx, arg)
-}
-
-func (q *querier) UpdateChatLastInjectedContext(ctx context.Context, arg database.UpdateChatLastInjectedContextParams) (database.Chat, error) {
-	chat, err := q.db.GetChatByID(ctx, arg.ID)
-	if err != nil {
-		return database.Chat{}, err
-	}
-	if err := q.authorizeContext(ctx, policy.ActionUpdate, chat); err != nil {
-		return database.Chat{}, err
-	}
-	return q.db.UpdateChatLastInjectedContext(ctx, arg)
 }
 
 func (q *querier) UpdateChatLastModelConfigByID(ctx context.Context, arg database.UpdateChatLastModelConfigByIDParams) (database.Chat, error) {
@@ -8413,6 +8433,24 @@ func (q *querier) UpdateWorkspaceBuildFlagsByID(ctx context.Context, arg databas
 		return err
 	}
 	return q.db.UpdateWorkspaceBuildFlagsByID(ctx, arg)
+}
+
+func (q *querier) UpdateWorkspaceBuildNotifiedAutostopDeadline(ctx context.Context, arg database.UpdateWorkspaceBuildNotifiedAutostopDeadlineParams) error {
+	build, err := q.db.GetWorkspaceBuildByID(ctx, arg.ID)
+	if err != nil {
+		return err
+	}
+
+	workspace, err := q.db.GetWorkspaceByID(ctx, build.WorkspaceID)
+	if err != nil {
+		return err
+	}
+
+	err = q.authorizeContext(ctx, policy.ActionUpdate, workspace.RBACObject())
+	if err != nil {
+		return err
+	}
+	return q.db.UpdateWorkspaceBuildNotifiedAutostopDeadline(ctx, arg)
 }
 
 func (q *querier) UpdateWorkspaceBuildProvisionerStateByID(ctx context.Context, arg database.UpdateWorkspaceBuildProvisionerStateByIDParams) error {
