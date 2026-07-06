@@ -38,8 +38,8 @@ function writeLocalStorage(key: string, value: string): void {
 	}
 }
 
-export const BlinkProvider: FC<PropsWithChildren> = ({ children }) => {
-	const [enabled] = useState(() => readLocalStorage("blink_enabled", "false") === "true");
+export const BlinkProvider: FC<PropsWithChildren<{ forceEnabled?: boolean }>> = ({ children, forceEnabled }) => {
+	const [enabled] = useState(() => forceEnabled || readLocalStorage("blink_enabled", "false") === "true");
 	const [open, setOpen] = useState(false);
 	const [messages, setMessages] = useState<BlinkMessage[]>([]);
 	const [isThinking, setIsThinking] = useState(false);
