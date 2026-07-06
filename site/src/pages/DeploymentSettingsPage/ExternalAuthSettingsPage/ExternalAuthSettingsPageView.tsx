@@ -1,10 +1,9 @@
-import type { FC } from "react";
-import type {
-	DeploymentValues,
-	ExternalAuthConfig,
-} from "#/api/typesGenerated";
-import { Alert } from "#/components/Alert/Alert";
-import { PremiumBadge } from "#/components/Badges/Badges";
+import { type FC, useState } from "react";
+import { Link } from "react-router";
+import type { ExternalAuthProviderEntry } from "#/api/typesGenerated";
+import { Button } from "#/components/Button/Button";
+import { ConfirmDialog } from "#/components/Dialogs/ConfirmDialog/ConfirmDialog";
+import { AvatarData } from "#/components/Avatar/AvatarData";
 import {
 	SettingsHeader,
 	SettingsHeaderDescription,
@@ -19,19 +18,56 @@ import {
 	TableHeader,
 	TableRow,
 } from "#/components/Table/Table";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "#/components/DropdownMenu/DropdownMenu";
+import { Loader } from "#/components/Loader/Loader";
+import { ErrorAlert } from "#/components/Alert/ErrorAlert";
+import { LockIcon, MoreVerticalIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { TableEmpty } from "#/components/TableEmpty/TableEmpty";
 import { docs } from "#/utils/docs";
 
-type ExternalAuthSettingsPageViewProps = {
-	config: DeploymentValues;
+export type ExternalAuthSettingsPageViewProps = {
+	providers: ExternalAuthProviderEntry[] | undefined;
+	isLoading: boolean;
+	error: Error | null;
+	canCreateProvider: boolean;
+	onDeleteProvider: (provider: ExternalAuthProviderEntry) => Promise<void>;
+	deleteProviderLoading: boolean;
 };
 
 export const ExternalAuthSettingsPageView: FC<
 	ExternalAuthSettingsPageViewProps
-> = ({ config }) => {
+> = ({
+	providers,
+	isLoading,
+	error,
+	canCreateProvider,
+	onDeleteProvider,
+	deleteProviderLoading,
+}) => {
+	const [providerToDelete, setProviderToDelete] =
+		useState<ExternalAuthProviderEntry | null>(null);
+
 	return (
 		<>
 			<SettingsHeader
-				actions={<SettingsHeaderDocsLink href={docs("/admin/external-auth")} />}
+				actions={
+					<>
+						<SettingsHeaderDocsLink href={docs("/admin/external-auth")} />
+						{canCreateProvider && (
+							<Button asChild>
+								<Link to="/deployment/external-auth/add">
+									<PlusIcon aria-hidden="true" />
+									Add provider
+								</Link>
+							</Button>
+						)}
+					</>
+				}
 			>
 				<SettingsHeaderTitle>External Authentication</SettingsHeaderTitle>
 				<SettingsHeaderDescription>
@@ -40,56 +76,134 @@ export const ExternalAuthSettingsPageView: FC<
 				</SettingsHeaderDescription>
 			</SettingsHeader>
 
-			<video
-				autoPlay
-				muted
-				loop
-				playsInline
-				src="/external-auth.mp4"
-				style={{
-					maxWidth: "100%",
-					borderRadius: 4,
-				}}
-			/>
+			{error && <ErrorAlert error={error} />}
 
-			<div className="mt-6 mb-6">
-				<Alert severity="info" actions={<PremiumBadge key="enterprise" />}>
-					Integrating with multiple External authentication providers is an
-					Premium feature.
-				</Alert>
-			</div>
+			{isLoading && <Loader />}
 
-			<Table className="[&_td]:py-6 [&_td:last-child]:pl-8 [&_th:last-child]:pl-8">
-				<TableHeader>
-					<TableRow>
-						<TableHead className="w-1/3">ID</TableHead>
-						<TableHead className="w-1/3">Client ID</TableHead>
-						<TableHead className="w-1/3">Match</TableHead>
-					</TableRow>
-				</TableHeader>
-				<TableBody>
-					{((config.external_auth === null ||
-						config.external_auth?.length === 0) && (
+			{!isLoading && !error && (
+				<Table>
+					<TableHeader>
 						<TableRow>
-							<TableCell colSpan={999}>
-								<div className="text-center">
-									No providers have been configured!
-								</div>
-							</TableCell>
+							<TableHead>Provider</TableHead>
+							<TableHead>Type</TableHead>
+							<TableHead>Provider ID</TableHead>
+							<TableHead>Client ID</TableHead>
+							<TableHead>Source</TableHead>
+							<TableHead className="w-10" />
 						</TableRow>
-					)) ||
-						config.external_auth?.map((git: ExternalAuthConfig) => {
-							const name = git.id || git.type;
-							return (
-								<TableRow key={name}>
-									<TableCell>{name}</TableCell>
-									<TableCell>{git.client_id}</TableCell>
-									<TableCell>{git.regex || "Not Set"}</TableCell>
-								</TableRow>
-							);
-						})}
-				</TableBody>
-			</Table>
+					</TableHeader>
+					<TableBody>
+						{(!providers || providers.length === 0) ? (
+							<TableEmpty
+								message="No external auth providers configured."
+								cta={
+									canCreateProvider ? (
+										<Button asChild>
+											<Link to="/deployment/external-auth/add">
+												Add a provider
+											</Link>
+										</Button>
+									) : undefined
+								}
+							/>
+						) : (
+							providers.map((provider) => {
+								const isDatabaseSourced = provider.source === "database";
+								return (
+									<TableRow key={provider.id}>
+										<TableCell>
+											<Link
+												to={`/deployment/external-auth/${provider.id}`}
+												className="no-underline text-inherit hover:underline"
+											>
+												<AvatarData
+													title={provider.display_name || provider.provider_id}
+													subtitle={provider.regex || undefined}
+													src={provider.display_icon || undefined}
+												/>
+											</Link>
+										</TableCell>
+										<TableCell>{provider.type || "custom"}</TableCell>
+										<TableCell>
+											<code>{provider.provider_id}</code>
+										</TableCell>
+										<TableCell>
+											<code>{provider.client_id}</code>
+										</TableCell>
+										<TableCell>
+											<SourceBadge source={provider.source} />
+										</TableCell>
+										<TableCell>
+											{isDatabaseSourced && (
+												<DropdownMenu>
+													<DropdownMenuTrigger asChild>
+														<Button
+															variant="subtle"
+															size="icon"
+															aria-label="Open menu"
+														>
+															<MoreVerticalIcon className="size-4" />
+														</Button>
+													</DropdownMenuTrigger>
+													<DropdownMenuContent align="end">
+														<DropdownMenuItem asChild>
+															<Link
+																to={`/deployment/external-auth/${provider.id}`}
+															>
+																<PencilIcon aria-hidden="true" className="size-4" />
+																Edit
+															</Link>
+														</DropdownMenuItem>
+														<DropdownMenuItem
+															className="text-destructive"
+															onClick={() => setProviderToDelete(provider)}
+														>
+															<Trash2Icon className="size-4" />
+															Delete
+														</DropdownMenuItem>
+													</DropdownMenuContent>
+												</DropdownMenu>
+											)}
+										</TableCell>
+									</TableRow>
+								);
+							})
+						)}
+					</TableBody>
+				</Table>
+			)}
+
+			<ConfirmDialog
+				open={providerToDelete !== null}
+				title="Delete external auth provider"
+				description={`Are you sure you want to delete "${providerToDelete?.display_name || providerToDelete?.provider_id}"?`}
+				confirmText="Delete"
+				onConfirm={() => {
+					if (providerToDelete) {
+						onDeleteProvider(providerToDelete).then(() => {
+							setProviderToDelete(null);
+						});
+					}
+				}}
+				onClose={() => setProviderToDelete(null)}
+				confirmLoading={deleteProviderLoading}
+			/>
 		</>
+	);
+};
+
+const SourceBadge: FC<{ source: string }> = ({ source }) => {
+	if (source === "env") {
+		return (
+			<span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+				<LockIcon aria-hidden="true" className="size-3.5" />
+				Environment
+			</span>
+		);
+	}
+	return (
+		<span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+			Database
+		</span>
 	);
 };

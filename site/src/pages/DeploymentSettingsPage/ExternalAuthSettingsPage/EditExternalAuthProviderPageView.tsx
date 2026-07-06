@@ -11,7 +11,6 @@ import {
 	SettingsHeaderDescription,
 	SettingsHeaderTitle,
 } from "#/components/SettingsHeader/SettingsHeader";
-import { Stack } from "#/components/Stack/Stack";
 import { ExternalAuthProviderForm } from "./ExternalAuthProviderForm";
 
 type EditExternalAuthProviderPageViewProps = {
@@ -52,11 +51,7 @@ export const EditExternalAuthProviderPageView: FC<
 
 	return (
 		<>
-			<Stack
-				alignItems="baseline"
-				direction="row"
-				justifyContent="space-between"
-			>
+			<div className="flex flex-row items-baseline justify-between">
 				<SettingsHeader>
 					<SettingsHeaderTitle>
 						Edit External Auth Provider
@@ -72,9 +67,9 @@ export const EditExternalAuthProviderPageView: FC<
 						All External Auth Providers
 					</RouterLink>
 				</Button>
-			</Stack>
+			</div>
 
-			<Stack>
+			<div className="flex flex-col gap-6">
 				{isEnvSourced && (
 					<Alert severity="info">
 						This provider is configured via environment variables and
@@ -90,7 +85,7 @@ export const EditExternalAuthProviderPageView: FC<
 					error={submitError}
 					disabled={isDisabled}
 				/>
-			</Stack>
+			</div>
 		</>
 	);
 };

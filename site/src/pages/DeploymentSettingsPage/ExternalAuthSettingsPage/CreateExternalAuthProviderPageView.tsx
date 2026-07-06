@@ -9,7 +9,7 @@ import {
 	SettingsHeaderDescription,
 	SettingsHeaderTitle,
 } from "#/components/SettingsHeader/SettingsHeader";
-import { Stack } from "#/components/Stack/Stack";
+
 import { ExternalAuthProviderForm } from "./ExternalAuthProviderForm";
 
 type CreateExternalAuthProviderPageViewProps = {
@@ -24,11 +24,7 @@ export const CreateExternalAuthProviderPageView: FC<
 > = ({ isSubmitting, createProvider, error, canEdit }) => {
 	return (
 		<>
-			<Stack
-				alignItems="baseline"
-				direction="row"
-				justifyContent="space-between"
-			>
+			<div className="flex flex-row items-baseline justify-between">
 				<SettingsHeader>
 					<SettingsHeaderTitle>
 						Add External Auth Provider
@@ -45,9 +41,9 @@ export const CreateExternalAuthProviderPageView: FC<
 						All External Auth Providers
 					</RouterLink>
 				</Button>
-			</Stack>
+			</div>
 
-			<Stack>
+			<div className="flex flex-col gap-6">
 				{error ? <ErrorAlert error={error} /> : undefined}
 				<ExternalAuthProviderForm
 					onSubmit={(data) => {
@@ -61,7 +57,7 @@ export const CreateExternalAuthProviderPageView: FC<
 					error={error}
 					disabled={!canEdit}
 				/>
-			</Stack>
+			</div>
 		</>
 	);
 };
