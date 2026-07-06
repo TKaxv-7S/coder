@@ -1932,7 +1932,8 @@ CREATE TABLE chat_messages (
     deleted boolean DEFAULT false NOT NULL,
     provider_response_id text,
     api_key_id text,
-    revision bigint NOT NULL
+    revision bigint NOT NULL,
+    search_tsv tsvector
 );
 
 CREATE SEQUENCE chat_messages_id_seq
@@ -4693,6 +4694,8 @@ CREATE UNIQUE INDEX idx_chat_debug_steps_run_step ON chat_debug_steps USING btre
 
 CREATE INDEX idx_chat_debug_steps_stale ON chat_debug_steps USING btree (updated_at) WHERE (finished_at IS NULL);
 
+CREATE INDEX idx_chat_diff_statuses_pr_title_fts ON chat_diff_statuses USING gin (to_tsvector('simple'::regconfig, pull_request_title));
+
 CREATE INDEX idx_chat_diff_statuses_stale_at ON chat_diff_statuses USING btree (stale_at);
 
 CREATE INDEX idx_chat_diff_statuses_url_lower ON chat_diff_statuses USING btree (lower(url)) WHERE ((url IS NOT NULL) AND (url <> ''::text));
@@ -4712,6 +4715,10 @@ CREATE INDEX idx_chat_messages_compressed_summary_boundary ON chat_messages USIN
 CREATE INDEX idx_chat_messages_created_at ON chat_messages USING btree (created_at);
 
 CREATE INDEX idx_chat_messages_owner_spend ON chat_messages USING btree (chat_id, created_at) WHERE (total_cost_micros IS NOT NULL);
+
+CREATE INDEX idx_chat_messages_search_tsv ON chat_messages USING gin (search_tsv) WHERE ((search_tsv IS NOT NULL) AND (deleted = false) AND (visibility = ANY (ARRAY['user'::chat_message_visibility, 'both'::chat_message_visibility])) AND (role = ANY (ARRAY['user'::chat_message_role, 'assistant'::chat_message_role])));
+
+CREATE INDEX idx_chat_messages_search_tsv_pending ON chat_messages USING btree (id DESC) WHERE ((search_tsv IS NULL) AND (deleted = false) AND (visibility = ANY (ARRAY['user'::chat_message_visibility, 'both'::chat_message_visibility])) AND (role = ANY (ARRAY['user'::chat_message_role, 'assistant'::chat_message_role])));
 
 CREATE INDEX idx_chat_messages_user_prompts ON chat_messages USING btree (chat_id, id DESC) WHERE ((deleted = false) AND (role = 'user'::chat_message_role) AND (visibility = ANY (ARRAY['user'::chat_message_visibility, 'both'::chat_message_visibility])));
 
@@ -4740,6 +4747,8 @@ CREATE INDEX idx_chats_parent_chat_id ON chats USING btree (parent_chat_id);
 CREATE INDEX idx_chats_pending ON chats USING btree (status) WHERE (status = 'pending'::chat_status);
 
 CREATE INDEX idx_chats_root_chat_id ON chats USING btree (root_chat_id);
+
+CREATE INDEX idx_chats_title_fts ON chats USING gin (to_tsvector('simple'::regconfig, title));
 
 CREATE INDEX idx_chats_worker_acquisition_candidates ON chats USING btree (status, updated_at, id) WHERE (archived = false);
 
