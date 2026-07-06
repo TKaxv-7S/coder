@@ -27,7 +27,7 @@ export const SummaryStep: FC<SummaryStepProps> = ({
 			<div className="flex flex-col gap-3">
 				<div className="flex items-center gap-3 p-3 rounded-md bg-surface-secondary">
 					<span className="text-sm">
-						{agentsEnabled ? "✅" : "➖"} AI Agents{" "}
+						{agentsEnabled ? "\u2705" : "\u2796"} Blink assistant{" "}
 						{agentsEnabled ? "enabled" : "not enabled"}
 					</span>
 				</div>

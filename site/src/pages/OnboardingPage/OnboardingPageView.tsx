@@ -22,8 +22,8 @@ interface StepDef {
 function getSteps(agentsEnabled: boolean): StepDef[] {
 	const steps: StepDef[] = [{ key: "welcome", label: "Welcome" }];
 	if (agentsEnabled) {
-		steps.push({ key: "provider", label: "Provider" });
-		steps.push({ key: "chat", label: "Chat", wide: true });
+		steps.push({ key: "provider", label: "AI Provider" });
+		steps.push({ key: "blink", label: "Blink", wide: true });
 	}
 	steps.push({ key: "summary", label: "Summary" });
 	return steps;
@@ -59,7 +59,7 @@ export const OnboardingPageView: FC<OnboardingPageViewProps> = ({
 						onProviderConfigured={() => state.setProviderConfigured(true)}
 					/>
 				);
-			case "chat":
+			case "blink":
 				return <AgentChatStep onFinish={advance} />;
 			case "summary":
 				return (

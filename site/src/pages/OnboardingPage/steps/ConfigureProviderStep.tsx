@@ -93,7 +93,7 @@ export const ConfigureProviderStep: FC<ConfigureProviderStepProps> = ({
 			<header>
 				<h2 className="text-2xl font-semibold m-0">Configure AI Provider</h2>
 				<p className="text-sm text-content-secondary mt-2 mb-0">
-					Connect an AI provider to power agent capabilities.
+					Connect an AI provider to power Blink assistant capabilities.
 				</p>
 			</header>
 

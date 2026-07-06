@@ -5,60 +5,48 @@ interface AgentChatStepProps {
 	onFinish: () => void;
 }
 
+const BLINK_ENABLED_KEY = "blink_enabled";
+
 export const AgentChatStep: FC<AgentChatStepProps> = ({ onFinish }) => {
-	// TODO: Wire up real chat via createChat mutation, useChatStore, and
-	// watchChat for WebSocket streaming. Render messages using patterns
-	// from ChatConversation/ConversationTimeline.tsx.
+	const enableBlink = () => {
+		localStorage.setItem(BLINK_ENABLED_KEY, "true");
+		onFinish();
+	};
 
 	return (
-		<div className="flex flex-col gap-4 h-full">
-			<header>
-				<h2 className="text-2xl font-semibold m-0">Agent Chat</h2>
+		<div className="flex flex-col gap-6 h-full items-center justify-center">
+			<header className="text-center max-w-lg">
+				<h2 className="text-2xl font-semibold m-0">Meet Blink</h2>
 				<p className="text-sm text-content-secondary mt-2 mb-0">
-					Chat with the Coder agent to help set up your environment.
+					Your built-in Coder assistant
 				</p>
 			</header>
 
-			{/* Chat container placeholder */}
-			<div className="flex-1 min-h-[400px] rounded-lg border border-border bg-surface-secondary flex flex-col">
-				{/* Messages area */}
-				<div className="flex-1 flex items-center justify-center p-8">
-					<div className="text-center text-content-secondary">
-						<div className="text-4xl mb-4">💬</div>
-						<p className="text-sm font-medium m-0">
-							Agent chat will appear here
-						</p>
-						<p className="text-xs mt-1 mb-0">
-							This will be an interactive chat powered by your configured AI
-							provider.
-						</p>
-					</div>
+			{/* Blink button mockup */}
+			<div className="relative w-72 h-48 rounded-lg border border-border bg-surface-secondary flex items-end justify-end p-4">
+				<div className="absolute top-4 left-4 text-xs text-content-secondary">
+					Coder Dashboard
 				</div>
-
-				{/* Input area placeholder */}
-				<div className="border-t border-border p-4">
-					<div className="flex gap-2">
-						<input
-							type="text"
-							disabled
-							placeholder="Ask the agent anything about Coder..."
-							className="flex-1 h-10 rounded-md border border-border bg-transparent px-3 text-sm
-								placeholder:text-content-secondary disabled:cursor-not-allowed disabled:opacity-50"
-						/>
-						<button
-							type="button"
-							disabled
-							className="h-10 px-4 rounded-md bg-surface-tertiary text-content-secondary text-sm
-								cursor-not-allowed opacity-50"
-						>
-							Send
-						</button>
-					</div>
+				<div className="w-12 h-12 rounded-full bg-content-link flex items-center justify-center text-white text-lg font-bold shadow-lg">
+					B
 				</div>
 			</div>
 
-			<div className="flex justify-end pt-2">
-				<Button onClick={onFinish}>Finish Setup</Button>
+			<div className="text-center max-w-md space-y-2">
+				<p className="text-sm text-content-primary m-0">
+					Blink lives in the bottom-right corner of your dashboard.
+				</p>
+				<p className="text-sm text-content-secondary m-0">
+					It can help you manage templates, create workspaces, troubleshoot
+					issues, and answer questions about your Coder deployment.
+				</p>
+			</div>
+
+			<div className="flex gap-3 pt-2">
+				<Button variant="outline" onClick={onFinish}>
+					Skip
+				</Button>
+				<Button onClick={enableBlink}>Enable Blink</Button>
 			</div>
 		</div>
 	);

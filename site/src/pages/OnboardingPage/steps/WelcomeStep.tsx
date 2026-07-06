@@ -39,12 +39,12 @@ export const WelcomeStep: FC<WelcomeStepProps> = ({
 				/>
 				<div className="flex flex-col gap-1">
 					<span className="text-sm font-semibold">
-						Enable AI Agents to help with setup
+						Enable Blink, your Coder assistant
 					</span>
 					<span className="text-xs text-content-secondary leading-relaxed">
-						An AI assistant will help you set up templates, create workspaces,
-						and answer questions about Coder. You can configure an AI provider
-						in the next step.
+						Blink is an AI assistant that lives in your Coder dashboard.
+						It can help you manage templates, create workspaces,
+						troubleshoot issues, and answer questions about your deployment.
 					</span>
 				</div>
 			</label>
