@@ -41,17 +41,34 @@ import (
 	"io"
 	"strings"
 
+	"charm.land/fantasy"
 	"golang.org/x/xerrors"
 )
 
 // Step is the on-the-wire (well, on-the-line) representation of a single
-// scripted step. Exactly one of Text, Think, ToolCall, or Error must be
-// set.
+// scripted step. Exactly one of Text, Think, ToolCall, Object, Error,
+// TurnEnd, or EmptyTurn must be set.
 type Step struct {
-	Text     string     `json:"text,omitempty"`
-	Think    string     `json:"think,omitempty"`
-	ToolCall *ToolCall  `json:"tool_call,omitempty"`
-	Error    *ErrorStep `json:"error,omitempty"`
+	Text     string      `json:"text,omitempty"`
+	Think    string      `json:"think,omitempty"`
+	ToolCall *ToolCall   `json:"tool_call,omitempty"`
+	Object   *ObjectStep `json:"object,omitempty"`
+	Error    *ErrorStep  `json:"error,omitempty"`
+	// TurnEnd forces a turn boundary without contributing any content.
+	// Needed because the normal boundary rule (a text/think line after a
+	// tool_call flushes the previous turn) has no signal to split two
+	// consecutive plain-text turns that never involve a tool call --
+	// e.g. scripting two separate "the model just says X" round trips
+	// in a row. Explicit rather than inferring boundaries from blank
+	// lines or other formatting, per the same "explicit is better than
+	// implicit" reasoning that deferred parallel-tool-call inference.
+	TurnEnd bool `json:"turn_end,omitempty"`
+	// EmptyTurn scripts a turn that completes with zero content (no
+	// text/think parts, no tool calls) -- e.g. testing what happens when
+	// a model call succeeds but says nothing. Distinct from TurnEnd,
+	// which only flushes whatever was already accumulating and creates
+	// nothing new by itself.
+	EmptyTurn bool `json:"empty_turn,omitempty"`
 }
 
 // ToolCall is a single scripted tool call. Result is required: fakellm
@@ -66,6 +83,52 @@ type ToolCall struct {
 // ErrorStep scripts a turn that fails instead of completing.
 type ErrorStep struct {
 	Message string `json:"message"`
+}
+
+// Usage optionally scripts token-usage accounting for an object-call
+// turn, for tests that assert on returned usage numbers (e.g.
+// TestGenerateManualTitle_ReturnsUsageForEmptyNormalizedTitle-style
+// assertions).
+type Usage struct {
+	InputTokens     int64 `json:"input_tokens,omitempty"`
+	OutputTokens    int64 `json:"output_tokens,omitempty"`
+	TotalTokens     int64 `json:"total_tokens,omitempty"`
+	ReasoningTokens int64 `json:"reasoning_tokens,omitempty"`
+}
+
+func (u Usage) toFantasy() fantasy.Usage {
+	return fantasy.Usage{
+		InputTokens:     u.InputTokens,
+		OutputTokens:    u.OutputTokens,
+		TotalTokens:     u.TotalTokens,
+		ReasoningTokens: u.ReasoningTokens,
+	}
+}
+
+// ObjectStep scripts a single structured-output call (fantasy's
+// GenerateObject/StreamObject), used for chatd flows like title and
+// turn-status-label generation that call a schema-constrained "produce
+// this JSON object" method instead of the plain text/tool-call
+// Generate/Stream path. Object calls are a separate timeline from
+// Turns: a script's object steps are consumed by GenerateObject/
+// StreamObject via their own counter, independent of the
+// Generate/Stream turn counter, since real chatd code never interleaves
+// the two on the same model call sequence.
+//
+// Exactly one of Value or Error must be set, same required-ness rule as
+// ToolCall.Result: a scripted object call that doesn't say what it
+// returns is a bug in the test.
+type ObjectStep struct {
+	Value json.RawMessage `json:"value"`
+	Usage *Usage          `json:"usage,omitempty"`
+	Error *ErrorStep      `json:"error,omitempty"`
+}
+
+// ObjectTurn is the compiled form of an ObjectStep.
+type ObjectTurn struct {
+	Value json.RawMessage
+	Usage *Usage
+	Err   *ErrorStep
 }
 
 // PartKind distinguishes the two kinds of content a turn's Parts can
@@ -94,13 +157,16 @@ type Turn struct {
 	Err       *ErrorStep
 }
 
-// Script is a fully-parsed, ordered sequence of Turns. Turn N is
-// consumed by the (N+1)th call made against a Model/Server driven by
-// this Script. There is no default/fallback turn: once Turns is
-// exhausted, further calls fail loudly rather than silently reusing the
-// last turn or echoing — see the package doc.
+// Script is a fully-parsed, ordered sequence of Turns and, separately,
+// ObjectTurns. Turn N is consumed by the (N+1)th Generate/Stream call
+// made against a Model/Server driven by this Script; ObjectTurn N is
+// consumed by the (N+1)th GenerateObject/StreamObject call, using an
+// independent counter. There is no default/fallback turn in either
+// timeline: once exhausted, further calls fail loudly rather than
+// silently reusing the last turn or echoing — see the package doc.
 type Script struct {
-	Turns []Turn
+	Turns   []Turn
+	Objects []ObjectTurn
 }
 
 // Parse reads one JSON object per line from r and compiles it into a
@@ -138,6 +204,22 @@ func Parse(r io.Reader) (*Script, error) {
 		}
 
 		switch {
+		case step.EmptyTurn:
+			flush()
+			script.Turns = append(script.Turns, Turn{})
+		case step.TurnEnd:
+			flush()
+		case step.Object != nil:
+			// Object calls live on a completely separate timeline from
+			// Turns (GenerateObject/StreamObject are never interleaved
+			// with Generate/Stream on the same call sequence in real
+			// chatd code), so they don't participate in the turn state
+			// machine at all: no flush, no accumulation into cur.
+			script.Objects = append(script.Objects, ObjectTurn{
+				Value: step.Object.Value,
+				Usage: step.Object.Usage,
+				Err:   step.Object.Error,
+			})
 		case step.Error != nil:
 			// An error is its own isolated turn: flush whatever was
 			// accumulating, then flush the error turn immediately.
@@ -172,7 +254,7 @@ func Parse(r io.Reader) (*Script, error) {
 	}
 	flush()
 
-	if len(script.Turns) == 0 {
+	if len(script.Turns) == 0 && len(script.Objects) == 0 {
 		return nil, xerrors.New("fakellm: script has no turns")
 	}
 	return script, nil
@@ -205,11 +287,20 @@ func validateStep(step Step, lineNo int) error {
 	if step.ToolCall != nil {
 		set++
 	}
+	if step.Object != nil {
+		set++
+	}
 	if step.Error != nil {
 		set++
 	}
+	if step.TurnEnd {
+		set++
+	}
+	if step.EmptyTurn {
+		set++
+	}
 	if set != 1 {
-		return xerrors.Errorf("fakellm: line %d: exactly one of text/think/tool_call/error must be set, got %d", lineNo, set)
+		return xerrors.Errorf("fakellm: line %d: exactly one of text/think/tool_call/object/error/turn_end/empty_turn must be set, got %d", lineNo, set)
 	}
 	if step.ToolCall != nil {
 		if step.ToolCall.Name == "" {
@@ -220,6 +311,13 @@ func validateStep(step Step, lineNo int) error {
 				"fakellm: line %d: tool_call %q has no result; every scripted tool call must specify its result explicitly (fakellm does not silently skip this check)",
 				lineNo, step.ToolCall.Name,
 			)
+		}
+	}
+	if step.Object != nil {
+		hasValue := len(step.Object.Value) > 0 && !bytes.Equal(bytes.TrimSpace(step.Object.Value), []byte("null"))
+		hasError := step.Object.Error != nil
+		if hasValue == hasError {
+			return xerrors.Errorf("fakellm: line %d: object step must set exactly one of value/error, got value=%v error=%v", lineNo, hasValue, hasError)
 		}
 	}
 	return nil

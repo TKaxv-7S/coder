@@ -67,3 +67,16 @@ func TestParse(t *testing.T) {
 		require.Nil(t, script.Turns[2].Err)
 	})
 }
+
+func TestParse_TurnEnd(t *testing.T) {
+	t.Parallel()
+
+	script := fakellm.MustParseString(`
+		{"text": "first"}
+		{"turn_end": true}
+		{"text": "second"}
+	`)
+	require.Len(t, script.Turns, 2)
+	require.Equal(t, "first", script.Turns[0].Text())
+	require.Equal(t, "second", script.Turns[1].Text())
+}
