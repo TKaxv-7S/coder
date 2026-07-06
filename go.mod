@@ -114,7 +114,7 @@ replace github.com/charmbracelet/anthropic-sdk-go => github.com/coder/anthropic-
 
 // Replace sdks with our own optimized forks until relevant upstream PRs are merged.
 // https://github.com/anthropics/anthropic-sdk-go/pull/262
-replace github.com/anthropics/anthropic-sdk-go v1.19.0 => github.com/dannykopping/anthropic-sdk-go v0.0.0-20251230111224-88a4315810bd
+replace github.com/anthropics/anthropic-sdk-go v1.19.0 => github.com/coder/anthropic-sdk-go v0.0.0-20260627122427-f006ef626a1e
 
 // Fork of openai-go with fix for WithJSONSet + deferred serialization: https://github.com/kylecarbs/openai-go/pull/2
 // Also includes an SSE stream fix for OpenRouter: https://github.com/coder/openai-go/pull/3
@@ -514,6 +514,7 @@ require (
 	github.com/charmbracelet/x/exp/strings v0.1.0 // indirect
 	github.com/go-json-experiment/json v0.0.0-20260601182631-00ed12fed2a6 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
+	github.com/standard-webhooks/standard-webhooks/libraries v0.0.1 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 )
 

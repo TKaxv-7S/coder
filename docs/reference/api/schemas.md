@@ -423,7 +423,12 @@
       "bedrock_region": "string",
       "bedrock_small_fast_model": "string",
       "name": "string",
-      "type": "string"
+      "type": "string",
+      "wif_federation_rule_id": "string",
+      "wif_identity_token_file": "string",
+      "wif_organization_id": "string",
+      "wif_service_account_id": "string",
+      "wif_workspace_id": "string"
     }
   ],
   "rate_limit": 0,
@@ -976,7 +981,12 @@
         "bedrock_region": "string",
         "bedrock_small_fast_model": "string",
         "name": "string",
-        "type": "string"
+        "type": "string",
+        "wif_federation_rule_id": "string",
+        "wif_identity_token_file": "string",
+        "wif_organization_id": "string",
+        "wif_service_account_id": "string",
+        "wif_workspace_id": "string"
       }
     ],
     "rate_limit": 0,
@@ -1070,7 +1080,12 @@
   "bedrock_region": "string",
   "bedrock_small_fast_model": "string",
   "name": "string",
-  "type": "string"
+  "type": "string",
+  "wif_federation_rule_id": "string",
+  "wif_identity_token_file": "string",
+  "wif_organization_id": "string",
+  "wif_service_account_id": "string",
+  "wif_workspace_id": "string"
 }
 ```
 
@@ -1084,6 +1099,11 @@
 | `bedrock_small_fast_model` | string | false    |              |                                                                                                                                                       |
 | `name`                     | string | false    |              | Name is the unique instance identifier used for routing. Defaults to Type if not provided.                                                            |
 | `type`                     | string | false    |              | Type is the provider type. Valid values are: "openai", "anthropic", "azure", "bedrock", "google", "openai-compat", "openrouter", "vercel", "copilot". |
+| `wif_federation_rule_id`   | string | false    |              | Wif federation rule ID fields (only applicable when Type == "anthropic").                                                                             |
+| `wif_identity_token_file`  | string | false    |              |                                                                                                                                                       |
+| `wif_organization_id`      | string | false    |              |                                                                                                                                                       |
+| `wif_service_account_id`   | string | false    |              |                                                                                                                                                       |
+| `wif_workspace_id`         | string | false    |              |                                                                                                                                                       |
 
 ## codersdk.AIProviderKey
 
@@ -5660,7 +5680,12 @@ CreateWorkspaceRequest provides options for creating a new workspace. Only one o
             "bedrock_region": "string",
             "bedrock_small_fast_model": "string",
             "name": "string",
-            "type": "string"
+            "type": "string",
+            "wif_federation_rule_id": "string",
+            "wif_identity_token_file": "string",
+            "wif_organization_id": "string",
+            "wif_service_account_id": "string",
+            "wif_workspace_id": "string"
           }
         ],
         "rate_limit": 0,
@@ -6269,7 +6294,12 @@ CreateWorkspaceRequest provides options for creating a new workspace. Only one o
           "bedrock_region": "string",
           "bedrock_small_fast_model": "string",
           "name": "string",
-          "type": "string"
+          "type": "string",
+          "wif_federation_rule_id": "string",
+          "wif_identity_token_file": "string",
+          "wif_organization_id": "string",
+          "wif_service_account_id": "string",
+          "wif_workspace_id": "string"
         }
       ],
       "rate_limit": 0,
