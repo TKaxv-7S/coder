@@ -1112,20 +1112,6 @@ func New(options *Options) *API {
 	// Uses a parameterized route so dynamically-added providers are
 	// picked up without restarting the server.
 	for _, route := range []string{"gitauth", "external-auth"} {
-		r.Route("/"+route, func(r chi.Router) {
-			for _, externalAuthConfig := range options.ExternalAuthConfigs {
-				// We don't need to register a callback handler for device auth.
-				if externalAuthConfig.DeviceAuth != nil {
-					continue
-				}
-				r.Route(fmt.Sprintf("/%s/callback", externalAuthConfig.ID), func(r chi.Router) {
-					r.Use(
-						apiKeyMiddlewareRedirect,
-						httpmw.ExtractOAuth2(externalAuthConfig, options.HTTPClient, options.DeploymentValues.HTTPCookies, nil, externalAuthConfig.CodeChallengeMethodsSupported, nil, ""),
-					)
-					r.Get("/", api.externalAuthCallback(externalAuthConfig))
-				})
-			}
 		r.Route("/"+route+"/{externalauth}/callback", func(r chi.Router) {
 			r.Use(apiKeyMiddlewareRedirect)
 			r.Get("/", api.externalAuthCallback)

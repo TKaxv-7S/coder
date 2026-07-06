@@ -239,6 +239,7 @@ func ResourceID[T Auditable](tgt T) uuid.UUID {
 	case database.UserSecret:
 		return typed.ID
 	case database.UserSkill:
+		return typed.ID
 	case database.ExternalAuthProviderConfig:
 		return typed.ID
 	default:
@@ -402,6 +403,7 @@ func ResourceRequiresOrgID[T Auditable]() bool {
 		return false
 	case database.UserSkill:
 		// User skills are global to the user across organizations.
+		return false
 	case database.ExternalAuthProviderConfig:
 		// Deployment-level config, not org-scoped.
 		return false

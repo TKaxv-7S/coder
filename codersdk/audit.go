@@ -53,10 +53,7 @@ const (
 	ResourceTypeUserAIBudgetOverride ResourceType = "user_ai_budget_override"
 	ResourceTypeChat                 ResourceType = "chat"
 	ResourceTypeUserSecret           ResourceType = "user_secret"
-	ResourceTypeUserSkill            ResourceType = "user_skill"
-	ResourceTypeWorkspaceApp ResourceType = "workspace_app"
-	ResourceTypeTask                        ResourceType = "task"
-	ResourceTypeAISeat                      ResourceType = "ai_seat"
+	ResourceTypeUserSkill                  ResourceType = "user_skill"
 	ResourceTypeExternalAuthProviderConfig ResourceType = "external_auth_provider_config"
 )
 

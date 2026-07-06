@@ -140,7 +140,7 @@ func (api *API) aiGatewayServe(rw http.ResponseWriter, r *http.Request) {
 		logger,
 		api.AccessURL.String(),
 		api.DeploymentValues.AI.BridgeConfig,
-		api.ExternalAuthConfigs,
+		api.ExternalAuthRegistry,
 		api.AGPL.Experiments,
 		api.AGPL.AISeatTracker,
 	)

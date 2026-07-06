@@ -275,7 +275,7 @@ func (api *API) externalAuthCallback(rw http.ResponseWriter, r *http.Request) {
 	inner := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		api.handleExternalAuthCallback(rw, r, config)
 	})
-	httpmw.ExtractOAuth2(config, api.HTTPClient, api.DeploymentValues.HTTPCookies, nil, config.CodeChallengeMethodsSupported)(inner).ServeHTTP(rw, r)
+	httpmw.ExtractOAuth2(config, api.HTTPClient, api.DeploymentValues.HTTPCookies, nil, config.CodeChallengeMethodsSupported, nil, "")(inner).ServeHTTP(rw, r)
 }
 
 func (api *API) handleExternalAuthCallback(rw http.ResponseWriter, r *http.Request, externalAuthConfig *externalauth.Config) {

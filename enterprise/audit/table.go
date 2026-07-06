@@ -37,18 +37,7 @@ var AuditActionMap = map[string][]codersdk.AuditAction{
 	"Chat":                          {codersdk.AuditActionCreate, codersdk.AuditActionWrite}, // chats get 'archived' by users, not deleted.
 	"UserSecret":                    {codersdk.AuditActionCreate, codersdk.AuditActionWrite, codersdk.AuditActionDelete},
 	"UserSkill":                     {codersdk.AuditActionCreate, codersdk.AuditActionWrite, codersdk.AuditActionDelete},
-	"GitSSHKey":       {codersdk.AuditActionCreate},
-	"Template":        {codersdk.AuditActionWrite, codersdk.AuditActionDelete},
-	"TemplateVersion": {codersdk.AuditActionCreate, codersdk.AuditActionWrite},
-	"User":            {codersdk.AuditActionCreate, codersdk.AuditActionWrite, codersdk.AuditActionDelete},
-	"Workspace":       {codersdk.AuditActionCreate, codersdk.AuditActionWrite, codersdk.AuditActionDelete},
-	"WorkspaceBuild":  {codersdk.AuditActionStart, codersdk.AuditActionStop},
-	"Group":           {codersdk.AuditActionCreate, codersdk.AuditActionWrite, codersdk.AuditActionDelete},
-	"APIKey":          {codersdk.AuditActionLogin, codersdk.AuditActionLogout, codersdk.AuditActionRegister, codersdk.AuditActionCreate, codersdk.AuditActionWrite, codersdk.AuditActionDelete},
-	"License":         {codersdk.AuditActionCreate, codersdk.AuditActionDelete},
-	"Task":            {codersdk.AuditActionCreate, codersdk.AuditActionWrite, codersdk.AuditActionDelete},
-	"AiSeatState":                  {codersdk.AuditActionCreate},
-	"ExternalAuthProviderConfig": {codersdk.AuditActionCreate, codersdk.AuditActionWrite, codersdk.AuditActionDelete},
+	"ExternalAuthProviderConfig":    {codersdk.AuditActionCreate, codersdk.AuditActionWrite, codersdk.AuditActionDelete},
 }
 
 type Action string
@@ -516,6 +505,7 @@ var auditableResourcesTypes = map[any]map[string]Action{
 		"value_key_id": ActionIgnore,
 		"created_at":   ActionIgnore,
 		"updated_at":   ActionIgnore,
+	},
 	&database.ExternalAuthProviderConfig{}: {
 		"id":                      ActionIgnore,
 		"created_at":              ActionIgnore,
