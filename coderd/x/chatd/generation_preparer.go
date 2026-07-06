@@ -359,6 +359,11 @@ func (server *Server) prepareGeneration(
 	}
 	prompt = renderPlanPathPrompt(prompt, planPathBlock)
 	setAdvisorPromptSnapshot(prompt)
+	// Squash after the advisor snapshot so stripAdvisorGuidanceBlock can
+	// still match the guidance block as a whole message.
+	if server.experiments.Enabled(codersdk.ExperimentChatSingleSystemMessage) {
+		prompt = chatprompt.SquashSystem(prompt)
+	}
 
 	storeChatAttachment := server.newStoreChatAttachmentFunc(&workspaceCtx)
 	tools := []fantasy.AgentTool{

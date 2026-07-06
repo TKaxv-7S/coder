@@ -3323,3 +3323,29 @@ func TestPartFromContent_ExecuteToolParsedCommands(t *testing.T) {
 		})
 	}
 }
+
+func TestSquashSystem(t *testing.T) {
+	t.Parallel()
+
+	text := func(role fantasy.MessageRole, s string) fantasy.Message {
+		return fantasy.Message{Role: role, Content: []fantasy.MessagePart{fantasy.TextPart{Text: s}}}
+	}
+
+	prompt := []fantasy.Message{
+		text(fantasy.MessageRoleSystem, "one"),
+		text(fantasy.MessageRoleSystem, "two"),
+		text(fantasy.MessageRoleSystem, "three"),
+		text(fantasy.MessageRoleUser, "hello"),
+	}
+	got := chatprompt.SquashSystem(prompt)
+	require.Len(t, got, 2)
+	require.Equal(t, fantasy.MessageRoleSystem, got[0].Role)
+	require.Equal(t, "one\n\ntwo\n\nthree", got[0].Content[0].(fantasy.TextPart).Text)
+	require.Equal(t, fantasy.MessageRoleUser, got[1].Role)
+
+	// A single (or zero) system message is returned unchanged.
+	single := []fantasy.Message{text(fantasy.MessageRoleSystem, "one"), text(fantasy.MessageRoleUser, "hi")}
+	require.Equal(t, single, chatprompt.SquashSystem(single))
+	empty := []fantasy.Message{}
+	require.Equal(t, empty, chatprompt.SquashSystem(empty))
+}

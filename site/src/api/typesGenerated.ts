@@ -4597,6 +4597,7 @@ export type Experiment =
 	| "ai-gateway-cost-control"
 	| "auto-fill-parameters"
 	| "chat-advisor"
+	| "chat-single-system-message"
 	| "chat-virtual-desktop"
 	| "example"
 	| "mcp-server-http"
@@ -4611,6 +4612,7 @@ export const Experiments: Experiment[] = [
 	"ai-gateway-cost-control",
 	"auto-fill-parameters",
 	"chat-advisor",
+	"chat-single-system-message",
 	"chat-virtual-desktop",
 	"example",
 	"mcp-server-http",

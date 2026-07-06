@@ -5213,18 +5213,19 @@ type Experiment string
 
 const (
 	// Add new experiments here!
-	ExperimentExample               Experiment = "example"                 // This isn't used for anything.
-	ExperimentAutoFillParameters    Experiment = "auto-fill-parameters"    // This should not be taken out of experiments until we have redesigned the feature.
-	ExperimentNotifications         Experiment = "notifications"           // Sends notifications via SMTP and webhooks following certain events.
-	ExperimentWorkspaceUsage        Experiment = "workspace-usage"         // Enables the new workspace usage tracking.
-	ExperimentOAuth2                Experiment = "oauth2"                  // Enables OAuth2 provider functionality.
-	ExperimentMCPServerHTTP         Experiment = "mcp-server-http"         // Enables the MCP HTTP server functionality.
-	ExperimentWorkspaceBuildUpdates Experiment = "workspace-build-updates" // Enables publishing workspace build updates to the all builds pubsub channel.
-	ExperimentNATSPubsub            Experiment = "nats_pubsub"             // Enables embedded NATS pubsub.
-	ExperimentMinimumImplicitMember Experiment = "minimum-implicit-member" // Allows organizations to deviate from the default organization-member roles, in support of Gateway Accounts.
-	ExperimentAIGatewayCostControl  Experiment = "ai-gateway-cost-control" // Enables AI Gateway cost control functionality.
-	ExperimentChatAdvisor           Experiment = "chat-advisor"            // Enables the advisor tool for root agent chats.
-	ExperimentChatVirtualDesktop    Experiment = "chat-virtual-desktop"    // Enables virtual desktop and computer use provider for agents.
+	ExperimentExample                 Experiment = "example"                    // This isn't used for anything.
+	ExperimentAutoFillParameters      Experiment = "auto-fill-parameters"       // This should not be taken out of experiments until we have redesigned the feature.
+	ExperimentNotifications           Experiment = "notifications"              // Sends notifications via SMTP and webhooks following certain events.
+	ExperimentWorkspaceUsage          Experiment = "workspace-usage"            // Enables the new workspace usage tracking.
+	ExperimentOAuth2                  Experiment = "oauth2"                     // Enables OAuth2 provider functionality.
+	ExperimentMCPServerHTTP           Experiment = "mcp-server-http"            // Enables the MCP HTTP server functionality.
+	ExperimentWorkspaceBuildUpdates   Experiment = "workspace-build-updates"    // Enables publishing workspace build updates to the all builds pubsub channel.
+	ExperimentNATSPubsub              Experiment = "nats_pubsub"                // Enables embedded NATS pubsub.
+	ExperimentMinimumImplicitMember   Experiment = "minimum-implicit-member"    // Allows organizations to deviate from the default organization-member roles, in support of Gateway Accounts.
+	ExperimentAIGatewayCostControl    Experiment = "ai-gateway-cost-control"    // Enables AI Gateway cost control functionality.
+	ExperimentChatAdvisor             Experiment = "chat-advisor"               // Enables the advisor tool for root agent chats.
+	ExperimentChatVirtualDesktop      Experiment = "chat-virtual-desktop"       // Enables virtual desktop and computer use provider for agents.
+	ExperimentChatSingleSystemMessage Experiment = "chat-single-system-message" // Squashes chat system messages into one for models that only support a single system message.
 )
 
 func (e Experiment) DisplayName() string {
@@ -5253,6 +5254,8 @@ func (e Experiment) DisplayName() string {
 		return "Chat Advisor"
 	case ExperimentChatVirtualDesktop:
 		return "Chat Virtual Desktop"
+	case ExperimentChatSingleSystemMessage:
+		return "Chat Single System Message"
 	default:
 		// Split on hyphen and convert to title case
 		// e.g. "mcp-server-http" -> "Mcp Server Http"
@@ -5275,6 +5278,7 @@ var ExperimentsKnown = Experiments{
 	ExperimentAIGatewayCostControl,
 	ExperimentChatAdvisor,
 	ExperimentChatVirtualDesktop,
+	ExperimentChatSingleSystemMessage,
 }
 
 // ExperimentsSafe should include all experiments that are safe for

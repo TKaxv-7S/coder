@@ -271,6 +271,38 @@ func InsertSystem(prompt []fantasy.Message, instruction string) []fantasy.Messag
 	return out
 }
 
+// SquashSystem merges the leading contiguous block of system messages
+// into a single system message, for models that only accept one system
+// message per request. Text parts are joined with blank lines; the rest
+// of the prompt is returned unchanged.
+func SquashSystem(prompt []fantasy.Message) []fantasy.Message {
+	systemEnd := 0
+	for systemEnd < len(prompt) && prompt[systemEnd].Role == fantasy.MessageRoleSystem {
+		systemEnd++
+	}
+	if systemEnd <= 1 {
+		return prompt
+	}
+
+	texts := make([]string, 0, systemEnd)
+	for _, message := range prompt[:systemEnd] {
+		for _, part := range message.Content {
+			if textPart, ok := fantasy.AsMessagePart[fantasy.TextPart](part); ok {
+				texts = append(texts, textPart.Text)
+			}
+		}
+	}
+
+	out := make([]fantasy.Message, 0, len(prompt)-systemEnd+1)
+	out = append(out, fantasy.Message{
+		Role: fantasy.MessageRoleSystem,
+		Content: []fantasy.MessagePart{
+			fantasy.TextPart{Text: strings.Join(texts, "\n\n")},
+		},
+	})
+	return append(out, prompt[systemEnd:]...)
+}
+
 const (
 	// ContentVersionV0 is the legacy content format. Parsing uses
 	// role-aware heuristics to distinguish fantasy envelope format

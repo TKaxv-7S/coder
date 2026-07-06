@@ -19619,12 +19619,14 @@ const docTemplate = `{
                 "minimum-implicit-member",
                 "ai-gateway-cost-control",
                 "chat-advisor",
-                "chat-virtual-desktop"
+                "chat-virtual-desktop",
+                "chat-single-system-message"
             ],
             "x-enum-comments": {
                 "ExperimentAIGatewayCostControl": "Enables AI Gateway cost control functionality.",
                 "ExperimentAutoFillParameters": "This should not be taken out of experiments until we have redesigned the feature.",
                 "ExperimentChatAdvisor": "Enables the advisor tool for root agent chats.",
+                "ExperimentChatSingleSystemMessage": "Squashes chat system messages into one for models that only support a single system message.",
                 "ExperimentChatVirtualDesktop": "Enables virtual desktop and computer use provider for agents.",
                 "ExperimentExample": "This isn't used for anything.",
                 "ExperimentMCPServerHTTP": "Enables the MCP HTTP server functionality.",
@@ -19647,7 +19649,8 @@ const docTemplate = `{
                 "Allows organizations to deviate from the default organization-member roles, in support of Gateway Accounts.",
                 "Enables AI Gateway cost control functionality.",
                 "Enables the advisor tool for root agent chats.",
-                "Enables virtual desktop and computer use provider for agents."
+                "Enables virtual desktop and computer use provider for agents.",
+                "Squashes chat system messages into one for models that only support a single system message."
             ],
             "x-enum-varnames": [
                 "ExperimentExample",
@@ -19661,7 +19664,8 @@ const docTemplate = `{
                 "ExperimentMinimumImplicitMember",
                 "ExperimentAIGatewayCostControl",
                 "ExperimentChatAdvisor",
-                "ExperimentChatVirtualDesktop"
+                "ExperimentChatVirtualDesktop",
+                "ExperimentChatSingleSystemMessage"
             ]
         },
         "codersdk.ExternalAPIKeyScopes": {
