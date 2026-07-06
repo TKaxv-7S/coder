@@ -760,8 +760,6 @@ const AgentChatPage: FC = () => {
 		enabled: Boolean(parentChatID),
 	});
 	const workspaceId = chatQuery.data?.workspace_id;
-	// The backend selects the chat's agent (see coderd/x/chatd/agentselect);
-	// when agent_id is missing, no agent is shown.
 	const chatAgentId = chatQuery.data?.agent_id;
 	const workspaceQuery = useQuery({
 		...workspaceById(workspaceId ?? ""),

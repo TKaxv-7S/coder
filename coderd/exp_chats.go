@@ -477,11 +477,9 @@ func (api *API) listChats(rw http.ResponseWriter, r *http.Request) {
 	httpapi.Write(ctx, rw, http.StatusOK, sdkChats)
 }
 
-// enrichChatAgentIDs fills AgentID on chats (and their embedded children)
-// that have a bound workspace but no persisted agent binding, which chatd
-// only persists once a turn dials the workspace. Clients rely on this field
-// instead of selecting an agent themselves. Enrichment is response-only and
-// best-effort: on error the field stays null.
+// enrichChatAgentIDs fills missing AgentIDs for chats with a bound
+// workspace, since chatd persists the binding lazily. Best-effort and
+// response-only; on error the field stays null.
 func (api *API) enrichChatAgentIDs(ctx context.Context, chats []codersdk.Chat) {
 	agentIDByWorkspace := make(map[uuid.UUID]*uuid.UUID)
 	resolve := func(workspaceID uuid.UUID) *uuid.UUID {
