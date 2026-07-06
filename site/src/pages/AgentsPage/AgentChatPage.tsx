@@ -19,7 +19,6 @@ import { checkAuthorization } from "#/api/queries/authCheck";
 import { buildOptimisticEditedMessage } from "#/api/queries/chatMessageEdits";
 import {
 	chat,
-	chatDebugRuns,
 	chatKey,
 	chatMessagesForInfiniteScroll,
 	chatModelConfigs,
@@ -86,6 +85,7 @@ import {
 } from "./components/MCPServerPicker";
 import { getModelSelectorHelp } from "./components/ModelSelectorHelp";
 import { useGitWatcher } from "./hooks/useGitWatcher";
+import { useDebugRunsExistence } from "./useDebugRunsExistence";
 import { getAgentChatSendShortcut } from "./utils/agentChatSendShortcut";
 import { type ParsedDraft, parseStoredDraft } from "./utils/draftStorage";
 import {
@@ -108,9 +108,6 @@ export const RIGHT_PANEL_OPEN_KEY = "agents.right-panel-open";
 
 const lastModelConfigIDStorageKey = "agents.last-model-config-id";
 
-// Poll interval for the lightweight Debug-tab existence check during an
-// in-flight turn. Idle chats fetch once on mount and do not poll.
-const DEBUG_RUNS_EXISTENCE_POLL_MS = 5_000;
 /** @internal Exported for testing. */
 export const draftInputStorageKeyPrefix = "agents.draft-input.";
 
@@ -1076,28 +1073,13 @@ const AgentChatPage: FC = () => {
 		useChatSelector(store, selectChatStatus) ?? chatRecord?.status ?? null;
 	// Show the Debug tab whenever a chat has debug runs, even with full
 	// logging off (errors are captured by default). This check shares the
-	// Debug panel's query key, so react-query deduplicates requests. To
-	// avoid polling idle chats, it fetches once on mount and polls only
-	// while a turn is in flight and no run exists. Terminal states
-	// (error/completed/interrupted) do not poll: a non-generic error never
-	// creates a run, and polling would loop indefinitely. The Debug panel
-	// keeps its own polling while open.
+	// Debug panel's query key, so react-query deduplicates requests.
 	const chatTurnInFlight =
 		liveChatStatus === "pending" ||
 		liveChatStatus === "running" ||
 		liveChatStatus === "interrupting" ||
 		liveChatStatus === "requires_action";
-	const chatDebugRunsQuery = useQuery({
-		...chatDebugRuns(agentId ?? ""),
-		enabled: Boolean(agentId),
-		refetchInterval: (query) => {
-			const hasRuns = (query.state.data?.length ?? 0) > 0;
-			return hasRuns || !chatTurnInFlight
-				? false
-				: DEBUG_RUNS_EXISTENCE_POLL_MS;
-		},
-	});
-	const hasDebugRuns = (chatDebugRunsQuery.data?.length ?? 0) > 0;
+	const { hasDebugRuns } = useDebugRunsExistence(agentId, chatTurnInFlight);
 	const persistedError = getPersistedDetailError({
 		chatStatus: liveChatStatus,
 		chatRecord,
