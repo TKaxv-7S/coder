@@ -179,6 +179,7 @@ type Server struct {
 	debugSvcInit                   sync.Once
 	configCache                    *chatConfigCache
 	configCacheUnsubscribe         func()
+	providerCacheUnsubscribe       func()
 
 	usageTracker      *workspacestats.UsageTracker
 	clock             quartz.Clock
@@ -2928,7 +2929,6 @@ func recordManualTitleUsage(
 				Compressed:          []bool{false},
 				TotalCostMicros:     []int64{ptr.NilToDefault(totalCostMicros, 0)},
 				RuntimeMs:           []int64{0},
-				ProviderResponseID:  []string{""},
 			})
 			if err != nil {
 				return xerrors.Errorf("insert manual title usage message: %w", err)
@@ -2982,7 +2982,6 @@ type chatMessage struct {
 	contextLimit        int64
 	totalCostMicros     int64
 	runtimeMs           int64
-	providerResponseID  string
 }
 
 type userChatMessage struct {
@@ -3057,7 +3056,6 @@ func appendMessageFields(
 	params.Compressed = append(params.Compressed, msg.compressed)
 	params.TotalCostMicros = append(params.TotalCostMicros, msg.totalCostMicros)
 	params.RuntimeMs = append(params.RuntimeMs, msg.runtimeMs)
-	params.ProviderResponseID = append(params.ProviderResponseID, msg.providerResponseID)
 }
 
 func appendChatMessage(params *database.InsertChatMessagesParams, msg chatMessage) {
@@ -3329,8 +3327,6 @@ func New(ps pubsub.Pubsub, cfg Config) *Server {
 				return
 			}
 			switch ev.Kind {
-			case coderdpubsub.ChatConfigEventProviders:
-				p.configCache.InvalidateProviders()
 			case coderdpubsub.ChatConfigEventModelConfig:
 				p.configCache.InvalidateModelConfig(ev.EntityID)
 			case coderdpubsub.ChatConfigEventUserPrompt:
@@ -3344,6 +3340,22 @@ func New(ps pubsub.Pubsub, cfg Config) *Server {
 		p.logger.Error(ctx, "subscribe to chat config events", slog.Error(err))
 	} else {
 		p.configCacheUnsubscribe = cancelConfigSub
+	}
+
+	cancelProviderSub, err := p.pubsub.SubscribeWithErr(
+		coderdpubsub.AIProvidersChangedChannel,
+		func(cbCtx context.Context, _ []byte, err error) {
+			if err != nil {
+				p.logger.Warn(cbCtx, "ai providers changed event error", slog.Error(err))
+				return
+			}
+			p.configCache.InvalidateProviders()
+		},
+	)
+	if err != nil {
+		p.logger.Error(ctx, "subscribe to ai providers changed events", slog.Error(err))
+	} else {
+		p.providerCacheUnsubscribe = cancelProviderSub
 	}
 
 	p.ctx = ctx
@@ -3812,9 +3824,9 @@ func mergeTurnSkills(
 	)
 }
 
-// buildSystemPrompt applies system-level prompt injections in the
-// canonical order. It is used by both the initial prompt assembly
-// and the ReloadMessages callback to keep them in sync.
+// buildSystemPrompt applies system-level prompt injections in a fixed
+// order: subagent instruction, chat instruction, skill index, user prompt,
+// then mode overlay prompts.
 func buildSystemPrompt(
 	prompt []fantasy.Message,
 	subagentInstruction string,
@@ -4930,6 +4942,10 @@ func (p *Server) Close() error {
 	p.closeInflightAdmission()
 	if unsub := p.configCacheUnsubscribe; unsub != nil {
 		p.configCacheUnsubscribe = nil
+		unsub()
+	}
+	if unsub := p.providerCacheUnsubscribe; unsub != nil {
+		p.providerCacheUnsubscribe = nil
 		unsub()
 	}
 	if p.chatWorker != nil {
