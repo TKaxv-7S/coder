@@ -294,6 +294,81 @@ describe("runGoalAction", () => {
 		expect(updateGoal).not.toHaveBeenCalled();
 		expect(onMissingGoal).toHaveBeenCalledOnce();
 	});
+
+	it.each([
+		{
+			name: "running chat",
+			liveChatStatus: "running",
+			hasQueuedInput: false,
+			planModeEnabled: false,
+		},
+		{
+			name: "interrupting chat",
+			liveChatStatus: "interrupting",
+			hasQueuedInput: false,
+			planModeEnabled: false,
+		},
+		{
+			name: "queued input",
+			liveChatStatus: "error",
+			hasQueuedInput: true,
+			planModeEnabled: false,
+		},
+		{
+			name: "plan mode",
+			liveChatStatus: "waiting",
+			hasQueuedInput: false,
+			planModeEnabled: true,
+		},
+	] as const)("does not resume with $name", async ({
+		liveChatStatus,
+		hasQueuedInput,
+		planModeEnabled,
+	}) => {
+		const updateGoal = vi.fn(async () => undefined);
+		const onActionUnavailable = vi.fn();
+
+		await runGoalAction({
+			agentId: "chat-1",
+			goal: makeGoal("paused"),
+			action: "resume",
+			updateGoal,
+			liveChatStatus,
+			hasQueuedInput,
+			planModeEnabled,
+			onActionUnavailable,
+		});
+
+		expect(updateGoal).not.toHaveBeenCalled();
+		expect(onActionUnavailable).toHaveBeenCalledOnce();
+		expect(onActionUnavailable).toHaveBeenCalledWith(expect.any(String));
+	});
+
+	it("resumes on an idle chat", async () => {
+		const updateGoal = vi.fn(async () => undefined);
+		const onActionUnavailable = vi.fn();
+
+		await runGoalAction({
+			agentId: "chat-1",
+			goal: makeGoal("paused"),
+			action: "resume",
+			updateGoal,
+			liveChatStatus: "waiting",
+			hasQueuedInput: false,
+			planModeEnabled: false,
+			onActionUnavailable,
+		});
+
+		expect(onActionUnavailable).not.toHaveBeenCalled();
+		expect(updateGoal).toHaveBeenCalledWith({
+			chatId: "chat-1",
+			mutation: {
+				action: "resume",
+				goal_id: "goal-1",
+				completion_summary: undefined,
+			},
+		});
+	});
 });
 
 describe("runPromoteQueuedMessage", () => {

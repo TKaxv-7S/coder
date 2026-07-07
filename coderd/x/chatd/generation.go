@@ -483,9 +483,10 @@ func loadGenerationState(
 
 // loadDecisionMessages loads the message history that generation
 // decisions operate on: all user-visible messages plus model-only goal
-// completion reminders. Reminders are loaded independently of the
-// compaction prompt window so reminder accounting stays stable when a
-// compaction summary hides earlier rows from the prompt.
+// messages (completion reminders and resume kicks). They are loaded
+// independently of the compaction prompt window so goal accounting
+// stays stable when a compaction summary hides earlier rows from the
+// prompt.
 func loadDecisionMessages(ctx context.Context, store database.Store, chatID uuid.UUID) ([]database.ChatMessage, error) {
 	loaded, err := store.GetChatMessagesByChatID(ctx, database.GetChatMessagesByChatIDParams{
 		ChatID:  chatID,
@@ -498,7 +499,7 @@ func loadDecisionMessages(ctx context.Context, store database.Store, chatID uuid
 	if err != nil {
 		return nil, xerrors.Errorf("load hidden chat messages: %w", err)
 	}
-	return appendGoalCompletionReminderMessages(loaded, hidden)
+	return appendHiddenGoalMessages(loaded, hidden)
 }
 
 var errGoalCompletionReminderSkipped = xerrors.New("goal completion reminder skipped")

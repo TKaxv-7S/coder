@@ -448,6 +448,21 @@ func TestChatGoalAPI(t *testing.T) {
 	require.NotNil(t, gotChat.Goal)
 	require.Equal(t, codersdk.ChatGoalStatusPaused, gotChat.Goal.Status)
 
+	// Resume while the chat is busy is rejected: resume starts a turn
+	// and only proceeds from idle states.
+	_, err = client.UpdateChatGoal(ctx, chat.ID, codersdk.ChatGoalMutation{
+		Action: codersdk.ChatGoalMutationActionResume,
+		GoalID: &chat.Goal.ID,
+	})
+	sdkErr := requireSDKError(t, err, http.StatusConflict)
+	require.Contains(t, sdkErr.Message, "Cannot resume a goal while the chat is busy")
+
+	_, err = db.UpdateChatStatus(dbauthz.AsSystemRestricted(ctx), database.UpdateChatStatusParams{
+		ID:     chat.ID,
+		Status: database.ChatStatusWaiting,
+	})
+	require.NoError(t, err)
+
 	resumed, err := client.UpdateChatGoal(ctx, chat.ID, codersdk.ChatGoalMutation{
 		Action: codersdk.ChatGoalMutationActionResume,
 		GoalID: &chat.Goal.ID,
@@ -455,6 +470,11 @@ func TestChatGoalAPI(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, resumed.Goal)
 	require.Equal(t, codersdk.ChatGoalStatusActive, resumed.Goal.Status)
+
+	// Resume kicks off a turn on the idle chat.
+	gotChat, err = client.GetChat(ctx, chat.ID)
+	require.NoError(t, err)
+	require.Equal(t, codersdk.ChatStatusRunning, gotChat.Status)
 
 	completed, err := client.UpdateChatGoal(ctx, chat.ID, codersdk.ChatGoalMutation{
 		Action: codersdk.ChatGoalMutationActionComplete,
@@ -539,10 +559,7 @@ func TestChatGoalAPI(t *testing.T) {
 		Action: codersdk.ChatGoalMutationActionClear,
 		GoalID: &staleGoal.ID,
 	})
-	require.Error(t, err)
-	var sdkErr *codersdk.Error
-	require.ErrorAs(t, err, &sdkErr)
-	require.Equal(t, http.StatusConflict, sdkErr.StatusCode())
+	requireSDKError(t, err, http.StatusConflict)
 
 	// The newer goal stays current after the stale clear attempt.
 	gotChat, err = client.GetChat(ctx, chat.ID)

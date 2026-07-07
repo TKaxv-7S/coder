@@ -19,6 +19,8 @@ import { checkAuthorization } from "#/api/queries/authCheck";
 import {
 	type ChatGoalAction,
 	chatGoalActionAllowed,
+	chatGoalActionUnavailableReason,
+	isChatBusyStatus,
 } from "#/api/queries/chatGoal";
 import { buildOptimisticEditedMessage } from "#/api/queries/chatMessageEdits";
 import {
@@ -234,7 +236,10 @@ export const runGoalAction = async (params: {
 		mutation: TypesGen.ChatGoalMutation;
 	}) => Promise<unknown>;
 	liveChatStatus?: TypesGen.ChatStatus | null;
+	hasQueuedInput?: boolean;
+	planModeEnabled?: boolean;
 	onMissingGoal?: () => void;
+	onActionUnavailable?: (reason: string) => void;
 	onPausedRunningGoal?: () => void;
 }): Promise<void> => {
 	const {
@@ -244,7 +249,10 @@ export const runGoalAction = async (params: {
 		completionSummary,
 		updateGoal,
 		liveChatStatus,
+		hasQueuedInput,
+		planModeEnabled,
 		onMissingGoal,
+		onActionUnavailable,
 		onPausedRunningGoal,
 	} = params;
 	if (!agentId) {
@@ -252,6 +260,17 @@ export const runGoalAction = async (params: {
 	}
 	if (!goal?.id || !chatGoalActionAllowed(goal, action)) {
 		onMissingGoal?.();
+		return;
+	}
+	// Mirror the server-side admission rules so the UI explains a
+	// rejection instead of surfacing a 409.
+	const unavailableReason = chatGoalActionUnavailableReason(action, {
+		chatStatus: liveChatStatus,
+		hasQueuedInput,
+		planModeEnabled,
+	});
+	if (unavailableReason) {
+		onActionUnavailable?.(unavailableReason);
 		return;
 	}
 	await updateGoal({
@@ -1239,6 +1258,18 @@ const AgentChatPage: FC = () => {
 	const canUpdateChatWorkspace = !isArchived && !isViewerNotOwner;
 	const canMutateGoal = areChatGoalsEnabled && isRootChat && !isViewerNotOwner;
 	const isGoalActionDisabled = isArchived || isViewerNotOwner;
+	const isChatWorking = isChatBusyStatus(liveChatStatus);
+	const hasQueuedInput = (chatQueuedMessages?.length ?? 0) > 0;
+	// Setting a goal is message-bound; a busy chat would queue the
+	// message and the server rejects queued goal mutations.
+	const canSetGoalNow = !isChatWorking && !hasQueuedInput;
+	const goalActionUnavailableReasons = {
+		resume: chatGoalActionUnavailableReason("resume", {
+			chatStatus: liveChatStatus,
+			hasQueuedInput,
+			planModeEnabled,
+		}),
+	};
 	const selectedWorkspaceId = chatQuery.data?.workspace_id ?? null;
 
 	const isWorkspaceLoading =
@@ -1271,11 +1302,18 @@ const AgentChatPage: FC = () => {
 			completionSummary,
 			updateGoal: updateChatGoalAsync,
 			liveChatStatus,
+			hasQueuedInput,
+			planModeEnabled,
 			onMissingGoal: () => {
 				toast.info("No current goal.");
 			},
+			onActionUnavailable: (reason) => {
+				toast.info(reason);
+			},
 			onPausedRunningGoal: () => {
-				toast.info("Goal paused. Use Stop to halt the current turn.");
+				toast.info(
+					"Goal paused. The current turn keeps running; Stop halts it.",
+				);
 			},
 		}).catch(() => undefined);
 	};
@@ -1794,6 +1832,9 @@ const AgentChatPage: FC = () => {
 			canMutateGoal={canMutateGoal}
 			isGoalActionPending={isUpdateChatGoalPending}
 			isGoalActionDisabled={isGoalActionDisabled}
+			isChatWorking={isChatWorking}
+			canSetGoalNow={canSetGoalNow}
+			goalActionUnavailableReasons={goalActionUnavailableReasons}
 			onGoalAction={handleGoalAction}
 			handleInterrupt={handleInterrupt}
 			handleDeleteQueuedMessage={handleDeleteQueuedMessage}

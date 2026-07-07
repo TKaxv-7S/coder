@@ -189,6 +189,11 @@ interface AgentChatPageViewProps {
 	canMutateGoal?: boolean;
 	isGoalActionPending?: boolean;
 	isGoalActionDisabled?: boolean;
+	/** Whether the chat is busy (running, interrupting, requires action). */
+	isChatWorking?: boolean;
+	/** Whether a message-bound goal set can be sent right now. */
+	canSetGoalNow?: boolean;
+	goalActionUnavailableReasons?: Partial<Record<ChatGoalAction, string>>;
 	onGoalAction?: (action: ChatGoalAction) => Promise<void> | void;
 
 	// Chat action handlers.
@@ -373,6 +378,9 @@ export const AgentChatPageView: FC<AgentChatPageViewProps> = ({
 	canMutateGoal = false,
 	isGoalActionPending = false,
 	isGoalActionDisabled = false,
+	isChatWorking = false,
+	canSetGoalNow = true,
+	goalActionUnavailableReasons,
 	onGoalAction = () => {},
 	handleInterrupt,
 	handleDeleteQueuedMessage,
@@ -903,6 +911,8 @@ export const AgentChatPageView: FC<AgentChatPageViewProps> = ({
 										canMutateGoal={canMutateGoal}
 										isActionPending={isGoalActionPending}
 										isActionDisabled={isGoalActionDisabled}
+										isChatWorking={isChatWorking}
+										actionUnavailableReasons={goalActionUnavailableReasons}
 										onAction={onGoalAction}
 									/>
 								</div>
@@ -977,7 +987,9 @@ export const AgentChatPageView: FC<AgentChatPageViewProps> = ({
 								planModeEnabled={planModeEnabled}
 								onPlanModeToggle={onPlanModeToggle}
 								showPursueGoal={showPursueGoal}
-								canPursueGoal={canMutateGoal && !isGoalActionDisabled}
+								canPursueGoal={
+									canMutateGoal && !isGoalActionDisabled && canSetGoalNow
+								}
 								isModelCatalogLoading={isModelCatalogLoading}
 								workspaceOptions={workspaceOptions}
 								chatOrganizationId={organizationId}

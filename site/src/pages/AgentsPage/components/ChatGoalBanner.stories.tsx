@@ -35,7 +35,10 @@ const meta: Meta<typeof ChatGoalBanner> = {
 export default meta;
 type Story = StoryObj<typeof ChatGoalBanner>;
 
-export const Active: Story = {
+export const ActivePursuing: Story = {
+	args: {
+		isChatWorking: true,
+	},
 	play: async ({ canvasElement, args }) => {
 		const canvas = within(canvasElement);
 		expect(canvas.getByLabelText("Current goal")).toBeVisible();
@@ -49,6 +52,17 @@ export const Active: Story = {
 		expect(args.onAction).toHaveBeenNthCalledWith(1, "pause");
 		expect(args.onAction).toHaveBeenNthCalledWith(2, "complete");
 		expect(args.onAction).toHaveBeenNthCalledWith(3, "clear");
+	},
+};
+
+export const ActiveIdle: Story = {
+	args: {
+		isChatWorking: false,
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		expect(canvas.getByText("Goal active")).toBeVisible();
+		expect(canvas.queryByText("Pursuing goal")).toBeNull();
 	},
 };
 
@@ -66,6 +80,29 @@ export const Paused: Story = {
 
 		expect(args.onAction).toHaveBeenNthCalledWith(1, "resume");
 		expect(args.onAction).toHaveBeenNthCalledWith(2, "clear");
+	},
+};
+
+export const PausedResumeUnavailable: Story = {
+	args: {
+		goal: goal({ status: "paused" }),
+		isChatWorking: true,
+		actionUnavailableReasons: {
+			resume: "The chat is busy. Resume becomes available when it is idle.",
+		},
+		onAction: fn(),
+	},
+	play: async ({ canvasElement, args }) => {
+		const canvas = within(canvasElement);
+		const resume = canvas.getByRole("button", { name: /Resume/i });
+		expect(resume).toBeDisabled();
+		expect(resume).toHaveAttribute(
+			"title",
+			"The chat is busy. Resume becomes available when it is idle.",
+		);
+		// Clear stays available while resume is gated.
+		await userEvent.click(canvas.getByRole("button", { name: /Clear/i }));
+		expect(args.onAction).toHaveBeenCalledWith("clear");
 	},
 };
 
@@ -97,7 +134,7 @@ export const ReadOnlyChildGoal: Story = {
 	play: async ({ canvasElement, args }) => {
 		const canvas = within(canvasElement);
 		expect(canvas.getByLabelText("Current goal")).toBeVisible();
-		expect(canvas.getByText("Pursuing goal")).toBeVisible();
+		expect(canvas.getByText("Goal active")).toBeVisible();
 		expect(canvas.queryByRole("button", { name: /Pause/i })).toBeNull();
 		expect(args.onAction).not.toHaveBeenCalled();
 	},

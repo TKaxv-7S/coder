@@ -23,6 +23,17 @@ type ChatGoalBannerProps = {
 	canMutateGoal?: boolean;
 	isActionPending?: boolean;
 	isActionDisabled?: boolean;
+	/**
+	 * Whether the chat is actively working (running, interrupting, or
+	 * requires action). Drives the active-goal label so the banner never
+	 * claims the agent is pursuing a goal while the chat sits idle.
+	 */
+	isChatWorking?: boolean;
+	/**
+	 * Per-action unavailability reasons. A present entry disables that
+	 * action's button and explains why in its tooltip.
+	 */
+	actionUnavailableReasons?: Partial<Record<ChatGoalAction, string>>;
 	onAction: (action: ChatGoalAction) => Promise<void> | void;
 };
 
@@ -32,7 +43,7 @@ type GoalStatusUI = {
 };
 
 const GOAL_STATUS_UI = {
-	active: { label: "Pursuing goal", variant: "info" },
+	active: { label: "Goal active", variant: "info" },
 	paused: { label: "Goal paused", variant: "warning" },
 	complete: { label: "Goal complete", variant: "green" },
 } satisfies Record<CurrentChatGoalStatus, GoalStatusUI>;
@@ -54,13 +65,18 @@ export const ChatGoalBanner: FC<ChatGoalBannerProps> = ({
 	canMutateGoal = false,
 	isActionPending = false,
 	isActionDisabled = false,
+	isChatWorking = false,
+	actionUnavailableReasons,
 	onAction,
 }) => {
 	if (!goal || !isCurrentChatGoalStatus(goal.status)) {
 		return null;
 	}
 
-	const statusUI = GOAL_STATUS_UI[goal.status];
+	const statusUI =
+		goal.status === "active" && isChatWorking
+			? { label: "Pursuing goal", variant: "info" as const }
+			: GOAL_STATUS_UI[goal.status];
 	const actions = canMutateGoal ? chatGoalActionsForStatus(goal.status) : [];
 	const disabled = isActionPending || isActionDisabled;
 	const age = shortRelativeTime(goal.created_at);
@@ -105,12 +121,14 @@ export const ChatGoalBanner: FC<ChatGoalBannerProps> = ({
 							{actions.map((action) => {
 								const actionUI = GOAL_ACTION_UI[action];
 								const Icon = actionUI.Icon;
+								const unavailableReason = actionUnavailableReasons?.[action];
 								return (
 									<Button
 										key={action}
 										size="xs"
 										variant={action === "clear" ? "subtle" : "outline"}
-										disabled={disabled}
+										disabled={disabled || unavailableReason !== undefined}
+										title={unavailableReason}
 										onClick={() => {
 											void onAction(action);
 										}}

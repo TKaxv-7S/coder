@@ -613,6 +613,12 @@ func writeChatGoalMutationError(ctx context.Context, rw http.ResponseWriter, err
 	case errors.Is(err, chatd.ErrChatGoalBusy):
 		httpapi.Write(ctx, rw, http.StatusConflict, codersdk.Response{Message: "Cannot set a goal while the chat is busy."})
 		return true
+	case errors.Is(err, chatd.ErrChatGoalResumeBusy):
+		httpapi.Write(ctx, rw, http.StatusConflict, codersdk.Response{Message: "Cannot resume a goal while the chat is busy."})
+		return true
+	case errors.Is(err, chatd.ErrChatGoalResumePlanMode):
+		httpapi.Write(ctx, rw, http.StatusConflict, codersdk.Response{Message: "Cannot resume a goal while plan mode is on."})
+		return true
 	default:
 		return false
 	}
@@ -2308,9 +2314,13 @@ func (api *API) patchChatGoal(rw http.ResponseWriter, r *http.Request) {
 		ChatID:    chat.ID,
 		CreatedBy: apiKey.UserID,
 		Mutation:  req,
+		APIKeyID:  apiKey.ID,
 	})
 	if err != nil {
 		if writeChatGoalMutationError(ctx, rw, err) {
+			return
+		}
+		if maybeWriteLimitErr(ctx, rw, err) {
 			return
 		}
 		if errors.Is(err, chatd.ErrChatArchived) {

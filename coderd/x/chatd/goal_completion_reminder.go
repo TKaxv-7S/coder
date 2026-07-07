@@ -19,24 +19,60 @@ import (
 const (
 	goalCompletionReminderOpenTag  = "<goal-completion-required>"
 	goalCompletionReminderCloseTag = "</goal-completion-required>"
+
+	goalResumeKickOpenTag  = "<goal-resumed>"
+	goalResumeKickCloseTag = "</goal-resumed>"
 )
 
-func goalCompletionReminderText(goalID uuid.UUID) (string, error) {
+func goalTaggedPayload(goalID uuid.UUID, openTag, closeTag string) (string, error) {
 	payload, err := json.Marshal(struct {
 		GoalID string `json:"goal_id"`
 	}{
 		GoalID: goalID.String(),
 	})
 	if err != nil {
-		return "", xerrors.Errorf("marshal goal completion reminder payload: %w", err)
+		return "", xerrors.Errorf("marshal goal message payload: %w", err)
 	}
-	return goalCompletionReminderOpenTag + "\n" +
-		string(payload) + "\n" +
-		goalCompletionReminderCloseTag + "\n\n" +
+	return openTag + "\n" + string(payload) + "\n" + closeTag, nil
+}
+
+func goalCompletionReminderText(goalID uuid.UUID) (string, error) {
+	tagged, err := goalTaggedPayload(goalID, goalCompletionReminderOpenTag, goalCompletionReminderCloseTag)
+	if err != nil {
+		return "", err
+	}
+	return tagged + "\n\n" +
 		"Your previous response ended while this chat goal is still active.\n" +
 		"Do not finish the turn with the goal active.\n" +
 		"If the objective is satisfied, call complete_goal now with this goal_id and a concise summary.\n" +
 		"If the objective is not satisfied, continue working toward it. Ask the user only if blocked.", nil
+}
+
+func goalResumeKickText(goalID uuid.UUID) (string, error) {
+	tagged, err := goalTaggedPayload(goalID, goalResumeKickOpenTag, goalResumeKickCloseTag)
+	if err != nil {
+		return "", err
+	}
+	return tagged + "\n\n" +
+		"The user resumed the chat goal.\n" +
+		"Continue working toward the objective.\n" +
+		"Call complete_goal with this goal_id when the objective is verifiably done.", nil
+}
+
+func hiddenGoalUserMessage(text string, modelConfigID uuid.UUID, createdBy uuid.UUID, apiKeyID string) (chatstate.Message, error) {
+	content, err := chatprompt.MarshalParts([]codersdk.ChatMessagePart{codersdk.ChatMessageText(text)})
+	if err != nil {
+		return chatstate.Message{}, xerrors.Errorf("marshal hidden goal message: %w", err)
+	}
+	return chatstate.Message{
+		Role:           database.ChatMessageRoleUser,
+		Content:        content,
+		Visibility:     database.ChatMessageVisibilityModel,
+		ModelConfigID:  uuid.NullUUID{UUID: modelConfigID, Valid: modelConfigID != uuid.Nil},
+		CreatedBy:      uuid.NullUUID{UUID: createdBy, Valid: createdBy != uuid.Nil},
+		ContentVersion: chatprompt.CurrentContentVersion,
+		APIKeyID:       sql.NullString{String: apiKeyID, Valid: apiKeyID != ""},
+	}, nil
 }
 
 func goalCompletionReminderMessage(goalID uuid.UUID, modelConfigID uuid.UUID, apiKeyID string) (chatstate.Message, error) {
@@ -44,21 +80,26 @@ func goalCompletionReminderMessage(goalID uuid.UUID, modelConfigID uuid.UUID, ap
 	if err != nil {
 		return chatstate.Message{}, err
 	}
-	content, err := chatprompt.MarshalParts([]codersdk.ChatMessagePart{codersdk.ChatMessageText(text)})
-	if err != nil {
-		return chatstate.Message{}, xerrors.Errorf("marshal goal completion reminder: %w", err)
-	}
-	return chatstate.Message{
-		Role:           database.ChatMessageRoleUser,
-		Content:        content,
-		Visibility:     database.ChatMessageVisibilityModel,
-		ModelConfigID:  uuid.NullUUID{UUID: modelConfigID, Valid: modelConfigID != uuid.Nil},
-		ContentVersion: chatprompt.CurrentContentVersion,
-		APIKeyID:       sql.NullString{String: apiKeyID, Valid: apiKeyID != ""},
-	}, nil
+	return hiddenGoalUserMessage(text, modelConfigID, uuid.Nil, apiKeyID)
 }
 
-func appendGoalCompletionReminderMessages(messages []database.ChatMessage, promptRows []database.ChatMessage) ([]database.ChatMessage, error) {
+// goalResumeKickMessage builds the hidden user message that starts a
+// turn when a paused goal is resumed on an idle chat. Unlike the
+// completion reminder it counts as a real turn boundary: step counting,
+// reminder accounting, and stop-after scoping all reset at the kick.
+func goalResumeKickMessage(goalID uuid.UUID, modelConfigID uuid.UUID, createdBy uuid.UUID, apiKeyID string) (chatstate.Message, error) {
+	text, err := goalResumeKickText(goalID)
+	if err != nil {
+		return chatstate.Message{}, err
+	}
+	return hiddenGoalUserMessage(text, modelConfigID, createdBy, apiKeyID)
+}
+
+// appendHiddenGoalMessages merges model-only goal messages (completion
+// reminders and resume kicks) from promptRows into messages. Generation
+// decisions need both: reminders for per-turn reminder accounting and
+// resume kicks because they open the turn the decision loop is driving.
+func appendHiddenGoalMessages(messages []database.ChatMessage, promptRows []database.ChatMessage) ([]database.ChatMessage, error) {
 	seen := make(map[int64]struct{}, len(messages))
 	for _, msg := range messages {
 		seen[msg.ID] = struct{}{}
@@ -71,7 +112,11 @@ func appendGoalCompletionReminderMessages(messages []database.ChatMessage, promp
 		if err != nil {
 			return nil, err
 		}
-		if reminder {
+		_, resumeKick, err := parseGoalResumeKickMessage(msg)
+		if err != nil {
+			return nil, err
+		}
+		if reminder || resumeKick {
 			messages = append(messages, msg)
 			seen[msg.ID] = struct{}{}
 		}
@@ -116,19 +161,27 @@ func isGoalCompletionReminderMessageBestEffort(msg database.ChatMessage) bool {
 }
 
 func parseGoalCompletionReminderMessage(msg database.ChatMessage) (uuid.UUID, bool, error) {
+	return parseGoalTaggedMessage(msg, goalCompletionReminderOpenTag, goalCompletionReminderCloseTag)
+}
+
+func parseGoalResumeKickMessage(msg database.ChatMessage) (uuid.UUID, bool, error) {
+	return parseGoalTaggedMessage(msg, goalResumeKickOpenTag, goalResumeKickCloseTag)
+}
+
+func parseGoalTaggedMessage(msg database.ChatMessage, openTag, closeTag string) (uuid.UUID, bool, error) {
 	if msg.Role != database.ChatMessageRoleUser || msg.Visibility != database.ChatMessageVisibilityModel {
 		return uuid.Nil, false, nil
 	}
 	parts, err := chatprompt.ParseContent(msg)
 	if err != nil {
-		return uuid.Nil, false, xerrors.Errorf("parse goal completion reminder candidate: %w", err)
+		return uuid.Nil, false, xerrors.Errorf("parse goal tagged message candidate: %w", err)
 	}
 	text := textFromParts(parts)
-	remainder, ok := strings.CutPrefix(text, goalCompletionReminderOpenTag+"\n")
+	remainder, ok := strings.CutPrefix(text, openTag+"\n")
 	if !ok {
 		return uuid.Nil, false, nil
 	}
-	payload, _, ok := strings.Cut(remainder, "\n"+goalCompletionReminderCloseTag)
+	payload, _, ok := strings.Cut(remainder, "\n"+closeTag)
 	if !ok {
 		return uuid.Nil, false, nil
 	}

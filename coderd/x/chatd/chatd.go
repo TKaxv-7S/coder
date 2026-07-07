@@ -1103,6 +1103,15 @@ var (
 	ErrChatGoalNotRoot = xerrors.New("chat goal mutations require a root chat")
 	// ErrChatGoalBusy indicates a message-bound goal mutation cannot be queued.
 	ErrChatGoalBusy = xerrors.New("chat is busy")
+	// ErrChatGoalResumeBusy indicates a goal resume was rejected because
+	// the chat is busy or has queued input. Resume starts a turn, so it
+	// only proceeds from idle states where user input cannot be
+	// preempted.
+	ErrChatGoalResumeBusy = xerrors.New("cannot resume goal while chat is busy")
+	// ErrChatGoalResumePlanMode indicates a goal resume was rejected
+	// because plan mode is on. Plan-mode turns suspend goal behavior, so
+	// resuming would start a turn that ignores the goal.
+	ErrChatGoalResumePlanMode = xerrors.New("cannot resume goal while plan mode is on")
 )
 
 // ChatGoalMutationError describes a user-correctable goal mutation failure.
@@ -1242,6 +1251,9 @@ type ApplyGoalMutationOptions struct {
 	ChatID    uuid.UUID
 	CreatedBy uuid.UUID
 	Mutation  codersdk.ChatGoalMutation
+	// APIKeyID attributes the turn started by a resume mutation.
+	// Required for resume; unused by other actions.
+	APIKeyID string
 }
 
 // ApplyGoalMutationResult contains the current goal state after a mutation.
@@ -1251,7 +1263,10 @@ type ApplyGoalMutationResult struct {
 
 // ApplyGoalMutation applies a goal lifecycle mutation without sending a
 // chat message. Completing a running goal requests interruption so the
-// active turn can drain partial output and stop.
+// active turn can drain partial output and stop. Resuming a paused goal
+// starts a turn on the idle chat via a hidden kick message; resume is
+// rejected while the chat is busy, has queued input, or plan mode is on
+// so an active goal never lands on a chat that is not working.
 func (p *Server) ApplyGoalMutation(ctx context.Context, opts ApplyGoalMutationOptions) (ApplyGoalMutationResult, error) {
 	if opts.ChatID == uuid.Nil {
 		return ApplyGoalMutationResult{}, xerrors.New("chat_id is required")
@@ -1260,12 +1275,18 @@ func (p *Server) ApplyGoalMutation(ctx context.Context, opts ApplyGoalMutationOp
 	if err != nil {
 		return ApplyGoalMutationResult{}, err
 	}
+	if mutation.Action == codersdk.ChatGoalMutationActionResume {
+		if err := validateChatUserMessageAPIKeyID(opts.APIKeyID); err != nil {
+			return ApplyGoalMutationResult{}, err
+		}
+	}
 
 	var result ApplyGoalMutationResult
 	var eventChat database.Chat
 	var publishStatusChange bool
 	machine := p.newChatMachine(opts.ChatID)
 	updateErr := machine.Update(ctx, func(tx *chatstate.Tx, store database.Store) error {
+		publishStatusChange = false
 		lockedChat, err := store.GetChatByID(ctx, opts.ChatID)
 		if err != nil {
 			return xerrors.Errorf("load chat: %w", err)
@@ -1276,18 +1297,37 @@ func (p *Server) ApplyGoalMutation(ctx context.Context, opts ApplyGoalMutationOp
 		if !isRootChat(lockedChat) {
 			return ErrChatGoalNotRoot
 		}
+		if mutation.Action == codersdk.ChatGoalMutationActionResume {
+			if err := p.validateGoalResumeAdmission(ctx, store, lockedChat); err != nil {
+				return err
+			}
+		}
 		goal, err := applyGoalMutation(ctx, store, lockedChat.ID, 0, opts.CreatedBy, mutation)
 		if err != nil {
 			return err
 		}
 		eventChat = lockedChat
-		if mutation.Action == codersdk.ChatGoalMutationActionComplete && lockedChat.Status == database.ChatStatusRunning {
+		switch {
+		case mutation.Action == codersdk.ChatGoalMutationActionComplete && lockedChat.Status == database.ChatStatusRunning:
 			if _, err := tx.Interrupt(chatstate.InterruptInput{Reason: "Chat goal marked complete by user"}); err != nil {
 				return xerrors.Errorf("interrupt completed chat goal run: %w", err)
 			}
 			latest, err := store.GetChatByID(ctx, opts.ChatID)
 			if err != nil {
 				return xerrors.Errorf("reload chat after goal mutation interruption: %w", err)
+			}
+			eventChat = latest
+			publishStatusChange = true
+		case mutation.Action == codersdk.ChatGoalMutationActionResume:
+			// Start a turn in the same transaction so the goal never
+			// commits as active on an idle chat. A kick insert failure
+			// rolls back the resume.
+			if err := sendGoalResumeKick(ctx, tx, store, lockedChat, goal.ID, opts.APIKeyID); err != nil {
+				return err
+			}
+			latest, err := store.GetChatByID(ctx, opts.ChatID)
+			if err != nil {
+				return xerrors.Errorf("reload chat after goal resume kick: %w", err)
 			}
 			eventChat = latest
 			publishStatusChange = true
@@ -1303,6 +1343,55 @@ func (p *Server) ApplyGoalMutation(ctx context.Context, opts ApplyGoalMutationOp
 		p.publishChatPubsubEvent(eventChat, codersdk.ChatWatchEventKindStatusChange, nil)
 	}
 	return result, nil
+}
+
+// validateGoalResumeAdmission rejects a goal resume unless the chat is
+// idle with no queued input and plan mode is off. Queued input wins over
+// the goal: the queue promotion will start its own turn. Usage limits
+// are enforced like any other turn-starting admission.
+func (p *Server) validateGoalResumeAdmission(ctx context.Context, store database.Store, chat database.Chat) error {
+	if chat.PlanMode.Valid && chat.PlanMode.ChatPlanMode == database.ChatPlanModePlan {
+		return ErrChatGoalResumePlanMode
+	}
+	queued, err := store.CountChatQueuedMessages(ctx, chat.ID)
+	if err != nil {
+		return xerrors.Errorf("count queued messages: %w", err)
+	}
+	switch chatstate.ClassifyExecutionState(chat, queued > 0, true) {
+	case chatstate.StateW, chatstate.StateE0:
+	default:
+		return ErrChatGoalResumeBusy
+	}
+	return p.checkUsageLimit(ctx, store, chat.OwnerID, uuid.NullUUID{UUID: chat.OrganizationID, Valid: true})
+}
+
+// sendGoalResumeKick inserts the hidden user message that starts the
+// resumed goal's turn. The chat is idle (W/E0), so SendMessage inserts
+// directly into history and the chat lands in running for the worker
+// pool to pick up.
+func sendGoalResumeKick(
+	ctx context.Context,
+	tx *chatstate.Tx,
+	store database.Store,
+	chat database.Chat,
+	goalID uuid.UUID,
+	apiKeyID string,
+) error {
+	modelConfigID, err := resolveFallbackModelConfigID(ctx, store, chat.LastModelConfigID)
+	if err != nil {
+		return err
+	}
+	message, err := goalResumeKickMessage(goalID, modelConfigID, chat.OwnerID, apiKeyID)
+	if err != nil {
+		return err
+	}
+	if _, err := tx.SendMessage(chatstate.SendMessageInput{
+		Message:      message,
+		BusyBehavior: chatstate.BusyBehaviorQueue,
+	}); err != nil {
+		return xerrors.Errorf("send goal resume kick: %w", err)
+	}
+	return nil
 }
 
 func isRootChat(chat database.Chat) bool {
@@ -2433,6 +2522,10 @@ func translateToolResultValidationError(err error) error {
 // transition. Active runs land in `interrupting`; requires-action
 // chats synthesize cancellation messages and return to running.
 //
+// Interrupting a root chat also pauses its active goal in the same
+// transaction: Stop is a halt gesture, and a halted chat must not
+// report an active goal.
+//
 // Returns the post-transition chat and an error so callers can map
 // state conflicts deliberately. Idle chats return a
 // chatstate.ErrTransitionNotAllowed wrapper.
@@ -2445,8 +2538,10 @@ func (p *Server) InterruptChat(
 	}
 
 	var refreshed database.Chat
+	var pausedGoal *database.ChatGoal
 	machine := p.newChatMachine(chat.ID)
 	err := machine.Update(ctx, func(tx *chatstate.Tx, store database.Store) error {
+		pausedGoal = nil
 		if _, err := tx.Interrupt(chatstate.InterruptInput{
 			Reason: "Tool execution interrupted by user",
 		}); err != nil {
@@ -2460,6 +2555,12 @@ func (p *Server) InterruptChat(
 			return xerrors.Errorf("reload chat after interrupt: %w", err)
 		}
 		refreshed = latest
+
+		goal, err := p.pauseActiveGoalOnInterrupt(ctx, store, latest)
+		if err != nil {
+			return err
+		}
+		pausedGoal = goal
 		return nil
 	})
 	if err != nil {
@@ -2467,7 +2568,42 @@ func (p *Server) InterruptChat(
 	}
 
 	p.publishChatPubsubEvent(refreshed, codersdk.ChatWatchEventKindStatusChange, nil)
+	if pausedGoal != nil {
+		p.publishChatGoalChange(refreshed, pausedGoal)
+	}
 	return refreshed, nil
+}
+
+// pauseActiveGoalOnInterrupt pauses the chat's active goal as part of a
+// user-initiated interrupt. Returns the paused goal, or nil when there
+// is nothing to pause (goals disabled, child chat, no current goal, or
+// the goal is not active). A concurrent goal transition is tolerated:
+// the interrupt must not fail because the goal changed underneath it.
+func (p *Server) pauseActiveGoalOnInterrupt(ctx context.Context, store database.Store, chat database.Chat) (*database.ChatGoal, error) {
+	if !p.experiments.Enabled(codersdk.ExperimentChatGoals) || !isRootChat(chat) {
+		//nolint:nilnil // Nothing to pause is represented as nil.
+		return nil, nil
+	}
+	current, err := currentChatGoal(ctx, store, chat.ID)
+	if err != nil {
+		return nil, err
+	}
+	if current == nil || current.Status != database.ChatGoalStatusActive {
+		//nolint:nilnil // Nothing to pause is represented as nil.
+		return nil, nil
+	}
+	paused, err := store.PauseChatGoalByID(ctx, database.PauseChatGoalByIDParams{
+		RootChatID: chat.ID,
+		ID:         current.ID,
+	})
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			//nolint:nilnil // The goal left `active` concurrently; nothing to pause.
+			return nil, nil
+		}
+		return nil, xerrors.Errorf("pause chat goal on interrupt: %w", err)
+	}
+	return &paused, nil
 }
 
 // ReconcileInvalidStateChat recovers a chat stuck in an invalid

@@ -268,6 +268,25 @@ export const PursueGoalModeSendsGoalMutation: Story = {
 	},
 };
 
+export const PursueGoalDisabledWhileChatBusy: Story = {
+	args: {
+		onPlanModeToggle: fn(),
+		showPursueGoal: true,
+		// The page passes canPursueGoal={false} while the chat is busy
+		// because a goal set sent with a queued message is rejected.
+		canPursueGoal: false,
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await userEvent.click(canvas.getByRole("button", { name: "More options" }));
+		expect(
+			within(document.body).getByRole("menuitemcheckbox", {
+				name: "Pursue goal",
+			}),
+		).toBeDisabled();
+	},
+};
+
 export const EnterSendsByDefault: Story = {
 	args: {
 		onSend: fn(),
