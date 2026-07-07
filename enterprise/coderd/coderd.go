@@ -230,7 +230,15 @@ func New(ctx context.Context, options *Options) (_ *API, err error) {
 			})
 			return
 		}
-		req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, address+r.URL.RequestURI(), nil)
+		baseURL, err := url.Parse(address)
+		if err != nil {
+			httpapi.Write(r.Context(), rw, http.StatusInternalServerError, codersdk.Response{
+				Message: "failed to parse owning replica address",
+				Detail:  err.Error(),
+			})
+			return
+		}
+		req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, chatDebugProxyURL(baseURL, r.URL).String(), nil)
 		if err != nil {
 			httpapi.Write(r.Context(), rw, http.StatusInternalServerError, codersdk.Response{
 				Message: "failed to build proxy request",
@@ -795,6 +803,16 @@ func New(ctx context.Context, options *Options) (_ *API, err error) {
 	go api.BoundaryUsageTracker.StartFlushLoop(ctx, options.Logger.Named("boundary_usage_tracker"), options.Database, api.AGPL.ID)
 
 	return api, nil
+}
+
+// chatDebugProxyURL builds the target URL for forwarding a chat debug
+// snapshot request to the owning replica. It preserves the request's path
+// and query string, joining the path onto any base path baseURL already
+// has (relay addresses are not guaranteed to be bare host:port).
+func chatDebugProxyURL(baseURL, reqURL *url.URL) *url.URL {
+	proxyURL := baseURL.JoinPath(reqURL.Path)
+	proxyURL.RawQuery = reqURL.RawQuery
+	return proxyURL
 }
 
 func replicaRelayHTTPClient(base *http.Client, tlsConfig *tls.Config) *http.Client {

@@ -16,6 +16,7 @@
 package messagepartbuffer
 
 import (
+	"cmp"
 	"container/heap"
 	"context"
 	"encoding/json"
@@ -582,10 +583,10 @@ func (b *Buffer) InspectChat(chatID uuid.UUID) []EpisodeInfo {
 		})
 	}
 	slices.SortFunc(infos, func(a, b EpisodeInfo) int {
-		if a.HistoryVersion != b.HistoryVersion {
-			return int(a.HistoryVersion - b.HistoryVersion)
-		}
-		return int(a.GenerationAttempt - b.GenerationAttempt)
+		return cmp.Or(
+			cmp.Compare(a.HistoryVersion, b.HistoryVersion),
+			cmp.Compare(a.GenerationAttempt, b.GenerationAttempt),
+		)
 	})
 	return infos
 }
