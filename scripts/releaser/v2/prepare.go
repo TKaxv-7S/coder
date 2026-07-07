@@ -8,35 +8,6 @@ import (
 	"golang.org/x/xerrors"
 )
 
-// prepareRelease computes the next release version, then creates and
-// pushes the annotated tag and (optionally) the release branch.
-// It emits the same JSON as calculateNextVersion so the workflow
-// can consume it identically.
-func prepareRelease(exec CommandExecutor, releaseType, ref, commitSHA string) (calculateResult, error) {
-	result, err := calculateNextVersion(exec, releaseType, ref, commitSHA)
-	if err != nil {
-		return nil, err
-	}
-
-	switch v := result.(type) {
-	case CreateBranchRequest:
-		if err := createAndPushTag(exec, v.Version, v.TargetRef); err != nil {
-			return nil, err
-		}
-		if err := createAndPushBranch(exec, v.BranchName, v.TargetRef); err != nil {
-			return nil, err
-		}
-	case ReleaseRequest:
-		if err := createAndPushTag(exec, v.Version, v.TargetRef); err != nil {
-			return nil, err
-		}
-	default:
-		return nil, xerrors.Errorf("unexpected result type %T", result)
-	}
-
-	return result, nil
-}
-
 // createAndPushTag creates an annotated tag at targetRef and pushes
 // it. If the tag already exists at the correct commit, it is a
 // no-op. If it exists at a different commit, it returns an error.

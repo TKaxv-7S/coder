@@ -19,22 +19,10 @@ func main() {
 		dryRun bool
 	)
 
-	// Default (v2) subcommands. rc, branch, and release run the
-	// non-interactive prepare-release logic with the release type baked
-	// in.
-	children := []*serpent.Command{
-		releaserv2.TypeCommand("rc", "Tag a release candidate from main or a release branch.", "rc"),
-		releaserv2.TypeCommand("branch", "Cut a new release branch and tag its first release candidate.", "create-release-branch"),
-		releaserv2.TypeCommand("release", "Tag a stable release or patch from a release branch.", "release"),
-	}
-
-	// Hidden compatibility verbs. These preserve the exact names, flags,
-	// and stdout contract of the former scripts/release-action tool so
-	// GitHub Actions workflows migrate with a path-only change.
-	for _, c := range releaserv2.CICommands() {
-		c.Hidden = true
-		children = append(children, c)
-	}
+	// The v2 tooling exposes exactly three subcommands: rc, branch, and
+	// release. Each is run from a developer's command line and detects
+	// the branch it is invoked from.
+	children := releaserv2.Commands()
 
 	// --legacy selects the v1 interactive wizard and cannot be combined
 	// with a subcommand, which v1 does not understand.
