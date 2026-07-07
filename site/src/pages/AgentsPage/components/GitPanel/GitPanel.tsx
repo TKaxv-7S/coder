@@ -486,6 +486,8 @@ const ViewSwitcher: FC<ViewSwitcherProps> = ({
 		);
 	}
 
+	const isSingleItem = items.length <= 1;
+
 	const triggerContent = (
 		<>
 			<span
@@ -501,20 +503,35 @@ const ViewSwitcher: FC<ViewSwitcherProps> = ({
 			</span>
 			<span className="inline-flex min-w-0 items-center gap-1 px-1.5 text-content-primary">
 				<span className="truncate">{activeItem.triggerIdentifier}</span>
-				<ChevronDownIcon className="size-3 shrink-0 opacity-70" />
+				{!isSingleItem && (
+					<ChevronDownIcon className="size-3 shrink-0 opacity-70" />
+				)}
 			</span>
 		</>
 	);
 
-	const triggerClasses =
-		"inline-flex h-6 min-w-0 max-w-full cursor-pointer items-stretch overflow-hidden rounded-md border border-solid border-border-default bg-surface-primary text-xs transition-colors hover:bg-surface-secondary";
+	const triggerBase =
+		"inline-flex h-6 min-w-0 max-w-full items-stretch overflow-hidden rounded-md border border-solid border-border-default bg-surface-primary text-xs";
+	const triggerInteractive =
+		"cursor-pointer transition-colors hover:bg-surface-secondary";
+
+	// With a single item there is nothing to pick, so we render a
+	// static wrapper (no chevron, no dropdown behavior) that keeps
+	// the same visual footprint as the interactive trigger.
+	if (isSingleItem) {
+		return (
+			<div className={triggerBase} data-testid="git-panel-view-switcher">
+				{triggerContent}
+			</div>
+		);
+	}
 
 	return (
 		<DropdownMenu>
 			<DropdownMenuTrigger asChild>
 				<button
 					type="button"
-					className={triggerClasses}
+					className={cn(triggerBase, triggerInteractive)}
 					data-testid="git-panel-view-switcher"
 					aria-label="Switch git view"
 				>
