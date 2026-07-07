@@ -4,6 +4,7 @@ import { createContext, type PropsWithChildren, useContext } from "react";
 import { Avatar } from "#/components/Avatar/Avatar";
 import { Button } from "#/components/Button/Button";
 import { cn } from "#/utils/cn";
+import type { StepId } from "./steps";
 
 type Variant = "complete" | "current" | "upcoming" | null | undefined;
 
@@ -25,6 +26,17 @@ type SelectionSummaryProps = {
 	selectedTemplate?: SelectedTemplate;
 	selectedModules?: SelectedModule[];
 	onDeselectModule: (moduleId: string) => void;
+	/**
+	 * Jump to a wizard step. `SelectionSummary` calls this from the
+	 * numbered step labels and from the selected-template row.
+	 */
+	onNavigateStep?: (stepId: StepId) => void;
+	/**
+	 * Jump to a specific module's configuration section. Consumers
+	 * should switch to the appropriate step and scroll the module
+	 * into view.
+	 */
+	onNavigateModule?: (moduleId: string) => void;
 };
 
 export const SelectionSummary: React.FC<SelectionSummaryProps> = ({
@@ -32,6 +44,8 @@ export const SelectionSummary: React.FC<SelectionSummaryProps> = ({
 	selectedTemplate,
 	selectedModules,
 	onDeselectModule,
+	onNavigateStep,
+	onNavigateModule,
 }) => {
 	const variant = (step: number) => {
 		if (currentStep === step) return "current";
@@ -43,26 +57,57 @@ export const SelectionSummary: React.FC<SelectionSummaryProps> = ({
 			<h2 className="text-xl font-semibold">Selection</h2>
 			<div className="text-sm">
 				<VariantContext.Provider value={variant(1)}>
-					<StepIndicator step={1}>Base Template</StepIndicator>
+					<StepIndicator
+						step={1}
+						onClick={
+							onNavigateStep ? () => onNavigateStep("base-infra") : undefined
+						}
+					>
+						Base Template
+					</StepIndicator>
 					{selectedTemplate ? (
-						<BaseTemplateSelection template={selectedTemplate} />
+						<BaseTemplateSelection
+							template={selectedTemplate}
+							onClick={
+								onNavigateStep
+									? () => onNavigateStep("base-parameters")
+									: undefined
+							}
+						/>
 					) : (
 						<StepDivider />
 					)}
 				</VariantContext.Provider>
 				<VariantContext.Provider value={variant(2)}>
-					<StepIndicator step={2}>Modules</StepIndicator>
+					<StepIndicator
+						step={2}
+						onClick={
+							onNavigateStep ? () => onNavigateStep("module-select") : undefined
+						}
+					>
+						Modules
+					</StepIndicator>
 					{selectedModules ? (
 						<ModuleSelection
 							modules={selectedModules}
 							onDeselectModule={onDeselectModule}
+							onSelectModule={onNavigateModule}
 						/>
 					) : (
 						<StepDivider />
 					)}
 				</VariantContext.Provider>
 				<VariantContext.Provider value={variant(3)}>
-					<StepIndicator step={3}>Customizations</StepIndicator>
+					<StepIndicator
+						step={3}
+						onClick={
+							onNavigateStep
+								? () => onNavigateStep("customizations")
+								: undefined
+						}
+					>
+						Customizations
+					</StepIndicator>
 				</VariantContext.Provider>
 			</div>
 		</div>
@@ -94,10 +139,33 @@ const stepLabelVariants = cva("font-normal mr-2", {
 
 type StepIndicatorProps = PropsWithChildren<{
 	step: number;
+	onClick?: () => void;
 }>;
 
-const StepIndicator: React.FC<StepIndicatorProps> = ({ step, children }) => {
+const StepIndicator: React.FC<StepIndicatorProps> = ({
+	step,
+	onClick,
+	children,
+}) => {
 	const variant = useContext(VariantContext);
+	const label = typeof children === "string" ? children : `step ${step}`;
+
+	if (onClick) {
+		return (
+			<button
+				type="button"
+				onClick={onClick}
+				aria-label={`Go to ${label}`}
+				className={cn(
+					"flex items-center gap-2 w-full text-left p-0 bg-transparent border-0 cursor-pointer rounded-sm",
+					"hover:bg-surface-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-primary",
+				)}
+			>
+				<div className={stepCircleVariants({ variant })}>{step}</div>
+				<span className={stepLabelVariants({ variant })}>{children}</span>
+			</button>
+		);
+	}
 
 	return (
 		<div className="flex items-center gap-2">
@@ -142,19 +210,39 @@ const StepDivider: React.FC<StepDividerProps> = ({ className, children }) => {
 
 type BaseTemplateSelectionProps = {
 	template: SelectedTemplate;
+	onClick?: () => void;
 };
 
 const BaseTemplateSelection: React.FC<BaseTemplateSelectionProps> = ({
 	template,
+	onClick,
 }) => {
+	const inner = (
+		<div className="flex items-start p-1">
+			<div className="h-[1lh] content-center">
+				<Avatar src={template.iconUrl} size="sm" variant="icon" />
+			</div>
+			<span className="ml-2 text-content-secondary">{template.name}</span>
+		</div>
+	);
+
 	return (
 		<StepDivider>
-			<div className="flex items-start p-1">
-				<div className="h-[1lh] content-center">
-					<Avatar src={template.iconUrl} size="sm" variant="icon" />
-				</div>
-				<span className="ml-2 text-content-secondary">{template.name}</span>
-			</div>
+			{onClick ? (
+				<button
+					type="button"
+					onClick={onClick}
+					aria-label={`Configure ${template.name}`}
+					className={cn(
+						"w-full text-left p-0 bg-transparent border-0 cursor-pointer rounded-sm",
+						"hover:bg-surface-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-primary",
+					)}
+				>
+					{inner}
+				</button>
+			) : (
+				inner
+			)}
 		</StepDivider>
 	);
 };
@@ -162,26 +250,52 @@ const BaseTemplateSelection: React.FC<BaseTemplateSelectionProps> = ({
 type ModuleSelectionProps = {
 	modules: SelectedModule[];
 	onDeselectModule: (moduleId: string) => void;
+	onSelectModule?: (moduleId: string) => void;
 };
 
 const ModuleSelection: React.FC<ModuleSelectionProps> = ({
 	modules,
 	onDeselectModule,
+	onSelectModule,
 }) => {
 	return (
 		<StepDivider className="max-h-72 overflow-y-auto">
 			{modules.map((module) => (
 				<div
 					key={module.id}
-					className="group flex items-start justify-between p-1 mb-1 rounded-sm hover:bg-surface-secondary"
+					className={cn(
+						"group flex items-start justify-between rounded-sm mb-1",
+						"hover:bg-surface-secondary",
+					)}
 				>
-					<div className="h-[1lh] content-center">
-						<Avatar src={module.iconUrl} size="sm" variant="icon" />
-					</div>
-					<span className="flex-1 ml-2 text-content-secondary">
-						{module.name}
-					</span>
-					<div className="h-[1lh] content-center">
+					{onSelectModule ? (
+						<button
+							type="button"
+							onClick={() => onSelectModule(module.id)}
+							aria-label={`Configure ${module.name}`}
+							className={cn(
+								"flex flex-1 items-start min-w-0 p-1 text-left bg-transparent border-0 cursor-pointer rounded-sm",
+								"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-primary",
+							)}
+						>
+							<div className="h-[1lh] content-center">
+								<Avatar src={module.iconUrl} size="sm" variant="icon" />
+							</div>
+							<span className="flex-1 ml-2 text-content-secondary">
+								{module.name}
+							</span>
+						</button>
+					) : (
+						<div className="flex flex-1 items-start min-w-0 p-1">
+							<div className="h-[1lh] content-center">
+								<Avatar src={module.iconUrl} size="sm" variant="icon" />
+							</div>
+							<span className="flex-1 ml-2 text-content-secondary">
+								{module.name}
+							</span>
+						</div>
+					)}
+					<div className="h-[1lh] content-center p-1">
 						<Button
 							size="xs"
 							variant="subtle"

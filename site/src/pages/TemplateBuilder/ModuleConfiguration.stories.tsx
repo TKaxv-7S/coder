@@ -113,3 +113,50 @@ export const WithoutIcon: Story = {
 		],
 	},
 };
+
+export const WithSensitiveVariables: Story = {
+	args: {
+		name: "Claude Code",
+		description: "Install and configure the Claude Code CLI in your workspace.",
+		iconUrl: "/icon/claude.svg",
+		detailsUrl: "https://registry.coder.com/modules/claude-code",
+		optionalFields: [
+			{
+				type: "select",
+				id: "model",
+				label: "Model",
+				options: [
+					{ value: "sonnet", label: "Sonnet" },
+					{ value: "opus", label: "Opus" },
+				],
+			},
+		],
+		sensitiveVariables: [
+			{
+				name: "claude_code_oauth_token",
+				type: "string",
+				description: "OAuth token used by Claude Code",
+				required: true,
+				sensitive: true,
+			},
+		],
+	},
+};
+
+export const NoConfigWithSensitiveVariables: Story = {
+	args: {
+		name: "OpenAI Codex",
+		description: "Install the OpenAI Codex CLI in your workspace.",
+		iconUrl: "/icon/openai.svg",
+		detailsUrl: "https://registry.coder.com/modules/codex",
+		sensitiveVariables: [
+			{
+				name: "openai_api_key",
+				type: "string",
+				description: "OpenAI API key",
+				required: true,
+				sensitive: true,
+			},
+		],
+	},
+};

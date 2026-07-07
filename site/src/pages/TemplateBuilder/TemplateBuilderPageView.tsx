@@ -110,6 +110,37 @@ export const TemplateBuilderPageView: FC<TemplateBuilderPageViewProps> = ({
 		setStepIndex(nextIndex);
 	};
 
+	const navigateToStep = (targetId: StepId) => {
+		const target = WIZARD_STEPS.findIndex((s) => s.id === targetId);
+		if (target < 0) return;
+		if (currentStep.id === "customizations" && targetId !== "customizations") {
+			dispatch({ type: "RESET_CUSTOMIZATIONS" });
+			onClearCreateError?.();
+		}
+		window.scrollTo(0, 0);
+		setStepIndex(nearestVisible(target, state));
+	};
+
+	const navigateToModule = (moduleId: string) => {
+		const settingsIndex = WIZARD_STEPS.findIndex(
+			(s) => s.id === "module-settings",
+		);
+		// If module-settings is skipped (no configurable vars), fall back to
+		// module-select so the user still lands somewhere useful.
+		const targetId: StepId =
+			settingsIndex >= 0 && !WIZARD_STEPS[settingsIndex].shouldSkip(state)
+				? "module-settings"
+				: "module-select";
+		navigateToStep(targetId);
+		if (targetId === "module-settings") {
+			// Wait for the step render, then scroll the module section into view.
+			requestAnimationFrame(() => {
+				const el = document.getElementById(`module-config-${moduleId}`);
+				el?.scrollIntoView({ behavior: "smooth", block: "start" });
+			});
+		}
+	};
+
 	const handleProvisionerStatusChange = useCallback(
 		(value: boolean | undefined) => {
 			dispatch({ type: "SET_HAS_PROVISIONERS", value });
@@ -162,6 +193,7 @@ export const TemplateBuilderPageView: FC<TemplateBuilderPageViewProps> = ({
 							moduleVarMap,
 							createError,
 							handleProvisionerStatusChange,
+							handleDeselectModule,
 						)}
 					</div>
 
@@ -200,6 +232,8 @@ export const TemplateBuilderPageView: FC<TemplateBuilderPageViewProps> = ({
 								: undefined
 						}
 						onDeselectModule={handleDeselectModule}
+						onNavigateStep={navigateToStep}
+						onNavigateModule={navigateToModule}
 					/>
 				</div>
 			</div>
@@ -214,6 +248,7 @@ function renderStepContent(
 	moduleVarMap: Record<string, Record<string, string>>,
 	createError: Error | null,
 	onProvisionerStatusChange: (value: boolean | undefined) => void,
+	onRemoveModule: (moduleId: string) => void,
 ): ReactNode {
 	switch (stepId) {
 		case "base-infra":
@@ -259,6 +294,7 @@ function renderStepContent(
 							variables,
 						})
 					}
+					onRemoveModule={onRemoveModule}
 				/>
 			);
 		case "customizations":

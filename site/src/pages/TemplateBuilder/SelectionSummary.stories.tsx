@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, within } from "storybook/test";
+import { expect, fn, userEvent, within } from "storybook/test";
 import { SelectionSummary } from "./SelectionSummary";
 
 const meta: Meta<typeof SelectionSummary> = {
@@ -7,6 +7,8 @@ const meta: Meta<typeof SelectionSummary> = {
 	component: SelectionSummary,
 	args: {
 		onDeselectModule: fn(),
+		onNavigateStep: fn(),
+		onNavigateModule: fn(),
 	},
 };
 
@@ -149,5 +151,52 @@ export const Customizations: Story = {
 			{ id: "claude-code", name: "Claude Code", iconUrl: "/icon/claude.svg" },
 			{ id: "cursor", name: "Cursor IDE", iconUrl: "/icon/cursor.svg" },
 		],
+	},
+};
+
+export const NavigationClicks: Story = {
+	args: {
+		currentStep: 3,
+		selectedTemplate: {
+			name: "Docker Containers",
+			iconUrl: "/icon/docker.svg",
+		},
+		selectedModules: [
+			{ id: "claude-code", name: "Claude Code", iconUrl: "/icon/claude.svg" },
+			{ id: "cursor", name: "Cursor IDE", iconUrl: "/icon/cursor.svg" },
+		],
+	},
+	play: async ({ args, canvasElement }) => {
+		const canvas = within(canvasElement);
+
+		const baseTemplateBtn = await canvas.findByRole("button", {
+			name: "Go to Base Template",
+		});
+		await userEvent.click(baseTemplateBtn);
+		await expect(args.onNavigateStep).toHaveBeenCalledWith("base-infra");
+
+		const selectedBaseBtn = await canvas.findByRole("button", {
+			name: "Configure Docker Containers",
+		});
+		await userEvent.click(selectedBaseBtn);
+		await expect(args.onNavigateStep).toHaveBeenCalledWith("base-parameters");
+
+		const modulesBtn = await canvas.findByRole("button", {
+			name: "Go to Modules",
+		});
+		await userEvent.click(modulesBtn);
+		await expect(args.onNavigateStep).toHaveBeenCalledWith("module-select");
+
+		const customizationsBtn = await canvas.findByRole("button", {
+			name: "Go to Customizations",
+		});
+		await userEvent.click(customizationsBtn);
+		await expect(args.onNavigateStep).toHaveBeenCalledWith("customizations");
+
+		const moduleBtn = await canvas.findByRole("button", {
+			name: "Configure Claude Code",
+		});
+		await userEvent.click(moduleBtn);
+		await expect(args.onNavigateModule).toHaveBeenCalledWith("claude-code");
 	},
 };

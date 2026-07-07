@@ -1,4 +1,3 @@
-import { InfoIcon } from "lucide-react";
 import type { FC } from "react";
 import { useQuery } from "react-query";
 import { templateBuilderModules } from "#/api/queries/templateBuilder";
@@ -26,6 +25,7 @@ interface ModuleSettingsStepProps {
 		moduleId: string,
 		variables: Record<string, string>,
 	) => void;
+	onRemoveModule: (moduleId: string) => void;
 }
 
 function variableToField(
@@ -107,6 +107,7 @@ export const ModuleSettingsStep: FC<ModuleSettingsStepProps> = ({
 	selectedModuleIds,
 	moduleVariables,
 	onChangeModuleVariables,
+	onRemoveModule,
 }) => {
 	const { data } = useQuery(templateBuilderModules(baseId));
 	const modules = data?.modules ?? [];
@@ -149,7 +150,14 @@ export const ModuleSettingsStep: FC<ModuleSettingsStepProps> = ({
 					const optionalFields = optionalVars.map(toField);
 
 					return (
-						<div key={mod.id}>
+						// The id target is how the SelectionSummary jumps to a
+						// specific module. `scroll-mt-4` gives a small breathing
+						// margin when scrolled into view.
+						<div
+							key={mod.id}
+							id={`module-config-${mod.id}`}
+							className="scroll-mt-4"
+						>
 							<ModuleConfiguration
 								name={mod.display_name}
 								description={mod.description}
@@ -157,24 +165,9 @@ export const ModuleSettingsStep: FC<ModuleSettingsStepProps> = ({
 								detailsUrl={moduleDetailsUrl(mod.id)}
 								fields={requiredFields}
 								optionalFields={optionalFields}
+								sensitiveVariables={sensitiveVars}
+								onRemove={() => onRemoveModule(mod.id)}
 							/>
-
-							{sensitiveVars.length > 0 && (
-								<div className="flex items-center gap-2 mt-2 p-3 rounded-md text-sm text-content-secondary">
-									<InfoIcon className="size-icon-sm shrink-0 mt-0.5" />
-									<p>
-										{sensitiveVars.map((v) => (
-											<code
-												key={v.name}
-												className="mr-1 px-1.5 py-1 bg-surface-secondary"
-											>
-												{v.name}
-											</code>
-										))}
-										will be collected from developers at workspace creation.
-									</p>
-								</div>
-							)}
 						</div>
 					);
 				})}
