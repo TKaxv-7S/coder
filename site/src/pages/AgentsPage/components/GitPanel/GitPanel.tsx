@@ -376,7 +376,7 @@ export const GitPanel: FC<GitPanelProps> = ({
 			   with a known title. Truncated, with the full title in a
 			   hover tooltip only when the visible text is actually cut off. */}
 			{prTab && prTitle && (
-				<div className="flex shrink-0 items-center px-3 pb-1">
+				<div className="flex shrink-0 items-center px-3">
 					<Tooltip open={isPrTitleTruncated ? undefined : false}>
 						<TooltipTrigger asChild>
 							<span
