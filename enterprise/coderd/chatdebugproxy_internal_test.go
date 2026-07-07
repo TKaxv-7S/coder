@@ -1,10 +1,19 @@
 package coderd
 
 import (
+	"context"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"testing"
 
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"cdr.dev/slog/v3/sloggers/slogtest"
+	"github.com/coder/coder/v2/coderd"
+	"github.com/coder/coder/v2/codersdk"
 )
 
 func TestChatDebugProxyURL(t *testing.T) {
@@ -48,4 +57,93 @@ func TestChatDebugProxyURL(t *testing.T) {
 			require.Equal(t, tt.want, got.String())
 		})
 	}
+}
+
+func TestChatDebugProxyHandler_ReplicaNotFound(t *testing.T) {
+	t.Parallel()
+
+	resolve := func(context.Context, uuid.UUID) (string, bool) { return "", false }
+	handler := chatDebugProxyHandler(slogtest.Make(t, nil), http.DefaultClient, resolve)
+
+	rw := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/experimental/chats/"+uuid.NewString()+"/debug/snapshot", nil)
+	handler(rw, req, uuid.New())
+
+	require.Equal(t, http.StatusBadGateway, rw.Code)
+}
+
+func TestChatDebugProxyHandler_UnreachableReplica(t *testing.T) {
+	t.Parallel()
+
+	resolve := func(context.Context, uuid.UUID) (string, bool) { return "http://127.0.0.1:0", true }
+	handler := chatDebugProxyHandler(slogtest.Make(t, &slogtest.Options{IgnoreErrors: true}), http.DefaultClient, resolve)
+
+	rw := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/experimental/chats/"+uuid.NewString()+"/debug/snapshot", nil)
+	handler(rw, req, uuid.New())
+
+	require.Equal(t, http.StatusBadGateway, rw.Code)
+}
+
+func TestChatDebugProxyHandler_ForwardsVerbatim(t *testing.T) {
+	t.Parallel()
+
+	var (
+		gotPath          string
+		gotQuery         string
+		gotForwarded     string
+		gotSessionToken  string
+		upstreamRequests int
+	)
+	upstream := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		upstreamRequests++
+		gotPath = r.URL.Path
+		gotQuery = r.URL.RawQuery
+		gotForwarded = r.Header.Get(coderd.ChatDebugForwardedHeader)
+		gotSessionToken = r.Header.Get(codersdk.SessionTokenHeader)
+		rw.Header().Set("Content-Type", "application/json")
+		rw.WriteHeader(http.StatusOK)
+		_, _ = rw.Write([]byte(`{"execution_state":"R0"}`))
+	}))
+	defer upstream.Close()
+
+	resolve := func(context.Context, uuid.UUID) (string, bool) { return upstream.URL, true }
+	handler := chatDebugProxyHandler(slogtest.Make(t, nil), upstream.Client(), resolve)
+
+	rw := httptest.NewRecorder()
+	chatID := uuid.New()
+	req := httptest.NewRequest(http.MethodGet, "/api/experimental/chats/"+chatID.String()+"/debug/snapshot?foo=bar", nil)
+	req.Header.Set(codersdk.SessionTokenHeader, "test-token")
+	handler(rw, req, uuid.New())
+
+	require.Equal(t, 1, upstreamRequests)
+	assert.Equal(t, "/api/experimental/chats/"+chatID.String()+"/debug/snapshot", gotPath)
+	assert.Equal(t, "foo=bar", gotQuery)
+	assert.Equal(t, "1", gotForwarded)
+	assert.Equal(t, "test-token", gotSessionToken)
+
+	require.Equal(t, http.StatusOK, rw.Code)
+	assert.Equal(t, "application/json", rw.Header().Get("Content-Type"))
+	assert.JSONEq(t, `{"execution_state":"R0"}`, rw.Body.String())
+}
+
+func TestChatDebugProxyHandler_CapsResponseBody(t *testing.T) {
+	t.Parallel()
+
+	const overLimit = (1 << 20) + 1024
+	upstream := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		rw.WriteHeader(http.StatusOK)
+		_, _ = rw.Write(make([]byte, overLimit))
+	}))
+	defer upstream.Close()
+
+	resolve := func(context.Context, uuid.UUID) (string, bool) { return upstream.URL, true }
+	handler := chatDebugProxyHandler(slogtest.Make(t, nil), upstream.Client(), resolve)
+
+	rw := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/experimental/chats/"+uuid.NewString()+"/debug/snapshot", nil)
+	handler(rw, req, uuid.New())
+
+	require.Equal(t, http.StatusOK, rw.Code)
+	require.Equal(t, 1<<20, rw.Body.Len())
 }

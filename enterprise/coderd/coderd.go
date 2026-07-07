@@ -222,54 +222,7 @@ func New(ctx context.Context, options *Options) (_ *API, err error) {
 	}
 	options.Options.ChatStreamPartsDialer = entchatd.NewStreamPartsDialer(replicaCfg)
 
-	options.Options.ChatDebugProxy = func(rw http.ResponseWriter, r *http.Request, replicaID uuid.UUID) {
-		address, ok := resolveReplicaAddress(r.Context(), replicaID)
-		if !ok {
-			httpapi.Write(r.Context(), rw, http.StatusBadGateway, codersdk.Response{
-				Message: fmt.Sprintf("owning replica %s not found", replicaID),
-			})
-			return
-		}
-		baseURL, err := url.Parse(address)
-		if err != nil {
-			httpapi.Write(r.Context(), rw, http.StatusInternalServerError, codersdk.Response{
-				Message: "failed to parse owning replica address",
-				Detail:  err.Error(),
-			})
-			return
-		}
-		req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, chatDebugProxyURL(baseURL, r.URL).String(), nil)
-		if err != nil {
-			httpapi.Write(r.Context(), rw, http.StatusInternalServerError, codersdk.Response{
-				Message: "failed to build proxy request",
-				Detail:  err.Error(),
-			})
-			return
-		}
-		req.Header.Set(codersdk.SessionTokenHeader, entchatd.ExtractSessionToken(r.Header))
-		req.Header.Set(coderd.ChatDebugForwardedHeader, "1")
-		resp, err := replicaHTTPClient.Do(req)
-		if err != nil {
-			api.Logger.Error(r.Context(), "failed to reach owning replica for chat debug snapshot",
-				slog.F("replica_id", replicaID),
-				slog.F("address", address),
-				slog.Error(err),
-			)
-			httpapi.Write(r.Context(), rw, http.StatusBadGateway, codersdk.Response{
-				Message: "failed to reach owning replica",
-				Detail:  err.Error(),
-			})
-			return
-		}
-		defer resp.Body.Close()
-		if ct := resp.Header.Get("Content-Type"); ct != "" {
-			rw.Header().Set("Content-Type", ct)
-		}
-		rw.WriteHeader(resp.StatusCode)
-		// Defense-in-depth: the upstream is a sibling replica returning a
-		// bounded JSON snapshot, but cap the copy regardless.
-		_, _ = io.Copy(rw, io.LimitReader(resp.Body, 1<<20))
-	}
+	options.Options.ChatDebugProxy = chatDebugProxyHandler(options.Logger, replicaHTTPClient, resolveReplicaAddress)
 
 	api.AGPL = coderd.New(options.Options)
 	api.aiSeatTracker = aiseats.New(options.Database, api.Logger.Named("aiseats"), quartz.NewReal(), &api.AGPL.Auditor)
@@ -813,6 +766,65 @@ func chatDebugProxyURL(baseURL, reqURL *url.URL) *url.URL {
 	proxyURL := baseURL.JoinPath(reqURL.Path)
 	proxyURL.RawQuery = reqURL.RawQuery
 	return proxyURL
+}
+
+// chatDebugProxyHandler returns a coderd.Options.ChatDebugProxy implementation
+// that forwards a chat debug snapshot request to the replica owning the
+// chat, verbatim. resolveReplicaAddress resolves a replica ID to its relay
+// address, e.g. api's own resolveReplicaAddress closure.
+func chatDebugProxyHandler(
+	logger slog.Logger,
+	httpClient *http.Client,
+	resolveReplicaAddress func(context.Context, uuid.UUID) (string, bool),
+) func(http.ResponseWriter, *http.Request, uuid.UUID) {
+	return func(rw http.ResponseWriter, r *http.Request, replicaID uuid.UUID) {
+		address, ok := resolveReplicaAddress(r.Context(), replicaID)
+		if !ok {
+			httpapi.Write(r.Context(), rw, http.StatusBadGateway, codersdk.Response{
+				Message: fmt.Sprintf("owning replica %s not found", replicaID),
+			})
+			return
+		}
+		baseURL, err := url.Parse(address)
+		if err != nil {
+			httpapi.Write(r.Context(), rw, http.StatusInternalServerError, codersdk.Response{
+				Message: "failed to parse owning replica address",
+				Detail:  err.Error(),
+			})
+			return
+		}
+		req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, chatDebugProxyURL(baseURL, r.URL).String(), nil)
+		if err != nil {
+			httpapi.Write(r.Context(), rw, http.StatusInternalServerError, codersdk.Response{
+				Message: "failed to build proxy request",
+				Detail:  err.Error(),
+			})
+			return
+		}
+		req.Header.Set(codersdk.SessionTokenHeader, entchatd.ExtractSessionToken(r.Header))
+		req.Header.Set(coderd.ChatDebugForwardedHeader, "1")
+		resp, err := httpClient.Do(req)
+		if err != nil {
+			logger.Error(r.Context(), "failed to reach owning replica for chat debug snapshot",
+				slog.F("replica_id", replicaID),
+				slog.F("address", address),
+				slog.Error(err),
+			)
+			httpapi.Write(r.Context(), rw, http.StatusBadGateway, codersdk.Response{
+				Message: "failed to reach owning replica",
+				Detail:  err.Error(),
+			})
+			return
+		}
+		defer resp.Body.Close()
+		if ct := resp.Header.Get("Content-Type"); ct != "" {
+			rw.Header().Set("Content-Type", ct)
+		}
+		rw.WriteHeader(resp.StatusCode)
+		// Defense-in-depth: the upstream is a sibling replica returning a
+		// bounded JSON snapshot, but cap the copy regardless.
+		_, _ = io.Copy(rw, io.LimitReader(resp.Body, 1<<20))
+	}
 }
 
 func replicaRelayHTTPClient(base *http.Client, tlsConfig *tls.Config) *http.Client {
