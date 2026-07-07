@@ -941,7 +941,7 @@ describe(shouldInvalidateChatCost.name, () => {
 		expected: boolean;
 	}>([
 		{
-			name: "invalidates when a status change leaves active generation",
+			name: "invalidates when a status change ends active generation",
 			updatedChat: chatForFilterInvalidation({ status: "waiting" }),
 			eventKind: "status_change",
 			expected: true,

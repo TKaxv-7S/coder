@@ -200,10 +200,10 @@ const meta: Meta<typeof AgentChatPageView> = {
 	beforeEach: () => {
 		spyOn(API.experimental, "getChat").mockResolvedValue(buildChat());
 		spyOn(API.experimental, "getChatCost").mockResolvedValue({
-			root_chat_id: AGENT_ID,
+			chat_id: AGENT_ID,
 			total_cost_micros: 0,
 			priced_message_count: 0,
-			unpriced_message_count: 0,
+			unpriced_messages_with_usage_count: 0,
 		});
 	},
 	decorators: [withAuthProvider, withDashboardProvider, withProxyProvider()],
@@ -1344,7 +1344,7 @@ export const StickyUserMessagePinsOnScroll: Story = {
 		// which is the regression this story guards against.
 		const sentinels = scrollContainer.querySelectorAll("[data-user-sentinel]");
 		expect(sentinels.length).toBeGreaterThan(0);
-		for (const sentinel of sentinels) {
+		for (const sentinel of Array.from(sentinels)) {
 			expect(sentinel.closest("[data-testid='scroll-container']")).toBe(
 				scrollContainer,
 			);
@@ -1458,7 +1458,7 @@ export const StickyUserMessageClipUpdatesWhilePinned: Story = {
 		// resize of that node reflects transcript growth.
 		const sentinels = scrollContainer.querySelectorAll("[data-user-sentinel]");
 		expect(sentinels.length).toBeGreaterThan(0);
-		for (const sentinel of sentinels) {
+		for (const sentinel of Array.from(sentinels)) {
 			expect(contentMarker?.contains(sentinel)).toBe(true);
 		}
 

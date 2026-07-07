@@ -2,6 +2,7 @@ package coderd
 
 import (
 	"database/sql"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -18,6 +19,9 @@ import (
 	"github.com/coder/coder/v2/codersdk"
 )
 
+// ExtractChatParam authorizes the read, then GetChatModelUsageCostByChatID
+// authorizes it again. A denial on the second check means the ACL changed in
+// between (a read-authz race). Assert it surfaces as 404, not 500.
 func TestGetChatCostSurfacesReadAuthzRace(t *testing.T) {
 	t.Parallel()
 
@@ -46,6 +50,47 @@ func TestGetChatCostSurfacesReadAuthzRace(t *testing.T) {
 	defer resp.Body.Close()
 
 	require.Equal(t, http.StatusNotFound, resp.StatusCode)
+}
+
+func TestGetChatCostNormalizesChildToRoot(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	dbm := dbmock.NewMockStore(ctrl)
+	rootID := uuid.New()
+	child := database.Chat{
+		ID:             uuid.New(),
+		OrganizationID: uuid.New(),
+		OwnerID:        uuid.New(),
+		RootChatID:     uuid.NullUUID{UUID: rootID, Valid: true},
+	}
+
+	dbm.EXPECT().GetChatByID(gomock.Any(), child.ID).Return(child, nil)
+	dbm.EXPECT().GetChatModelUsageCostByChatID(gomock.Any(), rootID).Return(
+		database.GetChatModelUsageCostByChatIDRow{
+			ChatID:             rootID,
+			TotalCostMicros:    750,
+			PricedMessageCount: 2,
+		},
+		nil,
+	)
+
+	api := &API{Options: &Options{Database: dbm}}
+	rtr := chi.NewRouter()
+	rtr.With(httpmw.ExtractChatParam(dbm)).Get("/chats/{chat}/cost", api.getChatCost)
+
+	req := httptest.NewRequest(http.MethodGet, "/chats/"+child.ID.String()+"/cost", nil)
+	rec := httptest.NewRecorder()
+	rtr.ServeHTTP(rec, req)
+	resp := rec.Result()
+	defer resp.Body.Close()
+
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var cost codersdk.ChatCost
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&cost))
+	require.Equal(t, rootID, cost.ChatID)
+	require.Equal(t, int64(750), cost.TotalCostMicros)
+	require.Equal(t, int64(2), cost.PricedMessageCount)
 }
 
 func TestValidateChatModelProviderOptions_AnthropicThinkingDisplay(t *testing.T) {

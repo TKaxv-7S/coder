@@ -6,7 +6,7 @@ import { ChatSummary } from "./ChatSummary";
 
 type ChatSummaryPanelProps = {
 	chatId: string;
-	/** Gate reads on tab visibility so other tabs don't fetch every chat's cost. */
+	/** Gate reads on tab visibility so the chat and cost queries don't run while the tab is hidden. */
 	isVisible: boolean;
 };
 
@@ -30,7 +30,9 @@ export const ChatSummaryPanel: FC<ChatSummaryPanelProps> = ({
 				createdAt={chatData.created_at}
 				updatedAt={chatData.updated_at}
 				costMicros={costQuery.data?.total_cost_micros}
-				unpricedMessageCount={costQuery.data?.unpriced_message_count}
+				unpricedMessagesWithUsageCount={
+					costQuery.data?.unpriced_messages_with_usage_count
+				}
 				isCostLoading={costQuery.isLoading}
 				costError={costQuery.isError}
 			/>

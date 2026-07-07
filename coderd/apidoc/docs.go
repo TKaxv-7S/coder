@@ -16949,17 +16949,17 @@ const docTemplate = `{
         "codersdk.ChatCost": {
             "type": "object",
             "properties": {
-                "priced_message_count": {
-                    "type": "integer"
-                },
-                "root_chat_id": {
+                "chat_id": {
                     "type": "string",
                     "format": "uuid"
+                },
+                "priced_message_count": {
+                    "type": "integer"
                 },
                 "total_cost_micros": {
                     "type": "integer"
                 },
-                "unpriced_message_count": {
+                "unpriced_messages_with_usage_count": {
                     "type": "integer"
                 }
             }

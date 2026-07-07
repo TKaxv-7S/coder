@@ -13,8 +13,8 @@ interface ChatSummaryProps {
 	costMicros?: number | null;
 	isCostLoading?: boolean;
 	costError?: boolean;
-	/** Assistant messages with no model pricing; when > 0 the cost is partial and a note is shown. */
-	unpricedMessageCount?: number;
+	/** Assistant messages with usage but no model pricing; when > 0 the cost is partial and a note is shown. */
+	unpricedMessagesWithUsageCount?: number;
 }
 
 export const ChatSummary: FC<ChatSummaryProps> = ({
@@ -24,15 +24,15 @@ export const ChatSummary: FC<ChatSummaryProps> = ({
 	costMicros,
 	isCostLoading,
 	costError,
-	unpricedMessageCount,
+	unpricedMessagesWithUsageCount,
 }) => {
 	const trimmedSummary = summary?.trim();
 	const hasUnpricedMessages =
 		!isCostLoading &&
 		!costError &&
 		costMicros != null &&
-		unpricedMessageCount != null &&
-		unpricedMessageCount > 0;
+		unpricedMessagesWithUsageCount != null &&
+		unpricedMessagesWithUsageCount > 0;
 
 	return (
 		<div className="flex flex-col gap-4">
@@ -68,8 +68,9 @@ export const ChatSummary: FC<ChatSummaryProps> = ({
 
 			{hasUnpricedMessages && (
 				<p className="m-0 text-xs italic text-content-secondary">
-					Excludes {unpricedMessageCount} message
-					{unpricedMessageCount === 1 ? "" : "s"} without model pricing.
+					Excludes {unpricedMessagesWithUsageCount} message
+					{unpricedMessagesWithUsageCount === 1 ? "" : "s"} with usage but
+					without model pricing.
 				</p>
 			)}
 		</div>

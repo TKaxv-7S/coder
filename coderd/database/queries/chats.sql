@@ -2241,7 +2241,7 @@ SELECT
                 OR cm.cache_creation_tokens IS NOT NULL
                 OR cm.cache_read_tokens IS NOT NULL
             )
-    )::bigint AS unpriced_message_count,
+    )::bigint AS unpriced_messages_with_usage_count,
     COALESCE(SUM(cm.input_tokens), 0)::bigint AS total_input_tokens,
     COALESCE(SUM(cm.output_tokens), 0)::bigint AS total_output_tokens,
     COALESCE(SUM(cm.cache_read_tokens), 0)::bigint AS total_cache_read_tokens,
@@ -2340,7 +2340,7 @@ ORDER BY cc.total_cost_micros DESC;
 
 -- name: GetChatModelUsageCostByChatID :one
 WITH target AS (
-    SELECT COALESCE(root_chat_id, id) AS root_chat_id
+    SELECT id AS chat_id
     FROM chats
     WHERE id = @chat_id::uuid
 ), costs AS (
@@ -2358,21 +2358,21 @@ WITH target AS (
                     OR cm.cache_creation_tokens IS NOT NULL
                     OR cm.cache_read_tokens IS NOT NULL
                 )
-        )::bigint AS unpriced_message_count
+        )::bigint AS unpriced_messages_with_usage_count
     FROM chat_messages cm
     JOIN chats c ON c.id = cm.chat_id
-    -- Match by indexed columns, not COALESCE(root_chat_id, id), to avoid a full scan.
-    WHERE (
-        c.id = (SELECT root_chat_id FROM target)
-        OR c.root_chat_id = (SELECT root_chat_id FROM target)
-    )
+    WHERE
+        (
+            c.id = (SELECT chat_id FROM target)
+            OR c.root_chat_id = (SELECT chat_id FROM target)
+        )
         AND cm.role = 'assistant'
 )
 SELECT
-    t.root_chat_id,
+    t.chat_id,
     costs.total_cost_micros,
     costs.priced_message_count,
-    costs.unpriced_message_count
+    costs.unpriced_messages_with_usage_count
 FROM target t
 CROSS JOIN costs;
 

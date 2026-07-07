@@ -1454,18 +1454,18 @@ func (api *API) chatCostSummary(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	response := codersdk.ChatCostSummary{
-		StartDate:                startDate,
-		EndDate:                  endDate,
-		TotalCostMicros:          summary.TotalCostMicros,
-		PricedMessageCount:       summary.PricedMessageCount,
-		UnpricedMessageCount:     summary.UnpricedMessageCount,
-		TotalInputTokens:         summary.TotalInputTokens,
-		TotalOutputTokens:        summary.TotalOutputTokens,
-		TotalCacheReadTokens:     summary.TotalCacheReadTokens,
-		TotalCacheCreationTokens: summary.TotalCacheCreationTokens,
-		TotalRuntimeMs:           summary.TotalRuntimeMs,
-		ByModel:                  modelBreakdowns,
-		ByChat:                   chatBreakdowns,
+		StartDate:                      startDate,
+		EndDate:                        endDate,
+		TotalCostMicros:                summary.TotalCostMicros,
+		PricedMessageCount:             summary.PricedMessageCount,
+		UnpricedMessagesWithUsageCount: summary.UnpricedMessagesWithUsageCount,
+		TotalInputTokens:               summary.TotalInputTokens,
+		TotalOutputTokens:              summary.TotalOutputTokens,
+		TotalCacheReadTokens:           summary.TotalCacheReadTokens,
+		TotalCacheCreationTokens:       summary.TotalCacheCreationTokens,
+		TotalRuntimeMs:                 summary.TotalRuntimeMs,
+		ByModel:                        modelBreakdowns,
+		ByChat:                         chatBreakdowns,
 	}
 	if usageStatus != nil {
 		response.UsageLimit = usageStatus
@@ -2229,7 +2229,12 @@ func (api *API) getChatCost(rw http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	chat := httpmw.ChatParam(r)
 
-	row, err := api.Database.GetChatModelUsageCostByChatID(ctx, chat.ID)
+	rootChatID := chat.ID
+	if chat.RootChatID.Valid {
+		rootChatID = chat.RootChatID.UUID
+	}
+
+	row, err := api.Database.GetChatModelUsageCostByChatID(ctx, rootChatID)
 	if err != nil {
 		if httpapi.Is404Error(err) {
 			httpapi.ResourceNotFound(rw)
@@ -2243,10 +2248,10 @@ func (api *API) getChatCost(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	httpapi.Write(ctx, rw, http.StatusOK, codersdk.ChatCost{
-		RootChatID:           row.RootChatID,
-		TotalCostMicros:      row.TotalCostMicros,
-		PricedMessageCount:   row.PricedMessageCount,
-		UnpricedMessageCount: row.UnpricedMessageCount,
+		ChatID:                         row.ChatID,
+		TotalCostMicros:                row.TotalCostMicros,
+		PricedMessageCount:             row.PricedMessageCount,
+		UnpricedMessagesWithUsageCount: row.UnpricedMessagesWithUsageCount,
 	})
 }
 

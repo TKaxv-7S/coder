@@ -1924,6 +1924,8 @@ export const chatCostSummary = (user = "me", params?: ChatCostDateParams) => ({
 export const chatCostKey = (chatId: string) =>
 	[...chatsKey, chatId, "cost"] as const;
 
+// Chat cost changes only when a new assistant message is priced, so a short
+// stale window refreshes the sidebar without refetching on every render.
 const ASSISTANT_MESSAGE_PRICING_STALE_MS = 30_000;
 
 export const chatCost = (chatId: string) => ({

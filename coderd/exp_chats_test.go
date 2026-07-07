@@ -10394,7 +10394,7 @@ func assertChatCostSummary(t *testing.T, summary codersdk.ChatCostSummary, model
 
 	require.Equal(t, int64(1000), summary.TotalCostMicros)
 	require.Equal(t, int64(2), summary.PricedMessageCount)
-	require.Equal(t, int64(0), summary.UnpricedMessageCount)
+	require.Equal(t, int64(0), summary.UnpricedMessagesWithUsageCount)
 	require.Equal(t, int64(200), summary.TotalInputTokens)
 	require.Equal(t, int64(100), summary.TotalOutputTokens)
 	require.Equal(t, int64(4000), summary.TotalRuntimeMs)
@@ -10514,10 +10514,10 @@ func TestGetChatCost(t *testing.T) {
 
 		cost, err := f.Client.GetChatCost(ctx, f.ChatID)
 		require.NoError(t, err)
-		require.Equal(t, f.ChatID, cost.RootChatID)
+		require.Equal(t, f.ChatID, cost.ChatID)
 		require.Equal(t, int64(1000), cost.TotalCostMicros)
 		require.Equal(t, int64(2), cost.PricedMessageCount)
-		require.Equal(t, int64(0), cost.UnpricedMessageCount)
+		require.Equal(t, int64(0), cost.UnpricedMessagesWithUsageCount)
 	})
 
 	t.Run("RollsUpChildChats", func(t *testing.T) {
@@ -10560,14 +10560,15 @@ func TestGetChatCost(t *testing.T) {
 		// Root query rolls up the child's cost.
 		rootCost, err := client.GetChatCost(ctx, rootChat.ID)
 		require.NoError(t, err)
-		require.Equal(t, rootChat.ID, rootCost.RootChatID)
+		require.Equal(t, rootChat.ID, rootCost.ChatID)
 		require.Equal(t, int64(750), rootCost.TotalCostMicros)
 		require.Equal(t, int64(2), rootCost.PricedMessageCount)
 
-		// Child query resolves to the same root rollup.
+		// Child route IDs are normalized to the root chat before the
+		// cost query so the summary panel shows whole-chat cost.
 		childCost, err := client.GetChatCost(ctx, childChat.ID)
 		require.NoError(t, err)
-		require.Equal(t, rootChat.ID, childCost.RootChatID)
+		require.Equal(t, rootChat.ID, childCost.ChatID)
 		require.Equal(t, int64(750), childCost.TotalCostMicros)
 		require.Equal(t, int64(2), childCost.PricedMessageCount)
 	})
@@ -10606,7 +10607,7 @@ func TestGetChatCost(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, int64(400), cost.TotalCostMicros)
 		require.Equal(t, int64(1), cost.PricedMessageCount)
-		require.Equal(t, int64(1), cost.UnpricedMessageCount)
+		require.Equal(t, int64(1), cost.UnpricedMessagesWithUsageCount)
 	})
 
 	t.Run("MemberCannotReadOtherUsersChat", func(t *testing.T) {
@@ -10654,10 +10655,10 @@ func TestGetChatCost(t *testing.T) {
 
 		cost, err := client.GetChatCost(ctx, chat.ID)
 		require.NoError(t, err)
-		require.Equal(t, chat.ID, cost.RootChatID)
+		require.Equal(t, chat.ID, cost.ChatID)
 		require.Equal(t, int64(0), cost.TotalCostMicros)
 		require.Equal(t, int64(0), cost.PricedMessageCount)
-		require.Equal(t, int64(0), cost.UnpricedMessageCount)
+		require.Equal(t, int64(0), cost.UnpricedMessagesWithUsageCount)
 	})
 
 	t.Run("ExcludesNonAssistantMessages", func(t *testing.T) {
@@ -10692,7 +10693,7 @@ func TestGetChatCost(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, int64(600), cost.TotalCostMicros)
 		require.Equal(t, int64(1), cost.PricedMessageCount)
-		require.Equal(t, int64(0), cost.UnpricedMessageCount)
+		require.Equal(t, int64(0), cost.UnpricedMessagesWithUsageCount)
 	})
 }
 
@@ -10889,7 +10890,7 @@ func TestChatCostSummary_UnpricedMessages(t *testing.T) {
 
 	require.Equal(t, int64(500), summary.TotalCostMicros)
 	require.Equal(t, int64(1), summary.PricedMessageCount)
-	require.Equal(t, int64(1), summary.UnpricedMessageCount)
+	require.Equal(t, int64(1), summary.UnpricedMessagesWithUsageCount)
 	require.Equal(t, int64(300), summary.TotalInputTokens)
 	require.Equal(t, int64(125), summary.TotalOutputTokens)
 }

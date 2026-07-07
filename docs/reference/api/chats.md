@@ -1300,10 +1300,10 @@ Experimental: this endpoint is subject to change.
 
 ```json
 {
+  "chat_id": "efc9fe20-a1e5-4a8c-9c48-f1b30c1e4f86",
   "priced_message_count": 0,
-  "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
   "total_cost_micros": 0,
-  "unpriced_message_count": 0
+  "unpriced_messages_with_usage_count": 0
 }
 ```
 
