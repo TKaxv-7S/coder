@@ -3153,6 +3153,17 @@ func (api *API) postChatMessages(rw http.ResponseWriter, r *http.Request) {
 	if req.ModelConfigID != nil {
 		modelConfigID = *req.ModelConfigID
 	}
+	// Reject explicitly requested models the user cannot use (for example
+	// when the model or its provider is disabled) instead of admitting the
+	// message and failing later at runtime. A nil ID keeps the chat's
+	// current model and is validated by the daemon's fallback logic.
+	if modelConfigID != uuid.Nil {
+		status, resp := api.validateUserChatModelConfigAvailable(ctx, apiKey.UserID, modelConfigID)
+		if resp != nil {
+			httpapi.Write(ctx, rw, status, *resp)
+			return
+		}
+	}
 
 	sendResult, sendErr := api.chatDaemon.SendMessage(
 		ctx,
@@ -3310,6 +3321,17 @@ func (api *API) patchChatMessage(rw http.ResponseWriter, r *http.Request) {
 	editModelConfigID := uuid.Nil
 	if req.ModelConfigID != nil {
 		editModelConfigID = *req.ModelConfigID
+	}
+	// Reject explicitly requested models the user cannot use (for example
+	// when the model or its provider is disabled) instead of admitting the
+	// edit and failing later at runtime. A nil ID keeps the chat's current
+	// model and is validated by the daemon's fallback logic.
+	if editModelConfigID != uuid.Nil {
+		status, resp := api.validateUserChatModelConfigAvailable(ctx, apiKey.UserID, editModelConfigID)
+		if resp != nil {
+			httpapi.Write(ctx, rw, status, *resp)
+			return
+		}
 	}
 
 	editResult, editErr := api.chatDaemon.EditMessage(ctx, chatd.EditMessageOptions{
@@ -4621,6 +4643,12 @@ func (api *API) resolveCreateChatModelConfigID(
 				Message: "Invalid model config ID.",
 			}
 		}
+		// Reject explicitly requested models the user cannot use (for
+		// example when the model or its provider is disabled) instead of
+		// admitting the chat and failing later at runtime.
+		if status, resp := api.validateUserChatModelConfigAvailable(ctx, userID, *req.ModelConfigID); resp != nil {
+			return uuid.Nil, status, resp
+		}
 		return *req.ModelConfigID, 0, nil
 	}
 
@@ -5463,15 +5491,13 @@ func (api *API) putChatAdvisorConfig(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.ModelConfigID != uuid.Nil {
-		// Use system context because GetChatModelConfigByID requires
-		// deployment-config read access, which can be broader than the
-		// handler's explicit update check. The lookup only validates that
-		// the referenced model exists before persisting deployment config.
-		//nolint:gocritic // This admin-authorized validation lookup intentionally bypasses read authz.
-		if _, err := api.Database.GetChatModelConfigByID(dbauthz.AsSystemRestricted(ctx), req.ModelConfigID); err != nil {
+		// Require the referenced model config and its provider to be
+		// enabled so a deployment-wide advisor override never points at a
+		// model that cannot serve requests.
+		if _, err := lookupEnabledChatModelConfigByID(ctx, api.Database, req.ModelConfigID); err != nil {
 			if errors.Is(err, sql.ErrNoRows) || httpapi.Is404Error(err) {
 				httpapi.Write(ctx, rw, http.StatusBadRequest, codersdk.Response{
-					Message: fmt.Sprintf("model_config_id %q does not match any existing model config.", req.ModelConfigID),
+					Message: fmt.Sprintf("model_config_id %q does not match any enabled model config.", req.ModelConfigID),
 				})
 				return
 			}

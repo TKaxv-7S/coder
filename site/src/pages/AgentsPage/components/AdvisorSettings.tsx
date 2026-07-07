@@ -15,6 +15,10 @@ import {
 	SelectValue,
 } from "#/components/Select/Select";
 import { useTemporarySavedState } from "#/components/TemporarySavedState/TemporarySavedState";
+import {
+	filterConfigsWithEnabledProvider,
+	type ProviderInfo,
+} from "#/pages/AgentsPage/utils/modelOptions";
 import { AgentSettingLayout } from "#/pages/AISettingsPage/CoderAgentsPage/components/AgentSettingLayout";
 import { cn } from "#/utils/cn";
 
@@ -33,6 +37,7 @@ interface AdvisorSettingsProps {
 	isAdvisorConfigFetching: boolean;
 	isAdvisorConfigLoadError: boolean;
 	modelConfigs: readonly ChatModelConfig[];
+	providerInfoByID: ReadonlyMap<string, ProviderInfo>;
 	modelConfigsError: unknown;
 	isLoadingModelConfigs: boolean;
 	isFetchingModelConfigs: boolean;
@@ -124,6 +129,7 @@ export const AdvisorSettings: FC<AdvisorSettingsProps> = ({
 	isAdvisorConfigFetching,
 	isAdvisorConfigLoadError,
 	modelConfigs,
+	providerInfoByID,
 	modelConfigsError,
 	isLoadingModelConfigs,
 	isFetchingModelConfigs,
@@ -136,7 +142,12 @@ export const AdvisorSettings: FC<AdvisorSettingsProps> = ({
 	const maxOutputTokensId = useId();
 	const { isSavedVisible, showSavedState } = useTemporarySavedState();
 	const hasLoadedAdvisorConfig = advisorConfigData !== undefined;
-	const enabledModelConfigs = modelConfigs.filter((config) => config.enabled);
+	// Offer only models that can actually serve requests: the config and
+	// its provider row must both be enabled.
+	const enabledModelConfigs = filterConfigsWithEnabledProvider(
+		modelConfigs.filter((config) => config.enabled),
+		providerInfoByID,
+	);
 
 	const form = useFormik<AdvisorSettingsFormValues>({
 		enableReinitialize: true,
@@ -145,17 +156,21 @@ export const AdvisorSettings: FC<AdvisorSettingsProps> = ({
 		validate: validateAdvisorConfig,
 		onSubmit: (values, { resetForm }) => {
 			// If the last committed model override references a model config
-			// that no longer exists, the backend rejects the stale ID with a
-			// 400. Clear the override so a save stays reliable in that edge
-			// case. Only scrub when model configs have loaded successfully and
-			// no refetch is in flight.
+			// that no longer exists or is no longer enabled (including a
+			// disabled provider), the backend rejects the stale ID with a
+			// 400. Clear the override so a save stays reliable; the runtime
+			// already ignores unavailable overrides and falls back to the
+			// chat model. Only scrub when model configs have loaded
+			// successfully and no refetch is in flight.
 			let source = values;
 			if (
 				!isUnsetModelConfigId(source.model_config_id) &&
 				!isLoadingModelConfigs &&
 				!isFetchingModelConfigs &&
 				!modelConfigsError &&
-				!modelConfigs.some((config) => config.id === source.model_config_id)
+				!enabledModelConfigs.some(
+					(config) => config.id === source.model_config_id,
+				)
 			) {
 				source = { ...source, model_config_id: "" };
 			}
