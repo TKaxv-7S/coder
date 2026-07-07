@@ -19,7 +19,7 @@ import (
 )
 
 //nolint:revive // Long function is fine for a sequential release flow.
-func runRelease(ctx context.Context, inv *serpent.Invocation, executor ReleaseExecutor, ghAvailable, gpgConfigured, dryRun bool) error {
+func runRelease(ctx context.Context, inv *serpent.Invocation, executor ReleaseExecutor, ghAvailable, dryRun bool) error {
 	w := inv.Stderr
 
 	// --- Release landscape ---
@@ -451,43 +451,51 @@ func runRelease(ctx context.Context, inv *serpent.Invocation, executor ReleaseEx
 		if newVersion.Major == prevVersion.Major && newVersion.Minor == prevVersion.Minor && newVersion.Patch > prevVersion.Patch {
 			infof(w, "Checking for breaking changes in patch release...")
 
+			// Scope the check to commits added since the previous
+			// release on this branch. A change is breaking when the
+			// conventional commit title carries a "!" or the source
+			// PR is labeled release/breaking; both are evaluated over
+			// this same range so breaking changes from earlier
+			// releases are not reported again.
 			commitRange := prevVersion.String() + "..HEAD"
 			commits, err := commitLog(commitRange)
 			if err != nil {
 				return xerrors.Errorf("reading commit log: %w", err)
 			}
 
+			var prMeta *prMetadataMaps
+			if ghAvailable {
+				prMeta, err = ghBuildPRMetadataMap(commits)
+				if err != nil {
+					warnf(w, "Failed to fetch PR metadata: %v", err)
+				}
+			}
+			if prMeta == nil {
+				prMeta = &prMetadataMaps{
+					bySHA:    make(map[string]prMetadata),
+					byNumber: make(map[int]prMetadata),
+				}
+			}
+
 			var breakingCommits []commitEntry
 			for _, c := range commits {
-				if breakingCommitRe.MatchString(c.Title) {
+				meta := prMeta.lookupCommit(c.FullSHA, c.PRCount)
+				// Skip dependabot commits, matching release notes.
+				if meta.Author == "dependabot" || meta.Author == "app/dependabot" {
+					continue
+				}
+				if categorizeCommit(c.Title, meta.Labels) == "breaking" {
 					breakingCommits = append(breakingCommits, c)
 				}
 			}
 
-			// Check PR labels for release/breaking.
-			var breakingPRLabeled []ghPR
-			if ghAvailable {
-				breakingPRLabeled, err = ghListPRsWithLabel(currentBranch, "release/breaking")
-				if err != nil {
-					warnf(w, "Failed to check PR labels: %v", err)
-				}
-			}
-
-			if len(breakingCommits) > 0 || len(breakingPRLabeled) > 0 {
+			if len(breakingCommits) > 0 {
 				fmt.Fprintln(w)
 				warnf(w, "BREAKING CHANGES detected in a PATCH release — this violates semver!")
 				fmt.Fprintln(w)
-				if len(breakingCommits) > 0 {
-					fmt.Fprintln(w, "  Breaking commits (by conventional commit prefix):")
-					for _, c := range breakingCommits {
-						fmt.Fprintf(w, "    - %s %s\n", c.SHA, c.Title)
-					}
-				}
-				if len(breakingPRLabeled) > 0 {
-					fmt.Fprintln(w, "  PRs labeled release/breaking:")
-					for _, pr := range breakingPRLabeled {
-						fmt.Fprintf(w, "    - #%d %s\n", pr.Number, pr.Title)
-					}
+				fmt.Fprintf(w, "  Breaking changes since %s:\n", prevVersion)
+				for _, c := range breakingCommits {
+					fmt.Fprintf(w, "    - %s %s\n", c.SHA, c.Title)
 				}
 				fmt.Fprintln(w)
 				if err := confirmWithDefault(inv, "Continue with patch release despite breaking changes?", cliui.ConfirmNo); err != nil {
@@ -767,7 +775,7 @@ func runRelease(ctx context.Context, inv *serpent.Invocation, executor ReleaseEx
 		if err := confirm(inv, "Create tag?"); err != nil {
 			return xerrors.New("cannot proceed without a tag")
 		}
-		if err := executor.CreateTag(ctx, newVersion.String(), ref, "Release "+newVersion.String(), gpgConfigured); err != nil {
+		if err := executor.CreateTag(ctx, newVersion.String(), ref, "Release "+newVersion.String()); err != nil {
 			return xerrors.Errorf("creating tag: %w", err)
 		}
 		successf(w, "Tag %s created.", newVersion)
