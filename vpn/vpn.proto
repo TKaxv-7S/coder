@@ -299,5 +299,4 @@ message WakeRequest {}
 
 message WakeResponse {
 	bool success = 1;
-	string error_message = 2;
 }

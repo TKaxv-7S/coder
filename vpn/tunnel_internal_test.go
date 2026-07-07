@@ -202,7 +202,37 @@ func TestTunnel_Wake(t *testing.T) {
 	client := newFakeClient(ctx, t)
 	conn := newFakeConn(tailnet.WorkspaceUpdate{}, time.Time{})
 
-	_, mgr := setupTunnel(t, ctx, client, quartz.NewMock(t))
+	mClock := quartz.NewMock(t)
+	_, mgr := setupTunnel(t, ctx, client, mClock)
+
+	sendWake := func() *TunnelMessage {
+		wakeCh := make(chan *TunnelMessage, 1)
+		go func() {
+			defer close(wakeCh)
+			r, err := mgr.unaryRPC(ctx, &ManagerMessage{
+				Msg: &ManagerMessage_Wake{
+					Wake: &WakeRequest{},
+				},
+			})
+			assert.NoError(t, err)
+			wakeCh <- r
+		}()
+		return testutil.TryReceive(ctx, t, wakeCh)
+	}
+	requireNoRebind := func() {
+		// The tunnel rebinds before replying to the wake RPC, so by the
+		// time we have the response any rebind would already be buffered.
+		select {
+		case <-conn.rebinds:
+			t.Fatal("unexpected rebind")
+		default:
+		}
+	}
+
+	// Waking before the tunnel is started must not rebind.
+	wakeResp := sendWake()
+	require.True(t, wakeResp.GetWake().GetSuccess())
+	requireNoRebind()
 
 	startCh := make(chan *TunnelMessage, 1)
 	go func() {
@@ -223,21 +253,21 @@ func TestTunnel_Wake(t *testing.T) {
 	startResp := testutil.TryReceive(ctx, t, startCh)
 	require.NotNil(t, startResp.GetStart())
 
-	wakeCh := make(chan *TunnelMessage, 1)
-	go func() {
-		defer close(wakeCh)
-		r, err := mgr.unaryRPC(ctx, &ManagerMessage{
-			Msg: &ManagerMessage_Wake{
-				Wake: &WakeRequest{},
-			},
-		})
-		assert.NoError(t, err)
-		wakeCh <- r
-	}()
-
-	testutil.TryReceive(ctx, t, conn.rebinds)
-	wakeResp := testutil.TryReceive(ctx, t, wakeCh)
+	// The first wake after start triggers a rebind.
+	wakeResp = sendWake()
 	require.True(t, wakeResp.GetWake().GetSuccess())
+	testutil.TryReceive(ctx, t, conn.rebinds)
+
+	// A wake within the debounce window is dropped but still succeeds.
+	wakeResp = sendWake()
+	require.True(t, wakeResp.GetWake().GetSuccess())
+	requireNoRebind()
+
+	// After the debounce window elapses, a wake rebinds again.
+	mClock.Advance(wakeRebindDebounce).MustWait(ctx)
+	wakeResp = sendWake()
+	require.True(t, wakeResp.GetWake().GetSuccess())
+	testutil.TryReceive(ctx, t, conn.rebinds)
 }
 
 func TestTunnel_PeerUpdate(t *testing.T) {

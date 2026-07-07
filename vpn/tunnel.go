@@ -165,8 +165,11 @@ func (t *Tunnel) handleRPC(req *request[*TunnelMessage, *ManagerMessage]) {
 			},
 		}
 	case *ManagerMessage_Wake:
-		t.logger.Info(t.ctx, "handling system wake")
-		t.updater.rebind()
+		if t.updater.rebind() {
+			t.logger.Info(t.ctx, "handling system wake; rebinding")
+		} else {
+			t.logger.Debug(t.ctx, "ignoring system wake; tunnel is not running or a rebind happened recently")
+		}
 		resp.Msg = &TunnelMessage_Wake{
 			Wake: &WakeResponse{Success: true},
 		}
@@ -344,6 +347,10 @@ type updater struct {
 	// workspaces contains the workspaces to which agents are currently connected via the tunnel.
 	workspaces map[uuid.UUID]tailnet.Workspace
 	conn       Conn
+	// lastRebind is when the last wake-triggered rebind ran. It debounces
+	// wake events so duplicates arriving in quick succession collapse into
+	// a single rebind.
+	lastRebind time.Time
 
 	clock quartz.Clock
 }
@@ -557,14 +564,32 @@ func (u *updater) stop() error {
 	return err
 }
 
-func (u *updater) rebind() {
+// wakeRebindDebounce is the minimum interval between wake-triggered rebinds.
+// Each rebind resets which peer paths magicsock trusts, briefly forcing
+// traffic onto both the direct path and DERP until the paths are re-verified,
+// so wake events arriving in quick succession must not each trigger a rebind.
+const wakeRebindDebounce = 5 * time.Second
+
+// rebind resets the tunnel's network bindings and rediscovers peer paths. It
+// reports whether a rebind ran; rebinds within wakeRebindDebounce of the
+// previous one are dropped, as is a rebind while the tunnel is not running.
+func (u *updater) rebind() bool {
 	u.mu.Lock()
 	conn := u.conn
+	if conn == nil {
+		u.mu.Unlock()
+		return false
+	}
+	now := u.clock.Now()
+	if now.Sub(u.lastRebind) < wakeRebindDebounce {
+		u.mu.Unlock()
+		return false
+	}
+	u.lastRebind = now
 	u.mu.Unlock()
 
-	if conn != nil {
-		conn.Rebind()
-	}
+	conn.Rebind()
+	return true
 }
 
 // sendAgentUpdate sends a peer update message to the manager with the current
