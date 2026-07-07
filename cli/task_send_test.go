@@ -305,8 +305,16 @@ func Test_TaskSend(t *testing.T) {
 		t.Parallel()
 
 		// Given: An active task whose app is in "working" state.
+		//
+		// We skip the default "idle" PatchAppStatus in setup and insert
+		// a single "working" row directly. On Windows the time.Now()
+		// resolution is coarser than dbtime.Now()'s microsecond rounding,
+		// so two back-to-back inserts can land with an identical
+		// created_at and GetLatestWorkspaceAppStatusesByWorkspaceIDs
+		// would pick either row. See DEVEX-381 for the full flake
+		// analysis and Spike's coder/coder#21332 for prior art.
 		setupCtx := testutil.Context(t, testutil.WaitLong)
-		setup := setupCLITaskTest(setupCtx, t, fakeAgentAPITaskSendOK(t, "some task input", "some task response"))
+		setup := setupCLITaskTest(setupCtx, t, fakeAgentAPITaskSendOK(t, "some task input", "some task response"), withoutInitialAppStatus())
 
 		// Move the app into "working" state before running the command.
 		agentClient := agentsdk.New(setup.userClient.URL, agentsdk.WithFixedToken(setup.agentToken))

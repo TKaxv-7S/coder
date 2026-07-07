@@ -118,9 +118,14 @@ ORDER BY created_at DESC, id DESC
 LIMIT 1;
 
 -- name: GetLatestWorkspaceAppStatusesByWorkspaceIDs :many
+-- NOTE(jakehwll): the id DESC tiebreaker keeps the "latest" pick stable when
+-- two rows share the same created_at. dbtime.Now() rounds to microseconds and
+-- Windows time.Now() resolution is coarser than that, so back-to-back inserts
+-- can otherwise return either row (see coder/coder#25648, DEVEX-381).
+-- Matches the tiebreaker in GetLatestWorkspaceAppStatusByAppID above.
 SELECT DISTINCT ON (workspace_id)
   *
 FROM workspace_app_statuses
 WHERE workspace_id = ANY(@ids :: uuid[])
-ORDER BY workspace_id, created_at DESC;
+ORDER BY workspace_id, created_at DESC, id DESC;
 
