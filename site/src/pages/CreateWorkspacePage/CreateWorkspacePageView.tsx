@@ -393,18 +393,18 @@ export const CreateWorkspacePageView: FC<CreateWorkspacePageViewProps> = ({
 		);
 
 	return (
-		<>
-			<div className="sticky top-5 ml-10">
-				<button
+		<div className="grid grid-cols-1 gap-6 w-full px-4 pb-96 lg:grid-cols-[minmax(8rem,1fr)_minmax(0,768px)_minmax(8rem,1fr)] lg:px-10">
+			<div className="lg:sticky lg:top-5 lg:self-start lg:pt-[68px]">
+				<Button
 					onClick={onCancel}
-					type="button"
-					className="flex items-center gap-2 bg-transparent border-none text-content-secondary hover:text-content-primary translate-y-[68px]"
+					variant="subtle"
+					className="-ml-2 justify-start"
 				>
-					<ArrowLeftIcon size={20} />
+					<ArrowLeftIcon />
 					Go back
-				</button>
+				</Button>
 			</div>
-			<div className="flex flex-col gap-6 w-full max-w-screen-md mx-auto pb-96">
+			<div className="flex flex-col gap-6 w-full min-w-0 lg:col-start-2">
 				<header className="flex flex-col items-start gap-3 mt-10">
 					<div className="flex items-center gap-2 justify-between w-full">
 						<span className="flex items-center gap-2">
@@ -764,6 +764,6 @@ export const CreateWorkspacePageView: FC<CreateWorkspacePageViewProps> = ({
 					</div>
 				</form>
 			</div>
-		</>
+		</div>
 	);
 };

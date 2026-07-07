@@ -329,6 +329,20 @@ const parameterCheckbox: PreviewParameter = {
 	ephemeral: false,
 };
 
+export const NarrowViewport: Story = {
+	parameters: {
+		chromatic: { viewports: [390] },
+	},
+	args: {
+		parameters: [parameterInput, parameterDropdown, parameterTextarea],
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		const backButton = await canvas.findByRole("button", { name: /go back/i });
+		expect(backButton).toBeVisible();
+	},
+};
+
 export const WithParameters: Story = {
 	args: {
 		parameters: [
