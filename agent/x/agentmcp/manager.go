@@ -910,6 +910,7 @@ func (m *Manager) createTransport(ctx context.Context, cfg ServerConfig) (transp
 			transport.WithCommandFunc(func(ctx context.Context, command string, cmdEnv []string, args []string) (*exec.Cmd, error) {
 				cmd := m.execer.CommandContext(ctx, command, args...)
 				cmd.Env = cmdEnv
+				cmd.Dir = string(os.PathSeparator)
 				return cmd, nil
 			}),
 		), nil

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"testing"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"cdr.dev/slog/v3/sloggers/slogtest"
 	"github.com/coder/coder/v2/agent/agentexec"
 	"github.com/coder/coder/v2/codersdk/workspacesdk"
+	"github.com/coder/coder/v2/pty"
 	"github.com/coder/coder/v2/testutil"
 	"github.com/coder/quartz"
 )
@@ -209,6 +211,41 @@ func TestConvertResult(t *testing.T) {
 // server subprocess remains alive after connectServer returns. This is a
 // regression test for a bug where the subprocess was tied to a short-lived
 // connectCtx and killed as soon as the context was canceled.
+type recordingExecer struct {
+	cmds []*exec.Cmd
+}
+
+func (e *recordingExecer) CommandContext(ctx context.Context, command string, args ...string) *exec.Cmd {
+	cmd := exec.CommandContext(ctx, command, args...)
+	e.cmds = append(e.cmds, cmd)
+	return cmd
+}
+
+func (*recordingExecer) PTYCommandContext(context.Context, string, ...string) *pty.Cmd {
+	panic("PTYCommandContext is not used by MCP stdio transport")
+}
+
+func TestCreateTransport_StdioUsesStableWorkingDirectory(t *testing.T) {
+	t.Parallel()
+
+	ctx := testutil.Context(t, testutil.WaitShort)
+	execer := &recordingExecer{}
+	m := &Manager{execer: execer}
+
+	tr, err := m.createTransport(ctx, ServerConfig{
+		Name:      "fake",
+		Transport: "stdio",
+		Command:   "cat",
+	})
+	require.NoError(t, err)
+
+	require.NoError(t, tr.Start(ctx))
+	t.Cleanup(func() { _ = tr.Close() })
+
+	require.Len(t, execer.cmds, 1)
+	assert.Equal(t, string(os.PathSeparator), execer.cmds[0].Dir)
+}
+
 func TestConnectServer_StdioProcessSurvivesConnect(t *testing.T) {
 	t.Parallel()
 
