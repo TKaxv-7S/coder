@@ -524,9 +524,8 @@ No other input states are supported.
 
 ### `PATCH /api/experimental/chats/{chat}/goal`
 
-This endpoint applies goal lifecycle mutations without inserting a chat
-message. Most actions only mutate the current goal row and publish a
-`goal_change` watch event.
+This endpoint applies goal lifecycle mutations. Most actions only mutate the
+current goal row and publish a `goal_change` watch event.
 
 For `complete`, a running root chat also uses `Interrupt(goal_complete)` so
 an active agent turn is canceled through the normal interruption path:
@@ -537,6 +536,14 @@ an active agent turn is canceled through the normal interruption path:
 When the transition lands in `I0` or `I1`, the chat is later picked up by a
 `ChatRunner` to apply `FinishInterruption(partial?)`, preserving any partial
 assistant output and queued backlog.
+
+For `resume`, the chat must be idle (`W` or `E0` with no queued messages) and
+plan mode must be off; otherwise the endpoint returns 409. On success, the
+same transaction that reactivates the goal appends a hidden model-only kick
+message via `SendMessage`, starting a turn:
+
+- `W -> resume goal + SendMessage(kick) -> R0`
+- `E0 -> resume goal + SendMessage(kick) -> R0`
 
 Other input states do not get an execution-state transition from this endpoint.
 
@@ -848,11 +855,30 @@ The generation goroutine supports:
 
 When the deployment-wide chat goals setting is enabled and the root chat has an active goal, the generation goroutine augments the turn:
 
-- The system prompt carries the active goal. Root, non-plan, non-explore turns get the `complete_goal` tool; all turns get the read-only `get_goal` tool.
-- A successful `complete_goal` tool result is a stop-after tool: the next decision pass finishes the turn instead of generating another response. `complete_goal` verifies a fence (worker ID, runner ID, running status, history version) inside its transaction so a stale generation cannot complete the goal after an interrupt or worker takeover.
-- If the decision logic finds the current history complete while the active goal is still active, it inserts one hidden goal-completion reminder: a model-only user message committed via `CommitStep`, which keeps the chat in `R0`/`R1` so another generation pass runs. Before inserting, the goroutine rechecks (in the same transaction) that goals are still enabled, the chat is still owned by the task, no queued user message exists, and the same goal is still active.
-- At most one reminder is inserted per user turn. Reminder accounting loads model-only user messages independently of the compaction prompt window, so a compaction summary cannot hide an earlier reminder and cause a duplicate. If the model ignores the reminder and completes again, the turn finishes normally with a warning log and the goal stays active.
-- Reminder messages are excluded from user-turn boundaries for step counting and stop-after detection, so they extend the current turn instead of starting a new one.
+- The system prompt carries the active goal. Root, non-plan, non-explore turns get the `complete_goal` and `block_goal` tools; all turns get the read-only `get_goal` tool.
+- Successful `complete_goal` and `block_goal` tool results are stop-after tools: the next decision pass finishes the turn instead of generating another response. Both verify a fence (worker ID, runner ID, running status, history version) inside their transaction so a stale generation cannot mutate the goal after an interrupt or worker takeover. `complete_goal` marks the goal complete with a summary; `block_goal` marks it blocked with a model-supplied reason and is the model's escape hatch when it cannot proceed without the user.
+
+###### Goal continuation loop
+
+An `active` goal means work is happening or about to happen. The loop that maintains this invariant is event-driven: every turn boundary re-evaluates the goal inside the state-machine transaction that finishes the turn, so it is crash-safe and needs no scheduler.
+
+When a generation turn finishes (the `FinishTurn` transition), the same `machine.Update` transaction evaluates the current goal:
+
+- If `FinishTurn` promoted a queued user message (`R1` path), nothing happens: user input always wins over continuation.
+- Otherwise, for a root chat with goals enabled, plan mode off, and an `active` goal:
+    - If the goal's `continuation_count` has reached the cap (`ChatGoalMaxContinuationTurns`, 10), the goal is paused with reason `turn_limit`.
+    - If the user's chat usage limit is exhausted, the goal is paused with reason `usage_limit`. Continuation turns re-check the usage limit at every kick, unlike user-started turns, which only check at admission.
+    - Otherwise the transaction increments `continuation_count` and appends a hidden continuation message (a model-only user message via `SendMessage`), which moves the chat from `W` back to `R0`. The runner that finished the turn picks the state hint up and spawns the next generation task; no other component is involved.
+- If the turn finishes in an error state, an active goal is paused with reason `error`, so a persistent failure cannot spin the loop.
+- `InterruptChat` (the user's Stop gesture) pauses an active root goal with reason `interrupt` in the interrupt transaction.
+
+Goal pauses are one DB status (`paused`) plus a `paused_reason` column (`user`, `interrupt`, `turn_limit`, `usage_limit`, `error`). `block_goal` produces the separate `blocked` status with a `blocked_reason`. Both stop the loop until the user resumes the goal.
+
+Resuming (the `resume` goal mutation) admits only when the chat is idle (`W`/`E0`, no queued messages) and plan mode is off; otherwise it returns 409. On success, the same transaction flips the goal to `active`, resets `continuation_count`, clears the reasons, and appends a hidden resume kick message that starts a turn immediately, so the goal never lands `active` on an idle chat.
+
+The loop is bounded by: per-turn step limit (`maxSteps`) x continuation cap (10) x usage limits (checked at every kick) x the experiment gate.
+
+Hidden goal messages (continuation and resume kick) are model-only user messages: the UI never renders them, but they are always loaded into the generation context even when compaction hides other history. They act as turn boundaries: step counting restarts at each continuation, unlike the removed within-turn reminder mechanism, which extended the current turn. Legacy reminder messages may still exist in old histories and keep their mid-turn (non-boundary) role.
 
 #### Interrupt goroutine
 
