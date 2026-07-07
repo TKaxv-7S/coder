@@ -28,7 +28,7 @@ export const groups = () => {
 	} satisfies UseQueryOptions<Group[]>;
 };
 
-const getGroupsByOrganizationQueryKey = (organization: string) => [
+export const getGroupsByOrganizationQueryKey = (organization: string) => [
 	"organization",
 	organization,
 	"groups",

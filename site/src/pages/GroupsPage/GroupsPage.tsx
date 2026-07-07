@@ -29,13 +29,14 @@ const GroupsPage: FC = () => {
 	// the cost-control feature is stable.
 	const aibridgeVisible =
 		Boolean(aibridge) && experiments.includes("ai-gateway-cost-control");
+	const queriesEnabled = Boolean(groupsEnabled) && Boolean(organization);
 	const groupsQuery = useQuery({
 		...groupsByOrganization(organization?.name ?? ""),
-		enabled: Boolean(organization),
+		enabled: queriesEnabled,
 	});
 	const permissionsQuery = useQuery({
 		...organizationsPermissions([organization?.id ?? ""]),
-		enabled: Boolean(organization),
+		enabled: queriesEnabled,
 	});
 
 	useEffect(() => {
@@ -64,13 +65,36 @@ const GroupsPage: FC = () => {
 		return <EmptyState message="Organization not found" />;
 	}
 
-	if (permissionsQuery.isLoading) {
+	if (groupsEnabled && permissionsQuery.isLoading) {
 		return <Loader />;
 	}
 
 	const title = <title>{pageTitle("Groups")}</title>;
 
 	const permissions = permissionsQuery.data?.[organization.id];
+
+	if (!groupsEnabled) {
+		return (
+			<div className="w-full max-w-screen-2xl pb-10">
+				{title}
+
+				<SettingsHeader>
+					<SettingsHeaderTitle>Groups</SettingsHeaderTitle>
+					<SettingsHeaderDescription>
+						Manage groups for this{" "}
+						{showOrganizations ? "organization" : "deployment"}.
+					</SettingsHeaderDescription>
+				</SettingsHeader>
+
+				<GroupsPageView
+					groups={undefined}
+					canCreateGroup={false}
+					groupsEnabled={groupsEnabled}
+					showAIBudget={aibridgeVisible}
+				/>
+			</div>
+		);
+	}
 
 	if (!permissions?.viewGroups) {
 		return (
