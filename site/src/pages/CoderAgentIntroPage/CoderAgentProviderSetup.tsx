@@ -1,5 +1,6 @@
 import { type CSSProperties, type FC, useState } from "react";
 import { useMutation, useQueryClient } from "react-query";
+import { getErrorMessage } from "#/api/errors";
 import { createAIProviderMutation } from "#/api/queries/aiProviders";
 import { createChatModelConfig } from "#/api/queries/chats";
 import type { AIProviderType } from "#/api/typesGenerated";
@@ -7,6 +8,7 @@ import { Button } from "#/components/Button/Button";
 import { Input } from "#/components/Input/Input";
 import { Label } from "#/components/Label/Label";
 import { Spinner } from "#/components/Spinner/Spinner";
+import { getKnownModelsForProvider } from "#/pages/AgentsPage/components/ChatModelAdminPanel/knownModels";
 import { cn } from "#/utils/cn";
 
 interface CoderAgentProviderSetupProps {
@@ -14,11 +16,18 @@ interface CoderAgentProviderSetupProps {
 	onSkip: () => void;
 }
 
+interface ModelOption {
+	identifier: string;
+	displayName: string;
+	contextLimit?: number;
+}
+
 interface ProviderOption {
 	type: AIProviderType;
 	name: string;
 	defaultBaseUrl: string;
-	models: string[];
+	/** Fallback models for providers without a known-models catalog. */
+	fallbackModels?: ModelOption[];
 }
 
 const providers: ProviderOption[] = [
@@ -26,25 +35,43 @@ const providers: ProviderOption[] = [
 		type: "anthropic",
 		name: "Anthropic",
 		defaultBaseUrl: "https://api.anthropic.com",
-		models: [
-			"claude-sonnet-4-20250514",
-			"claude-3-5-haiku-20241022",
-			"claude-3-5-sonnet-20241022",
-		],
 	},
 	{
 		type: "openai",
 		name: "OpenAI",
 		defaultBaseUrl: "https://api.openai.com/v1",
-		models: ["gpt-4o", "gpt-4o-mini", "o3-mini"],
 	},
 	{
 		type: "google",
 		name: "Google",
 		defaultBaseUrl: "https://generativelanguage.googleapis.com/v1beta",
-		models: ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash"],
+		fallbackModels: [
+			{ identifier: "gemini-2.5-pro", displayName: "Gemini 2.5 Pro" },
+			{ identifier: "gemini-2.5-flash", displayName: "Gemini 2.5 Flash" },
+		],
 	},
 ];
+
+// Keep the intro focused: show a handful of current models rather
+// than the full catalog.
+const maxModelOptions = 5;
+
+/**
+ * Models for a provider, sourced from the shared known-models catalog
+ * used by the AI admin settings, with a static fallback for providers
+ * the catalog doesn't cover.
+ */
+function modelsForProvider(provider: ProviderOption): ModelOption[] {
+	const known = getKnownModelsForProvider(provider.type);
+	if (known.length > 0) {
+		return known.slice(0, maxModelOptions).map((model) => ({
+			identifier: model.modelIdentifier,
+			displayName: model.displayName,
+			contextLimit: model.contextLimit,
+		}));
+	}
+	return provider.fallbackModels ?? [];
+}
 
 /**
  * Provider setup shown as the first step of the Coder Agent intro flow.
@@ -63,19 +90,23 @@ export const CoderAgentProviderSetup: FC<CoderAgentProviderSetupProps> = ({
 		useState<ProviderOption | null>(null);
 	const [apiKey, setApiKey] = useState("");
 	const [baseUrl, setBaseUrl] = useState("");
-	const [selectedModel, setSelectedModel] = useState("");
+	const [selectedModel, setSelectedModel] = useState<ModelOption | null>(null);
 
+	const models = selectedProvider ? modelsForProvider(selectedProvider) : [];
 	const isPending = createProvider.isPending || createModelConfig.isPending;
 	const error = createProvider.error || createModelConfig.error;
 
 	const handleProviderSelect = (provider: ProviderOption) => {
 		setSelectedProvider(provider);
 		setBaseUrl(provider.defaultBaseUrl);
-		setSelectedModel(provider.models[0]);
+		setSelectedModel(modelsForProvider(provider)[0] ?? null);
 	};
 
 	const handleSave = () => {
-		if (!selectedProvider || !apiKey || !selectedModel) {
+		// Pasted keys frequently carry surrounding whitespace or a
+		// trailing newline, which the API rejects. Trim before sending.
+		const trimmedKey = apiKey.trim();
+		if (!selectedProvider || !trimmedKey || !selectedModel) {
 			return;
 		}
 		createProvider.mutate(
@@ -84,17 +115,19 @@ export const CoderAgentProviderSetup: FC<CoderAgentProviderSetupProps> = ({
 				name: selectedProvider.type,
 				display_name: selectedProvider.name,
 				enabled: true,
-				base_url: baseUrl,
-				api_keys: [apiKey],
+				base_url: baseUrl.trim(),
+				api_keys: [trimmedKey],
 			},
 			{
 				onSuccess: (provider) => {
 					createModelConfig.mutate(
 						{
 							ai_provider_id: provider.id,
-							model: selectedModel,
+							model: selectedModel.identifier,
+							display_name: selectedModel.displayName,
 							enabled: true,
 							is_default: true,
+							context_limit: selectedModel.contextLimit,
 						},
 						{
 							onSuccess: onComplete,
@@ -167,27 +200,32 @@ export const CoderAgentProviderSetup: FC<CoderAgentProviderSetupProps> = ({
 					<div className="flex flex-col gap-2">
 						<Label>Model</Label>
 						<div className="flex flex-col gap-1">
-							{selectedProvider.models.map((model) => (
+							{models.map((model) => (
 								<label
-									key={model}
-									htmlFor={`agent-model-${model}`}
+									key={model.identifier}
+									htmlFor={`agent-model-${model.identifier}`}
 									className={cn(
 										"flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-colors",
-										selectedModel === model
+										selectedModel?.identifier === model.identifier
 											? "bg-surface-secondary"
 											: "hover:bg-surface-secondary",
 									)}
 								>
 									<input
 										type="radio"
-										id={`agent-model-${model}`}
+										id={`agent-model-${model.identifier}`}
 										name="agent-model"
-										value={model}
-										checked={selectedModel === model}
+										value={model.identifier}
+										checked={selectedModel?.identifier === model.identifier}
 										onChange={() => setSelectedModel(model)}
 										className="accent-content-link"
 									/>
-									<span className="text-sm">{model}</span>
+									<span className="flex flex-col">
+										<span className="text-sm">{model.displayName}</span>
+										<span className="text-xs text-content-secondary">
+											{model.identifier}
+										</span>
+									</span>
 								</label>
 							))}
 						</div>
@@ -195,8 +233,7 @@ export const CoderAgentProviderSetup: FC<CoderAgentProviderSetupProps> = ({
 
 					{Boolean(error) && (
 						<p className="text-sm text-content-destructive m-0">
-							Failed to save the provider or model. Check your credentials and
-							try again.
+							{getErrorMessage(error, "Failed to save the provider or model.")}
 						</p>
 					)}
 				</div>
@@ -207,7 +244,7 @@ export const CoderAgentProviderSetup: FC<CoderAgentProviderSetupProps> = ({
 					Skip for now
 				</Button>
 				{selectedProvider ? (
-					<Button disabled={!apiKey || isPending} onClick={handleSave}>
+					<Button disabled={!apiKey.trim() || isPending} onClick={handleSave}>
 						<Spinner loading={isPending} />
 						Save &amp; Continue
 					</Button>
