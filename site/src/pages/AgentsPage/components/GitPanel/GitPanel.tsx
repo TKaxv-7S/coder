@@ -300,7 +300,7 @@ export const GitPanel: FC<GitPanelProps> = ({
 		triggerIdentifier: repoTabLabel(repoRoot),
 		itemPrimary: "Working",
 		itemSecondary: repoTabLabel(repoRoot),
-		stateClasses: "text-content-warning bg-surface-orange",
+		stateClasses: "text-content-warning",
 		icon: <CircleDotIcon className="!size-3.5 shrink-0 text-content-warning" />,
 	}));
 
