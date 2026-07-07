@@ -45,11 +45,18 @@ type SettingsWire = AIProviderSettings &
 		_version?: number;
 	};
 
-// Bedrock providers are identified by the settings discriminator. The
-// generated type marks settings as non-null, but Go serializes zero settings
-// as JSON `null`.
+// Bedrock providers are identified by the dedicated `bedrock` type, which is
+// authoritative on its own: rows migrated from chat_providers (see migrations
+// 000504/000505) carry `type=bedrock` with `settings=null`, so the settings
+// discriminator cannot be required. Legacy rows predating the dedicated type
+// are stored as `type=anthropic` and are recognised via the settings
+// discriminator instead. The generated type marks settings as non-null, but
+// Go serializes zero settings as JSON `null`.
 export const isBedrockProvider = (provider: AIProvider): boolean => {
-	if (provider.type !== "anthropic" && provider.type !== "bedrock") {
+	if (provider.type === "bedrock") {
+		return true;
+	}
+	if (provider.type !== "anthropic") {
 		return false;
 	}
 	const s = provider.settings as SettingsWire | null;
@@ -69,9 +76,11 @@ export const hasBedrockStoredCredentials = (provider: AIProvider): boolean => {
 	if (!isBedrockProvider(provider)) {
 		return false;
 	}
-	// Bedrock secrets are write-only. The server only persists Bedrock
-	// settings if credentials were supplied, so presence implies "on file".
-	return true;
+	// Bedrock secrets are write-only. The server only persists a Bedrock
+	// settings blob when configuration was supplied, so a present blob implies
+	// credentials are "on file". A migrated provider carries null settings and
+	// therefore has no stored credentials to mask.
+	return (provider.settings as SettingsWire | null) !== null;
 };
 
 const parseProviderHost = (url: string): string => {
@@ -246,14 +255,19 @@ export const aiProviderToFormValues = (
 	const displayName = provider.display_name || provider.name;
 	if (isBedrockProvider(provider)) {
 		const s = (provider.settings as SettingsWire | null) ?? {};
+		// Migrated providers (migrations 000504/000505) carry null settings and
+		// may carry a blank base_url. Omit the blank fields so ProviderForm's
+		// Bedrock type defaults fill them (the canonical endpoint and the
+		// deployment default models), keeping the edit form valid and
+		// submittable. A non-blank stored value always wins over the default.
 		return {
 			type: "bedrock",
 			name: provider.name,
 			displayName,
 			icon: provider.icon || (getProviderIcon("bedrock") ?? ""),
-			baseUrl: provider.base_url,
-			model: s.model ?? "",
-			smallFastModel: s.small_fast_model ?? "",
+			...(provider.base_url ? { baseUrl: provider.base_url } : {}),
+			...(s.model ? { model: s.model } : {}),
+			...(s.small_fast_model ? { smallFastModel: s.small_fast_model } : {}),
 			accessKey: "",
 			accessKeySecret: "",
 			roleArn: s.role_arn ?? "",

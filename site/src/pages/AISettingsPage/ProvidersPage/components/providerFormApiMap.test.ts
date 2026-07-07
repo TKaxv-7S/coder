@@ -159,6 +159,18 @@ describe("isBedrockProvider", () => {
 		expect(isBedrockProvider(provider)).toBe(true);
 	});
 
+	it("recognises a bedrock-typed provider whose settings are null", () => {
+		// Migrated `agents-bedrock` rows (migrations 000504/000505) carry the
+		// dedicated `type=bedrock` with `settings=null`; the type alone is
+		// authoritative, so the provider must still be treated as Bedrock.
+		const provider: AIProvider = {
+			...MockAIProviderBedrock,
+			type: "bedrock",
+			settings: null as unknown as AIProvider["settings"],
+		};
+		expect(isBedrockProvider(provider)).toBe(true);
+	});
+
 	it("rejects an OpenAI provider", () => {
 		expect(isBedrockProvider(MockAIProviderOpenAI)).toBe(false);
 	});
@@ -190,6 +202,17 @@ describe("hasBedrockStoredCredentials", () => {
 	it("is false for non-Bedrock providers", () => {
 		expect(hasBedrockStoredCredentials(MockAIProviderOpenAI)).toBe(false);
 		expect(hasBedrockStoredCredentials(MockAIProviderAnthropic)).toBe(false);
+	});
+
+	it("is false for a migrated Bedrock provider whose settings are null", () => {
+		// A migrated `agents-bedrock` row has no persisted settings blob and
+		// therefore no stored credentials; the form must not seed masked
+		// placeholders that imply credentials are on file.
+		const provider: AIProvider = {
+			...MockAIProviderBedrock,
+			settings: null as unknown as AIProvider["settings"],
+		};
+		expect(hasBedrockStoredCredentials(provider)).toBe(false);
 	});
 });
 
@@ -788,13 +811,41 @@ describe("aiProviderToFormValues", () => {
 	});
 
 	it("handles a Bedrock provider whose settings are null", () => {
-		// `isBedrockProvider` will return false, so the provider falls
-		// through to the generic branch. The helper must not throw.
+		// A migrated `agents-bedrock` row carries `type=bedrock` with null
+		// settings. The helper must recognise it as Bedrock and omit the
+		// model fields so ProviderForm's Bedrock defaults fill them, keeping
+		// the edit form valid and submittable.
 		const provider: AIProvider = {
 			...MockAIProviderBedrock,
 			settings: null as unknown as AIProvider["settings"],
 		};
 		const values = aiProviderToFormValues(provider);
 		expect(values.type).toBe("bedrock");
+		expect(values.model).toBeUndefined();
+		expect(values.smallFastModel).toBeUndefined();
+		expect(values.roleArn).toBe("");
+	});
+
+	it("omits a blank base_url so the Bedrock form default fills it", () => {
+		// Env-var deployments migrate with a blank base_url; omitting it lets
+		// ProviderForm seed the canonical endpoint rather than leave the
+		// required Endpoint field empty (which blocks submission).
+		const provider: AIProvider = {
+			...MockAIProviderBedrock,
+			base_url: "",
+			settings: null as unknown as AIProvider["settings"],
+		};
+		expect(aiProviderToFormValues(provider).baseUrl).toBeUndefined();
+	});
+
+	it("keeps a non-blank stored base_url on a null-settings provider", () => {
+		const provider: AIProvider = {
+			...MockAIProviderBedrock,
+			base_url: "https://bedrock-runtime.us-east-1.amazonaws.com",
+			settings: null as unknown as AIProvider["settings"],
+		};
+		expect(aiProviderToFormValues(provider).baseUrl).toBe(
+			"https://bedrock-runtime.us-east-1.amazonaws.com",
+		);
 	});
 });
