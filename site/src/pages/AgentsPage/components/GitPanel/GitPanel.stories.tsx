@@ -148,8 +148,8 @@ export const PullRequestAndWorkingChanges: Story = {
 		).toBeVisible();
 
 		// The view switcher trigger reads the PR state on the left
-		// and the PR number on the right; both are visible in the
-		// closed state.
+		// and the PR number on the right; both are visible when the
+		// dropdown is collapsed.
 		const switcher = canvas.getByTestId("git-panel-view-switcher");
 		await expect(switcher).toHaveTextContent("Open");
 		await expect(switcher).toHaveTextContent("PR #23020");
@@ -164,9 +164,9 @@ export const PullRequestAndWorkingChanges: Story = {
 };
 
 /**
- * Opens the view switcher dropdown so both the PR entry and each
- * dirty local repo appear in the menu. Exercises the click path
- * that swaps views without touching the diff style/refresh controls.
+ * Opens the view switcher dropdown, verifies both the PR and each
+ * dirty local repo appear in the menu, then clicks the second local
+ * repo to exercise the click path that swaps the active view.
  */
 export const ViewSwitcherOpen: Story = {
 	args: {
@@ -210,6 +210,19 @@ export const ViewSwitcherOpen: Story = {
 		await expect(menu).toHaveTextContent("Working");
 		await expect(menu).toHaveTextContent("coder");
 		await expect(menu).toHaveTextContent("other-project");
+
+		// Click the "other-project" working entry and verify the
+		// trigger swaps to that view.
+		const otherProjectItem = within(menu).getByText("other-project");
+		await userEvent.click(otherProjectItem);
+		await waitFor(() => {
+			expect(canvas.getByTestId("git-panel-view-switcher")).toHaveTextContent(
+				"other-project",
+			);
+		});
+		await expect(
+			canvas.getByTestId("git-panel-view-switcher"),
+		).toHaveTextContent("Working");
 	},
 };
 
@@ -236,6 +249,11 @@ export const DraftPullRequest: Story = {
 			diff: sampleDiff,
 		});
 	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		const switcher = canvas.getByTestId("git-panel-view-switcher");
+		await expect(switcher).toHaveTextContent("Draft");
+	},
 };
 
 /** Merged PR. */
@@ -258,6 +276,11 @@ export const MergedPullRequest: Story = {
 			diff: sampleDiff,
 		});
 	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		const switcher = canvas.getByTestId("git-panel-view-switcher");
+		await expect(switcher).toHaveTextContent("Merged");
+	},
 };
 
 /** Closed PR. */
@@ -279,6 +302,11 @@ export const ClosedPullRequest: Story = {
 			...defaultDiffContents,
 			diff: sampleDiff,
 		});
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		const switcher = canvas.getByTestId("git-panel-view-switcher");
+		await expect(switcher).toHaveTextContent("Closed");
 	},
 };
 
@@ -473,11 +501,13 @@ export const CleanRepoFromStart: Story = {
 		everDirty: new Set(),
 	},
 	play: async ({ canvasElement }) => {
-		// No "Working" state appears when no repo has ever been dirty.
-		// The switcher falls back to its empty placeholder text.
+		// With no dirty repos and no remote diff, the switcher renders
+		// its empty-state pill ("No changes") and no "Working" entry.
 		const switcher = canvasElement.querySelector(
 			"[data-testid='git-panel-view-switcher']",
 		);
+		expect(switcher).not.toBeNull();
+		expect(switcher?.textContent ?? "").toContain("No changes");
 		expect(switcher?.textContent ?? "").not.toContain("Working");
 	},
 };

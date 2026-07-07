@@ -12,7 +12,14 @@ import {
 	RefreshCwIcon,
 	RowsIcon,
 } from "lucide-react";
-import { type FC, type RefObject, useEffect, useRef, useState } from "react";
+import {
+	type FC,
+	type RefObject,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import { toast } from "sonner";
 import type {
 	ChatDiffStatus,
@@ -77,25 +84,20 @@ interface GitPanelProps {
 	chatInputRef?: RefObject<ChatMessageInputRef | null>;
 	/**
 	 * Repo roots that have been dirty at some point during this session.
-	 * Used to keep a repo's tab visible after its diff goes empty, so the
-	 * tab strip does not visibly flip when the agent edits a file and
-	 * then reverts it.
+	 * Used to keep a repo's entry visible after its diff goes empty, so
+	 * the view switcher does not visibly flip when the agent edits a
+	 * file and then reverts it.
 	 */
 	everDirty?: ReadonlySet<string>;
 }
 
-function repoTabLabel(repoRoot: string): string {
+function repoLabel(repoRoot: string): string {
 	const segments = repoRoot.split("/").filter(Boolean);
 	return segments[segments.length - 1] ?? repoRoot;
 }
 
-// A single dropdown item for either the PR view or a Working repo.
-// Rendered inside `ViewSwitcher` and used to compute the current
-// trigger contents.
-interface ViewItem {
+interface ViewItemBase {
 	id: string;
-	kind: "remote" | "local";
-	repoRoot?: string;
 	/** Left-pill label on the trigger (e.g. "Open", "Merged", "Working"). */
 	stateLabel: string;
 	/** Right-side label on the trigger (e.g. "PR #4847", "coder"). */
@@ -107,6 +109,10 @@ interface ViewItem {
 	stateClasses: string;
 	icon: React.ReactNode;
 }
+
+type ViewItem =
+	| (ViewItemBase & { kind: "remote" })
+	| (ViewItemBase & { kind: "local"; repoRoot: string });
 
 export const GitPanel: FC<GitPanelProps> = ({
 	prTab,
@@ -132,8 +138,7 @@ export const GitPanel: FC<GitPanelProps> = ({
 	const prState = remoteDiffStats?.pull_request_state;
 	const prDraft = remoteDiffStats?.pull_request_draft;
 
-	// Compute per-repo diff stats from unified diffs.
-	const repoStats = (() => {
+	const repoStats = useMemo(() => {
 		const stats = new Map<string, DiffStats>();
 		for (const [root, repo] of repositories.entries()) {
 			if (!repo.unified_diff) continue;
@@ -151,11 +156,11 @@ export const GitPanel: FC<GitPanelProps> = ({
 			}
 		}
 		return stats;
-	})();
+	}, [repositories]);
 
 	// Union of currently-dirty and ever-dirty repos (still known to
-	// the watcher) so a clean-revert does not hide the tab.
-	const localRepos = (() => {
+	// the watcher) so a clean-revert does not hide the entry.
+	const localRepos = useMemo(() => {
 		const roots = new Set<string>(repoStats.keys());
 		if (everDirty) {
 			for (const root of everDirty) {
@@ -165,7 +170,7 @@ export const GitPanel: FC<GitPanelProps> = ({
 			}
 		}
 		return Array.from(roots).sort((a, b) => a.localeCompare(b));
-	})();
+	}, [repoStats, everDirty, repositories]);
 
 	// Default to the first local repo when there are only local
 	// changes and no remote stats.
@@ -176,7 +181,7 @@ export const GitPanel: FC<GitPanelProps> = ({
 		return { type: "remote" };
 	});
 
-	// If the active tab gets hidden, switch to the first available.
+	// If the active view gets hidden, switch to the first available.
 	useEffect(() => {
 		if (view.type === "remote" && !showRemoteTab) {
 			if (localRepos.length > 0) {
@@ -184,7 +189,7 @@ export const GitPanel: FC<GitPanelProps> = ({
 			}
 		} else if (view.type === "local") {
 			// localRepos includes ever-dirty repos with empty diffs, so
-			// the active tab stays valid until its root leaves the set.
+			// the active view stays valid until its root leaves the set.
 			if (!localRepos.includes(view.repoRoot)) {
 				if (showRemoteTab) {
 					setView({ type: "remote" });
@@ -221,9 +226,6 @@ export const GitPanel: FC<GitPanelProps> = ({
 		spinTimerRef.current = setTimeout(() => setSpinning(false), 1000);
 	};
 
-	// The PR title renders truncated with a hover tooltip for the
-	// full text. Skip the tooltip when the title already fits so we
-	// don't show a redundant popover.
 	const prTitleRef = useRef<HTMLSpanElement>(null);
 	const [isPrTitleTruncated, setIsPrTitleTruncated] = useState(false);
 	useEffect(() => {
@@ -241,6 +243,7 @@ export const GitPanel: FC<GitPanelProps> = ({
 		return () => observer.disconnect();
 	}, [prTitle]);
 
+	const remoteHeadBranch = remoteDiffStats?.head_branch;
 	const remoteItem: ViewItem | null = showRemoteTab
 		? prTab
 			? {
@@ -263,8 +266,9 @@ export const GitPanel: FC<GitPanelProps> = ({
 					kind: "remote",
 					id: "remote",
 					stateLabel: "Branch",
-					triggerIdentifier: "Branch",
+					triggerIdentifier: remoteHeadBranch || "Branch",
 					itemPrimary: "Branch",
+					itemSecondary: remoteHeadBranch || undefined,
 					stateClasses: "text-content-secondary",
 					icon: <GitBranchIcon className="!size-3.5 shrink-0" />,
 				}
@@ -275,9 +279,9 @@ export const GitPanel: FC<GitPanelProps> = ({
 		id: `local:${repoRoot}`,
 		repoRoot,
 		stateLabel: "Working",
-		triggerIdentifier: repoTabLabel(repoRoot),
+		triggerIdentifier: repoLabel(repoRoot),
 		itemPrimary: "Working",
-		itemSecondary: repoTabLabel(repoRoot),
+		itemSecondary: repoLabel(repoRoot),
 		stateClasses: "text-content-warning",
 		icon: <CircleDotIcon className="!size-3.5 shrink-0 text-content-warning" />,
 	}));
@@ -287,20 +291,43 @@ export const GitPanel: FC<GitPanelProps> = ({
 		...localItems,
 	];
 
-	const activeItem: ViewItem | undefined =
+	// Compute the effective view inline so a stale `view.repoRoot`
+	// (from a repo that has left `localRepos`) never renders as "No
+	// changes" for a frame before the effect above corrects it. When
+	// nothing is available the remote view still renders, which the
+	// RemoteContent panel handles as its own empty/loading state.
+	const effectiveView: GitView =
 		view.type === "remote"
+			? showRemoteTab
+				? view
+				: localRepos.length > 0
+					? { type: "local", repoRoot: localRepos[0] }
+					: view
+			: localRepos.includes(view.repoRoot)
+				? view
+				: showRemoteTab
+					? { type: "remote" }
+					: localRepos.length > 0
+						? { type: "local", repoRoot: localRepos[0] }
+						: { type: "remote" };
+
+	const activeItem: ViewItem | undefined =
+		effectiveView.type === "remote"
 			? (remoteItem ?? undefined)
 			: items.find(
-					(item) => item.kind === "local" && item.repoRoot === view.repoRoot,
+					(item) =>
+						item.kind === "local" && item.repoRoot === effectiveView.repoRoot,
 				);
 
 	const handleSelectItem = (item: ViewItem) => {
 		if (item.kind === "remote") {
 			setView({ type: "remote" });
-		} else if (item.repoRoot) {
+		} else {
 			setView({ type: "local", repoRoot: item.repoRoot });
 		}
 	};
+
+	const showPrTitleRow = effectiveView.type === "remote" && prTab && prTitle;
 
 	return (
 		<div className="flex h-full flex-col">
@@ -310,6 +337,7 @@ export const GitPanel: FC<GitPanelProps> = ({
 					<ViewSwitcher
 						items={items}
 						activeItem={activeItem}
+						hasRemoteItem={remoteItem !== null}
 						onSelect={handleSelectItem}
 					/>
 				</div>
@@ -372,10 +400,10 @@ export const GitPanel: FC<GitPanelProps> = ({
 					</span>
 				</div>
 			</div>
-			{/* PR title row: shown below the switcher when the chat has a PR
-			   with a known title. Truncated, with the full title in a
-			   hover tooltip only when the visible text is actually cut off. */}
-			{prTab && prTitle && (
+			{/* PR title row: shown below the switcher when the PR view is
+			   active and a title is known. Truncated, with the full title
+			   in a hover tooltip only when the visible text is cut off. */}
+			{showPrTitleRow && (
 				<div className="flex shrink-0 items-center px-3">
 					<Tooltip open={isPrTitleTruncated ? undefined : false}>
 						<TooltipTrigger asChild>
@@ -399,7 +427,7 @@ export const GitPanel: FC<GitPanelProps> = ({
 			)}
 			{/* Content */}
 			<div className="min-h-0 flex-1">
-				{view.type === "remote" ? (
+				{effectiveView.type === "remote" ? (
 					<RemoteContent
 						prTab={prTab}
 						hasGitContext={hasGitContext}
@@ -411,10 +439,13 @@ export const GitPanel: FC<GitPanelProps> = ({
 					/>
 				) : (
 					<LocalRepoContent
-						repoRoot={view.repoRoot}
-						repo={repositories.get(view.repoRoot)}
+						repoRoot={effectiveView.repoRoot}
+						repo={repositories.get(effectiveView.repoRoot)}
 						diffStats={
-							repoStats.get(view.repoRoot) ?? { additions: 0, deletions: 0 }
+							repoStats.get(effectiveView.repoRoot) ?? {
+								additions: 0,
+								deletions: 0,
+							}
 						}
 						onCommit={onCommit}
 						isExpanded={isExpanded}
@@ -428,26 +459,32 @@ export const GitPanel: FC<GitPanelProps> = ({
 };
 
 // ---------------------------------------------------------------
-// View switcher: dropdown replacing the old tab strip.
+// View switcher: dropdown for the active PR/Branch/Working view.
 // ---------------------------------------------------------------
 
 interface ViewSwitcherProps {
 	items: ReadonlyArray<ViewItem>;
 	activeItem?: ViewItem;
+	/**
+	 * Whether a remote (PR or Branch) item exists in `items`. Controls
+	 * whether local entries are visually nested (indented) under it.
+	 */
+	hasRemoteItem: boolean;
 	onSelect: (item: ViewItem) => void;
 }
 
 const ViewSwitcher: FC<ViewSwitcherProps> = ({
 	items,
 	activeItem,
+	hasRemoteItem,
 	onSelect,
 }) => {
-	// When there is nothing to switch between, still render a
-	// placeholder so the toolbar keeps a stable height. It reads the
-	// same as the tab strip did in the empty state.
 	if (!activeItem) {
 		return (
-			<div className="inline-flex h-6 items-center gap-1.5 rounded-md border border-solid border-border-default px-2 text-xs text-content-secondary">
+			<div
+				className="inline-flex h-6 items-center gap-1.5 rounded-md border border-solid border-border-default px-2 text-xs text-content-secondary"
+				data-testid="git-panel-view-switcher"
+			>
 				<GitBranchIcon className="!size-3.5 shrink-0" />
 				<span>No changes</span>
 			</div>
@@ -483,9 +520,6 @@ const ViewSwitcher: FC<ViewSwitcherProps> = ({
 	const triggerInteractive =
 		"cursor-pointer transition-colors hover:bg-surface-secondary";
 
-	// With a single item there is nothing to pick, so we render a
-	// static wrapper (no chevron, no dropdown behavior) that keeps
-	// the same visual footprint as the interactive trigger.
 	if (isSingleItem) {
 		return (
 			<div className={triggerBase} data-testid="git-panel-view-switcher">
@@ -518,13 +552,12 @@ const ViewSwitcher: FC<ViewSwitcherProps> = ({
 							onSelect={() => onSelect(item)}
 							className={cn(
 								"flex items-center gap-2 rounded-sm px-2 py-1.5 text-xs",
-								// Local (Working) items are visually nested
-								// under the remote/PR entry above them. Using
-								// `ml-4 mt-0.5` shifts both the row and its
-								// highlight background off the left edge, so
-								// the grouping still reads once we track
-								// multiple PRs per chat.
-								item.kind === "local" ? "ml-4 mt-0.5" : "w-full",
+								// Nest local entries under the remote/PR entry
+								// when one exists. Without a parent above them,
+								// nesting reads as an orphan indent.
+								item.kind === "local" && hasRemoteItem
+									? "ml-4 mt-0.5"
+									: "w-full",
 								isActive && "bg-surface-secondary text-content-primary",
 							)}
 						>
@@ -665,7 +698,7 @@ const RepoHeader: FC<{
 			<div className="flex min-w-0 items-center gap-1.5 text-[13px] text-content-secondary">
 				<GitBranchIcon className="size-3.5 shrink-0" />
 				<span className="truncate">
-					{repo.branch?.trim() || repoTabLabel(repoRoot)}
+					{repo.branch?.trim() || repoLabel(repoRoot)}
 				</span>
 				<span className="truncate opacity-50">{repoRoot}</span>
 			</div>
@@ -715,7 +748,7 @@ function prStateClasses(state: string | undefined, draft: boolean | undefined) {
 }
 
 // ---------------------------------------------------------------
-// PR state icon (compact, for the tab bar)
+// PR state icon (compact, for the view switcher)
 // ---------------------------------------------------------------
 
 export const PrStateIcon: FC<{
@@ -723,24 +756,15 @@ export const PrStateIcon: FC<{
 	draft?: boolean;
 	className?: string;
 }> = ({ state, draft, className }) => {
+	const colorClass = prStateClasses(state, draft);
 	if (state === "merged") {
-		return <GitMergeIcon className={cn("text-git-merged-bright", className)} />;
+		return <GitMergeIcon className={cn(colorClass, className)} />;
 	}
 	if (state === "closed") {
-		return (
-			<GitPullRequestClosedIcon
-				className={cn("text-git-deleted-bright", className)}
-			/>
-		);
+		return <GitPullRequestClosedIcon className={cn(colorClass, className)} />;
 	}
 	if (draft) {
-		return (
-			<GitPullRequestDraftIcon
-				className={cn("text-content-secondary", className)}
-			/>
-		);
+		return <GitPullRequestDraftIcon className={cn(colorClass, className)} />;
 	}
-	return (
-		<GitPullRequestIcon className={cn("text-git-added-bright", className)} />
-	);
+	return <GitPullRequestIcon className={cn(colorClass, className)} />;
 };
