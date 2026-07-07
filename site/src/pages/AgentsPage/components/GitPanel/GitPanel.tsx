@@ -89,6 +89,25 @@ function repoTabLabel(repoRoot: string): string {
 	return segments[segments.length - 1] ?? repoRoot;
 }
 
+// A single dropdown item for either the PR view or a Working repo.
+// Rendered inside `ViewSwitcher` and used to compute the current
+// trigger contents.
+interface ViewItem {
+	id: string;
+	kind: "remote" | "local";
+	repoRoot?: string;
+	/** Left-pill label on the trigger (e.g. "Open", "Merged", "Working"). */
+	stateLabel: string;
+	/** Right-side label on the trigger (e.g. "PR #4847", "coder"). */
+	triggerIdentifier: string;
+	/** Primary text in the dropdown item (e.g. "PR #4847", "Working"). */
+	itemPrimary: string;
+	/** Secondary text in the dropdown item (e.g. PR title, repo name). */
+	itemSecondary?: string;
+	stateClasses: string;
+	icon: React.ReactNode;
+}
+
 export const GitPanel: FC<GitPanelProps> = ({
 	prTab,
 	repositories,
@@ -200,25 +219,6 @@ export const GitPanel: FC<GitPanelProps> = ({
 		setSpinning(true);
 		clearTimeout(spinTimerRef.current);
 		spinTimerRef.current = setTimeout(() => setSpinning(false), 1000);
-	};
-
-	// A single dropdown item for either the PR view or a Working repo.
-	// Rendered inside `ViewSwitcher` and used to compute the current
-	// trigger contents.
-	type ViewItem = {
-		id: string;
-		kind: "remote" | "local";
-		repoRoot?: string;
-		/** Left-pill label on the trigger (e.g. "Open", "Merged", "Working"). */
-		stateLabel: string;
-		/** Right-side label on the trigger (e.g. "PR #4847", "coder"). */
-		triggerIdentifier: string;
-		/** Primary text in the dropdown item (e.g. "PR #4847", "Working"). */
-		itemPrimary: string;
-		/** Secondary text in the dropdown item (e.g. PR title, repo name). */
-		itemSecondary?: string;
-		stateClasses: string;
-		icon: React.ReactNode;
 	};
 
 	const remoteItem: ViewItem | null = showRemoteTab
@@ -407,24 +407,9 @@ export const GitPanel: FC<GitPanelProps> = ({
 // ---------------------------------------------------------------
 
 interface ViewSwitcherProps {
-	items: ReadonlyArray<{
-		id: string;
-		kind: "remote" | "local";
-		stateLabel: string;
-		triggerIdentifier: string;
-		itemPrimary: string;
-		itemSecondary?: string;
-		stateClasses: string;
-		icon: React.ReactNode;
-	}>;
-	activeItem?: {
-		id: string;
-		stateLabel: string;
-		triggerIdentifier: string;
-		stateClasses: string;
-		icon: React.ReactNode;
-	};
-	onSelect: (item: ViewSwitcherProps["items"][number]) => void;
+	items: ReadonlyArray<ViewItem>;
+	activeItem?: ViewItem;
+	onSelect: (item: ViewItem) => void;
 }
 
 const ViewSwitcher: FC<ViewSwitcherProps> = ({

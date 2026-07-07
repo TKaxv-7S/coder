@@ -500,7 +500,6 @@ export const AgentChatPageView: FC<AgentChatPageViewProps> = ({
 	const hasBuiltInTerminal = Boolean(
 		workspace && workspaceAgent && !defaultTerminalHidden,
 	);
-
 	// Single source of truth for available tabs and their order. The list
 	// of tab IDs used by `getEffectiveTabId` is derived from this so a
 	// new tab can never be added to one without the other going out of
