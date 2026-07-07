@@ -1581,8 +1581,9 @@ func applyGoalMutation(
 			return nil, &ChatGoalMutationError{Message: "current goal is not active"}
 		}
 		goal, err := tx.PauseChatGoalByID(ctx, database.PauseChatGoalByIDParams{
-			RootChatID: rootChatID,
-			ID:         *mutation.GoalID,
+			RootChatID:   rootChatID,
+			ID:           *mutation.GoalID,
+			PausedReason: string(codersdk.ChatGoalPausedReasonUser),
 		})
 		if err != nil {
 			return nil, goalMutationUpdateError("pause chat goal", err)
@@ -2556,7 +2557,7 @@ func (p *Server) InterruptChat(
 		}
 		refreshed = latest
 
-		goal, err := p.pauseActiveGoalOnInterrupt(ctx, store, latest)
+		goal, err := p.pauseActiveGoalForReason(ctx, store, latest, codersdk.ChatGoalPausedReasonInterrupt)
 		if err != nil {
 			return err
 		}
@@ -2574,12 +2575,18 @@ func (p *Server) InterruptChat(
 	return refreshed, nil
 }
 
-// pauseActiveGoalOnInterrupt pauses the chat's active goal as part of a
-// user-initiated interrupt. Returns the paused goal, or nil when there
-// is nothing to pause (goals disabled, child chat, no current goal, or
-// the goal is not active). A concurrent goal transition is tolerated:
-// the interrupt must not fail because the goal changed underneath it.
-func (p *Server) pauseActiveGoalOnInterrupt(ctx context.Context, store database.Store, chat database.Chat) (*database.ChatGoal, error) {
+// pauseActiveGoalForReason pauses the chat's active goal as part of a
+// chat-level halt (user interrupt, terminal turn error). Returns the
+// paused goal, or nil when there is nothing to pause (goals disabled,
+// child chat, no current goal, or the goal is not active). A concurrent
+// goal transition is tolerated: the halt must not fail because the goal
+// changed underneath it.
+func (p *Server) pauseActiveGoalForReason(
+	ctx context.Context,
+	store database.Store,
+	chat database.Chat,
+	reason codersdk.ChatGoalPausedReason,
+) (*database.ChatGoal, error) {
 	if !p.experiments.Enabled(codersdk.ExperimentChatGoals) || !isRootChat(chat) {
 		//nolint:nilnil // Nothing to pause is represented as nil.
 		return nil, nil
@@ -2593,15 +2600,16 @@ func (p *Server) pauseActiveGoalOnInterrupt(ctx context.Context, store database.
 		return nil, nil
 	}
 	paused, err := store.PauseChatGoalByID(ctx, database.PauseChatGoalByIDParams{
-		RootChatID: chat.ID,
-		ID:         current.ID,
+		RootChatID:   chat.ID,
+		ID:           current.ID,
+		PausedReason: string(reason),
 	})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			//nolint:nilnil // The goal left `active` concurrently; nothing to pause.
 			return nil, nil
 		}
-		return nil, xerrors.Errorf("pause chat goal on interrupt: %w", err)
+		return nil, xerrors.Errorf("pause chat goal (%s): %w", reason, err)
 	}
 	return &paused, nil
 }

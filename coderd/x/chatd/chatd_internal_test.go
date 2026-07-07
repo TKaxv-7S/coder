@@ -2121,8 +2121,9 @@ func TestInterruptChatLeavesGoalUntouched(t *testing.T) {
 			require.NoError(t, err)
 			if tc.pauseFirst {
 				_, err := f.db.PauseChatGoalByID(dbauthz.AsSystemRestricted(ctx), database.PauseChatGoalByIDParams{
-					RootChatID: chat.ID,
-					ID:         goal.ID,
+					RootChatID:   chat.ID,
+					ID:           goal.ID,
+					PausedReason: string(codersdk.ChatGoalPausedReasonUser),
 				})
 				require.NoError(t, err)
 			}
@@ -2166,8 +2167,9 @@ func TestApplyGoalMutationResumeStartsTurn(t *testing.T) {
 	})
 	require.NoError(t, err)
 	_, err = f.db.PauseChatGoalByID(dbauthz.AsSystemRestricted(ctx), database.PauseChatGoalByIDParams{
-		RootChatID: chat.ID,
-		ID:         goal.ID,
+		RootChatID:   chat.ID,
+		ID:           goal.ID,
+		PausedReason: string(codersdk.ChatGoalPausedReasonUser),
 	})
 	require.NoError(t, err)
 	_, err = f.db.UpdateChatStatus(dbauthz.AsSystemRestricted(ctx), database.UpdateChatStatusParams{
@@ -2306,8 +2308,9 @@ func TestApplyGoalMutationResumeRejected(t *testing.T) {
 			})
 			require.NoError(t, err)
 			_, err = f.db.PauseChatGoalByID(dbauthz.AsSystemRestricted(ctx), database.PauseChatGoalByIDParams{
-				RootChatID: chat.ID,
-				ID:         goal.ID,
+				RootChatID:   chat.ID,
+				ID:           goal.ID,
+				PausedReason: string(codersdk.ChatGoalPausedReasonUser),
 			})
 			require.NoError(t, err)
 			tc.setup(t, ctx, f, chat)

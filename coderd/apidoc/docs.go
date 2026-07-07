@@ -17139,6 +17139,9 @@ const docTemplate = `{
         "codersdk.ChatGoal": {
             "type": "object",
             "properties": {
+                "blocked_reason": {
+                    "type": "string"
+                },
                 "cleared_at": {
                     "type": "string",
                     "format": "date-time"
@@ -17157,6 +17160,9 @@ const docTemplate = `{
                 "completion_summary": {
                     "type": "string"
                 },
+                "continuation_count": {
+                    "type": "integer"
+                },
                 "created_at": {
                     "type": "string",
                     "format": "date-time"
@@ -17171,6 +17177,9 @@ const docTemplate = `{
                 },
                 "objective": {
                     "type": "string"
+                },
+                "paused_reason": {
+                    "$ref": "#/definitions/codersdk.ChatGoalPausedReason"
                 },
                 "root_chat_id": {
                     "type": "string",
@@ -17231,6 +17240,23 @@ const docTemplate = `{
                 "ChatGoalMutationActionComplete"
             ]
         },
+        "codersdk.ChatGoalPausedReason": {
+            "type": "string",
+            "enum": [
+                "user",
+                "interrupt",
+                "turn_limit",
+                "usage_limit",
+                "error"
+            ],
+            "x-enum-varnames": [
+                "ChatGoalPausedReasonUser",
+                "ChatGoalPausedReasonInterrupt",
+                "ChatGoalPausedReasonTurnLimit",
+                "ChatGoalPausedReasonUsageLimit",
+                "ChatGoalPausedReasonError"
+            ]
+        },
         "codersdk.ChatGoalResponse": {
             "type": "object",
             "properties": {
@@ -17244,12 +17270,14 @@ const docTemplate = `{
             "enum": [
                 "active",
                 "paused",
+                "blocked",
                 "complete",
                 "cleared"
             ],
             "x-enum-varnames": [
                 "ChatGoalStatusActive",
                 "ChatGoalStatusPaused",
+                "ChatGoalStatusBlocked",
                 "ChatGoalStatusComplete",
                 "ChatGoalStatusCleared"
             ]

@@ -1327,6 +1327,7 @@ type ChatGoalStatus string
 const (
 	ChatGoalStatusActive   ChatGoalStatus = "active"
 	ChatGoalStatusPaused   ChatGoalStatus = "paused"
+	ChatGoalStatusBlocked  ChatGoalStatus = "blocked"
 	ChatGoalStatusComplete ChatGoalStatus = "complete"
 	ChatGoalStatusCleared  ChatGoalStatus = "cleared"
 	ChatGoalStatusReplaced ChatGoalStatus = "replaced"
@@ -1371,6 +1372,7 @@ func (e ChatGoalStatus) Valid() bool {
 	switch e {
 	case ChatGoalStatusActive,
 		ChatGoalStatusPaused,
+		ChatGoalStatusBlocked,
 		ChatGoalStatusComplete,
 		ChatGoalStatusCleared,
 		ChatGoalStatusReplaced:
@@ -1383,6 +1385,7 @@ func AllChatGoalStatusValues() []ChatGoalStatus {
 	return []ChatGoalStatus{
 		ChatGoalStatusActive,
 		ChatGoalStatusPaused,
+		ChatGoalStatusBlocked,
 		ChatGoalStatusComplete,
 		ChatGoalStatusCleared,
 		ChatGoalStatusReplaced,
@@ -5005,6 +5008,9 @@ type ChatGoal struct {
 	Objective            string         `db:"objective" json:"objective"`
 	Status               ChatGoalStatus `db:"status" json:"status"`
 	CompletionSummary    sql.NullString `db:"completion_summary" json:"completion_summary"`
+	PausedReason         sql.NullString `db:"paused_reason" json:"paused_reason"`
+	BlockedReason        sql.NullString `db:"blocked_reason" json:"blocked_reason"`
+	ContinuationCount    int64          `db:"continuation_count" json:"continuation_count"`
 	CreatedByUserID      uuid.UUID      `db:"created_by_user_id" json:"created_by_user_id"`
 	CompletedByUserID    uuid.NullUUID  `db:"completed_by_user_id" json:"completed_by_user_id"`
 	CompletedByAgent     bool           `db:"completed_by_agent" json:"completed_by_agent"`

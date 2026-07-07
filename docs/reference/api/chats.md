@@ -93,15 +93,18 @@ Experimental: this endpoint is subject to change.
       }
     ],
     "goal": {
+      "blocked_reason": "string",
       "cleared_at": "2019-08-24T14:15:22Z",
       "completed_at": "2019-08-24T14:15:22Z",
       "completed_by_agent": true,
       "completed_by_user_id": "46d01d21-f637-42aa-839a-6d4daf42c3a4",
       "completion_summary": "string",
+      "continuation_count": 0,
       "created_at": "2019-08-24T14:15:22Z",
       "created_by_user_id": "209f54c4-4c33-43bc-9c6a-ef4c65ad7473",
       "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
       "objective": "string",
+      "paused_reason": "user",
       "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
       "status": "active",
       "updated_at": "2019-08-24T14:15:22Z"
@@ -207,15 +210,18 @@ Status Code **200**
 | `»» organization_id`      | string(uuid)                                                                       | false    |              |                                                                                                                                                                                                                                                                            |
 | `»» owner_id`             | string(uuid)                                                                       | false    |              |                                                                                                                                                                                                                                                                            |
 | `» goal`                  | [codersdk.ChatGoal](schemas.md#codersdkchatgoal)                                   | false    |              |                                                                                                                                                                                                                                                                            |
+| `»» blocked_reason`       | string                                                                             | false    |              |                                                                                                                                                                                                                                                                            |
 | `»» cleared_at`           | string(date-time)                                                                  | false    |              |                                                                                                                                                                                                                                                                            |
 | `»» completed_at`         | string(date-time)                                                                  | false    |              |                                                                                                                                                                                                                                                                            |
 | `»» completed_by_agent`   | boolean                                                                            | false    |              |                                                                                                                                                                                                                                                                            |
 | `»» completed_by_user_id` | string(uuid)                                                                       | false    |              |                                                                                                                                                                                                                                                                            |
 | `»» completion_summary`   | string                                                                             | false    |              |                                                                                                                                                                                                                                                                            |
+| `»» continuation_count`   | integer                                                                            | false    |              |                                                                                                                                                                                                                                                                            |
 | `»» created_at`           | string(date-time)                                                                  | false    |              |                                                                                                                                                                                                                                                                            |
 | `»» created_by_user_id`   | string(uuid)                                                                       | false    |              |                                                                                                                                                                                                                                                                            |
 | `»» id`                   | string(uuid)                                                                       | false    |              |                                                                                                                                                                                                                                                                            |
 | `»» objective`            | string                                                                             | false    |              |                                                                                                                                                                                                                                                                            |
+| `»» paused_reason`        | [codersdk.ChatGoalPausedReason](schemas.md#codersdkchatgoalpausedreason)           | false    |              |                                                                                                                                                                                                                                                                            |
 | `»» root_chat_id`         | string(uuid)                                                                       | false    |              |                                                                                                                                                                                                                                                                            |
 | `»» status`               | [codersdk.ChatGoalStatus](schemas.md#codersdkchatgoalstatus)                       | false    |              |                                                                                                                                                                                                                                                                            |
 | `»» updated_at`           | string(date-time)                                                                  | false    |              |                                                                                                                                                                                                                                                                            |
@@ -250,12 +256,13 @@ Status Code **200**
 
 #### Enumerated Values
 
-| Property      | Value(s)                                                                                                                                                                                                 |
-|---------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `client_type` | `api`, `ui`                                                                                                                                                                                              |
-| `kind`        | `auth`, `config`, `generic`, `instruction_file`, `mcp_config`, `mcp_server`, `missing_key`, `overloaded`, `provider_disabled`, `rate_limit`, `skill`, `stream_silence_timeout`, `timeout`, `usage_limit` |
-| `status`      | `active`, `cleared`, `complete`, `completed`, `error`, `excluded`, `interrupting`, `invalid`, `ok`, `oversize`, `paused`, `pending`, `requires_action`, `running`, `unreadable`, `waiting`               |
-| `plan_mode`   | `plan`                                                                                                                                                                                                   |
+| Property        | Value(s)                                                                                                                                                                                                 |
+|-----------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `client_type`   | `api`, `ui`                                                                                                                                                                                              |
+| `kind`          | `auth`, `config`, `generic`, `instruction_file`, `mcp_config`, `mcp_server`, `missing_key`, `overloaded`, `provider_disabled`, `rate_limit`, `skill`, `stream_silence_timeout`, `timeout`, `usage_limit` |
+| `status`        | `active`, `blocked`, `cleared`, `complete`, `completed`, `error`, `excluded`, `interrupting`, `invalid`, `ok`, `oversize`, `paused`, `pending`, `requires_action`, `running`, `unreadable`, `waiting`    |
+| `paused_reason` | `error`, `interrupt`, `turn_limit`, `usage_limit`, `user`                                                                                                                                                |
+| `plan_mode`     | `plan`                                                                                                                                                                                                   |
 
 To perform this operation, you must be authenticated. [Learn more](authentication.md).
 
@@ -398,15 +405,18 @@ Experimental: this endpoint is subject to change.
         }
       ],
       "goal": {
+        "blocked_reason": "string",
         "cleared_at": "2019-08-24T14:15:22Z",
         "completed_at": "2019-08-24T14:15:22Z",
         "completed_by_agent": true,
         "completed_by_user_id": "46d01d21-f637-42aa-839a-6d4daf42c3a4",
         "completion_summary": "string",
+        "continuation_count": 0,
         "created_at": "2019-08-24T14:15:22Z",
         "created_by_user_id": "209f54c4-4c33-43bc-9c6a-ef4c65ad7473",
         "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
         "objective": "string",
+        "paused_reason": "user",
         "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
         "status": "active",
         "updated_at": "2019-08-24T14:15:22Z"
@@ -504,15 +514,18 @@ Experimental: this endpoint is subject to change.
     }
   ],
   "goal": {
+    "blocked_reason": "string",
     "cleared_at": "2019-08-24T14:15:22Z",
     "completed_at": "2019-08-24T14:15:22Z",
     "completed_by_agent": true,
     "completed_by_user_id": "46d01d21-f637-42aa-839a-6d4daf42c3a4",
     "completion_summary": "string",
+    "continuation_count": 0,
     "created_at": "2019-08-24T14:15:22Z",
     "created_by_user_id": "209f54c4-4c33-43bc-9c6a-ef4c65ad7473",
     "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
     "objective": "string",
+    "paused_reason": "user",
     "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
     "status": "active",
     "updated_at": "2019-08-24T14:15:22Z"
@@ -767,15 +780,18 @@ Experimental: this endpoint is subject to change.
       }
     ],
     "goal": {
+      "blocked_reason": "string",
       "cleared_at": "2019-08-24T14:15:22Z",
       "completed_at": "2019-08-24T14:15:22Z",
       "completed_by_agent": true,
       "completed_by_user_id": "46d01d21-f637-42aa-839a-6d4daf42c3a4",
       "completion_summary": "string",
+      "continuation_count": 0,
       "created_at": "2019-08-24T14:15:22Z",
       "created_by_user_id": "209f54c4-4c33-43bc-9c6a-ef4c65ad7473",
       "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
       "objective": "string",
+      "paused_reason": "user",
       "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
       "status": "active",
       "updated_at": "2019-08-24T14:15:22Z"
@@ -927,15 +943,18 @@ Experimental: this endpoint is subject to change.
         }
       ],
       "goal": {
+        "blocked_reason": "string",
         "cleared_at": "2019-08-24T14:15:22Z",
         "completed_at": "2019-08-24T14:15:22Z",
         "completed_by_agent": true,
         "completed_by_user_id": "46d01d21-f637-42aa-839a-6d4daf42c3a4",
         "completion_summary": "string",
+        "continuation_count": 0,
         "created_at": "2019-08-24T14:15:22Z",
         "created_by_user_id": "209f54c4-4c33-43bc-9c6a-ef4c65ad7473",
         "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
         "objective": "string",
+        "paused_reason": "user",
         "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
         "status": "active",
         "updated_at": "2019-08-24T14:15:22Z"
@@ -1033,15 +1052,18 @@ Experimental: this endpoint is subject to change.
     }
   ],
   "goal": {
+    "blocked_reason": "string",
     "cleared_at": "2019-08-24T14:15:22Z",
     "completed_at": "2019-08-24T14:15:22Z",
     "completed_by_agent": true,
     "completed_by_user_id": "46d01d21-f637-42aa-839a-6d4daf42c3a4",
     "completion_summary": "string",
+    "continuation_count": 0,
     "created_at": "2019-08-24T14:15:22Z",
     "created_by_user_id": "209f54c4-4c33-43bc-9c6a-ef4c65ad7473",
     "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
     "objective": "string",
+    "paused_reason": "user",
     "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
     "status": "active",
     "updated_at": "2019-08-24T14:15:22Z"
@@ -1230,15 +1252,18 @@ Experimental: this endpoint is subject to change.
         }
       ],
       "goal": {
+        "blocked_reason": "string",
         "cleared_at": "2019-08-24T14:15:22Z",
         "completed_at": "2019-08-24T14:15:22Z",
         "completed_by_agent": true,
         "completed_by_user_id": "46d01d21-f637-42aa-839a-6d4daf42c3a4",
         "completion_summary": "string",
+        "continuation_count": 0,
         "created_at": "2019-08-24T14:15:22Z",
         "created_by_user_id": "209f54c4-4c33-43bc-9c6a-ef4c65ad7473",
         "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
         "objective": "string",
+        "paused_reason": "user",
         "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
         "status": "active",
         "updated_at": "2019-08-24T14:15:22Z"
@@ -1336,15 +1361,18 @@ Experimental: this endpoint is subject to change.
     }
   ],
   "goal": {
+    "blocked_reason": "string",
     "cleared_at": "2019-08-24T14:15:22Z",
     "completed_at": "2019-08-24T14:15:22Z",
     "completed_by_agent": true,
     "completed_by_user_id": "46d01d21-f637-42aa-839a-6d4daf42c3a4",
     "completion_summary": "string",
+    "continuation_count": 0,
     "created_at": "2019-08-24T14:15:22Z",
     "created_by_user_id": "209f54c4-4c33-43bc-9c6a-ef4c65ad7473",
     "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
     "objective": "string",
+    "paused_reason": "user",
     "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
     "status": "active",
     "updated_at": "2019-08-24T14:15:22Z"
@@ -1531,15 +1559,18 @@ Experimental: this endpoint is subject to change.
         }
       ],
       "goal": {
+        "blocked_reason": "string",
         "cleared_at": "2019-08-24T14:15:22Z",
         "completed_at": "2019-08-24T14:15:22Z",
         "completed_by_agent": true,
         "completed_by_user_id": "46d01d21-f637-42aa-839a-6d4daf42c3a4",
         "completion_summary": "string",
+        "continuation_count": 0,
         "created_at": "2019-08-24T14:15:22Z",
         "created_by_user_id": "209f54c4-4c33-43bc-9c6a-ef4c65ad7473",
         "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
         "objective": "string",
+        "paused_reason": "user",
         "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
         "status": "active",
         "updated_at": "2019-08-24T14:15:22Z"
@@ -1637,15 +1668,18 @@ Experimental: this endpoint is subject to change.
     }
   ],
   "goal": {
+    "blocked_reason": "string",
     "cleared_at": "2019-08-24T14:15:22Z",
     "completed_at": "2019-08-24T14:15:22Z",
     "completed_by_agent": true,
     "completed_by_user_id": "46d01d21-f637-42aa-839a-6d4daf42c3a4",
     "completion_summary": "string",
+    "continuation_count": 0,
     "created_at": "2019-08-24T14:15:22Z",
     "created_by_user_id": "209f54c4-4c33-43bc-9c6a-ef4c65ad7473",
     "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
     "objective": "string",
+    "paused_reason": "user",
     "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
     "status": "active",
     "updated_at": "2019-08-24T14:15:22Z"
@@ -1954,15 +1988,18 @@ Experimental: this endpoint is subject to change.
 ```json
 {
   "goal": {
+    "blocked_reason": "string",
     "cleared_at": "2019-08-24T14:15:22Z",
     "completed_at": "2019-08-24T14:15:22Z",
     "completed_by_agent": true,
     "completed_by_user_id": "46d01d21-f637-42aa-839a-6d4daf42c3a4",
     "completion_summary": "string",
+    "continuation_count": 0,
     "created_at": "2019-08-24T14:15:22Z",
     "created_by_user_id": "209f54c4-4c33-43bc-9c6a-ef4c65ad7473",
     "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
     "objective": "string",
+    "paused_reason": "user",
     "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
     "status": "active",
     "updated_at": "2019-08-24T14:15:22Z"
@@ -2422,15 +2459,18 @@ Experimental: this endpoint is subject to change.
         }
       ],
       "goal": {
+        "blocked_reason": "string",
         "cleared_at": "2019-08-24T14:15:22Z",
         "completed_at": "2019-08-24T14:15:22Z",
         "completed_by_agent": true,
         "completed_by_user_id": "46d01d21-f637-42aa-839a-6d4daf42c3a4",
         "completion_summary": "string",
+        "continuation_count": 0,
         "created_at": "2019-08-24T14:15:22Z",
         "created_by_user_id": "209f54c4-4c33-43bc-9c6a-ef4c65ad7473",
         "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
         "objective": "string",
+        "paused_reason": "user",
         "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
         "status": "active",
         "updated_at": "2019-08-24T14:15:22Z"
@@ -2528,15 +2568,18 @@ Experimental: this endpoint is subject to change.
     }
   ],
   "goal": {
+    "blocked_reason": "string",
     "cleared_at": "2019-08-24T14:15:22Z",
     "completed_at": "2019-08-24T14:15:22Z",
     "completed_by_agent": true,
     "completed_by_user_id": "46d01d21-f637-42aa-839a-6d4daf42c3a4",
     "completion_summary": "string",
+    "continuation_count": 0,
     "created_at": "2019-08-24T14:15:22Z",
     "created_by_user_id": "209f54c4-4c33-43bc-9c6a-ef4c65ad7473",
     "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
     "objective": "string",
+    "paused_reason": "user",
     "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
     "status": "active",
     "updated_at": "2019-08-24T14:15:22Z"
@@ -3049,15 +3092,18 @@ Experimental: this endpoint is subject to change.
         }
       ],
       "goal": {
+        "blocked_reason": "string",
         "cleared_at": "2019-08-24T14:15:22Z",
         "completed_at": "2019-08-24T14:15:22Z",
         "completed_by_agent": true,
         "completed_by_user_id": "46d01d21-f637-42aa-839a-6d4daf42c3a4",
         "completion_summary": "string",
+        "continuation_count": 0,
         "created_at": "2019-08-24T14:15:22Z",
         "created_by_user_id": "209f54c4-4c33-43bc-9c6a-ef4c65ad7473",
         "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
         "objective": "string",
+        "paused_reason": "user",
         "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
         "status": "active",
         "updated_at": "2019-08-24T14:15:22Z"
@@ -3155,15 +3201,18 @@ Experimental: this endpoint is subject to change.
     }
   ],
   "goal": {
+    "blocked_reason": "string",
     "cleared_at": "2019-08-24T14:15:22Z",
     "completed_at": "2019-08-24T14:15:22Z",
     "completed_by_agent": true,
     "completed_by_user_id": "46d01d21-f637-42aa-839a-6d4daf42c3a4",
     "completion_summary": "string",
+    "continuation_count": 0,
     "created_at": "2019-08-24T14:15:22Z",
     "created_by_user_id": "209f54c4-4c33-43bc-9c6a-ef4c65ad7473",
     "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
     "objective": "string",
+    "paused_reason": "user",
     "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
     "status": "active",
     "updated_at": "2019-08-24T14:15:22Z"

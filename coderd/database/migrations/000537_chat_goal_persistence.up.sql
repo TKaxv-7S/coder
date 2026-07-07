@@ -1,6 +1,7 @@
 CREATE TYPE chat_goal_status AS ENUM (
     'active',
     'paused',
+    'blocked',
     'complete',
     'cleared',
     'replaced'
@@ -14,6 +15,15 @@ CREATE TABLE chat_goals (
     objective TEXT NOT NULL,
     status chat_goal_status NOT NULL,
     completion_summary TEXT,
+    -- Machine-readable cause for the current paused status
+    -- (user, interrupt, turn_limit, usage_limit, error).
+    paused_reason TEXT,
+    -- Model-supplied explanation for the current blocked status.
+    blocked_reason TEXT,
+    -- Auto-continuation turns consumed since the goal last became
+    -- active. Reset on resume; bounds the idle-driven continuation
+    -- loop.
+    continuation_count BIGINT NOT NULL DEFAULT 0,
     created_by_user_id UUID NOT NULL REFERENCES users(id),
     completed_by_user_id UUID REFERENCES users(id),
     completed_by_agent BOOLEAN NOT NULL DEFAULT FALSE,
@@ -28,12 +38,14 @@ CREATE TABLE chat_goals (
     CONSTRAINT chat_goals_replaced_at_status_check CHECK ((status = 'replaced') = (replaced_at IS NOT NULL)),
     CONSTRAINT chat_goals_completion_summary_status_check CHECK (completion_summary IS NULL OR status = 'complete'),
     CONSTRAINT chat_goals_completed_by_user_status_check CHECK (completed_by_user_id IS NULL OR status = 'complete'),
-    CONSTRAINT chat_goals_completed_by_agent_status_check CHECK (completed_by_agent = FALSE OR status = 'complete')
+    CONSTRAINT chat_goals_completed_by_agent_status_check CHECK (completed_by_agent = FALSE OR status = 'complete'),
+    CONSTRAINT chat_goals_paused_reason_status_check CHECK ((status = 'paused') = (paused_reason IS NOT NULL)),
+    CONSTRAINT chat_goals_blocked_reason_status_check CHECK ((status = 'blocked') = (blocked_reason IS NOT NULL))
 );
 
 CREATE UNIQUE INDEX idx_chat_goals_current
     ON chat_goals(root_chat_id)
-    WHERE status IN ('active', 'paused');
+    WHERE status IN ('active', 'paused', 'blocked');
 
 CREATE INDEX idx_chat_goals_root_created
     ON chat_goals(root_chat_id, created_at DESC, goal_order DESC);
