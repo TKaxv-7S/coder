@@ -123,8 +123,7 @@ export const BaseTemplateParametersStep: FC<
 				Your base template requires customizations.
 			</TemplateBuilderSubtitle>
 
-			{/* 340px accounts for navbar, page header, card padding, and nav controls */}
-			<div className="max-h-[calc(100vh-340px)] overflow-y-auto">
+			<div>
 				<TemplateConfiguration
 					name={base?.name ?? "Base Template"}
 					description={base?.description ?? ""}

@@ -117,14 +117,22 @@ export const TemplateBuilderPageView: FC<TemplateBuilderPageViewProps> = ({
 		setStepIndex(nextIndex);
 	};
 
-	const navigateToStep = (targetId: StepId) => {
+	const navigateToStep = (
+		targetId: StepId,
+		options?: { skipScrollReset?: boolean },
+	) => {
 		const target = WIZARD_STEPS.findIndex((s) => s.id === targetId);
 		if (target < 0) return;
 		if (currentStep.id === "customizations" && targetId !== "customizations") {
 			dispatch({ type: "RESET_CUSTOMIZATIONS" });
 			onClearCreateError?.();
 		}
-		window.scrollTo(0, 0);
+		// The caller sets skipScrollReset when it will manage the scroll
+		// position itself, for example by jumping to a specific module
+		// section via scrollIntoView.
+		if (!options?.skipScrollReset) {
+			window.scrollTo(0, 0);
+		}
 		setStepIndex(nearestVisible(target, state));
 	};
 
@@ -138,7 +146,7 @@ export const TemplateBuilderPageView: FC<TemplateBuilderPageViewProps> = ({
 			settingsIndex >= 0 && !WIZARD_STEPS[settingsIndex].shouldSkip(state)
 				? "module-settings"
 				: "module-select";
-		navigateToStep(targetId);
+		navigateToStep(targetId, { skipScrollReset: true });
 		if (targetId === "module-settings") {
 			// Wait for the step render, then scroll the module section into view.
 			requestAnimationFrame(() => {
