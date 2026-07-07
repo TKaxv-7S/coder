@@ -4,7 +4,8 @@ Records a detailed trace of each chat turn for troubleshooting: the
 normalized request sent to the LLM provider, the full response, token usage,
 retry attempts, and errors.
 
-Off by default. Three layers control whether it runs for a given chat:
+Full traces are off by default. Three layers control whether they run for
+a given chat:
 
 1. **Deployment override.** Setting `CODER_CHAT_DEBUG_LOGGING_ENABLED=true`
    (or `--chat-debug-logging-enabled` at server start) forces debug logging
@@ -20,6 +21,13 @@ Off by default. Three layers control whether it runs for a given chat:
    `409 Conflict` if the deployment override is active and `403 Forbidden`
    if the admin has not enabled user opt-in.
 
+These three layers control full traces only. Coder also records a minimal
+debug run automatically whenever a chat turn fails with an error it
+doesn't already recognize as a known condition, such as an expired API key
+or a rate limit, regardless of these layers. That run has only the
+failing step and its error message, no request or response bodies, giving
+a troubleshooting signal without a full trace's exposure.
+
 > [!IMPORTANT]
 > Debug logs may contain sensitive content from prompts, responses, tool
 > calls, and errors. Treat them with the same care as conversation history.
@@ -27,11 +35,14 @@ Off by default. Three layers control whether it runs for a given chat:
 > chat's debug runs through the API. Administrators do not get blanket
 > access to all users' debug data.
 
-When debug logging is active for a chat, a **Debug** tab appears in the
-right panel of the Agents page (alongside Git, Terminal, and Desktop) for
-that chat's owner. The tab lists recent debug runs and lets you expand a run
-into its per-step request, response, token usage, retry attempts, errors,
-and policy metadata.
+A **Debug** tab appears in the
+right panel of the Agents page (alongside Git, Terminal, and Desktop) for a
+chat's owner whenever debug logging is active for that chat, or the chat
+already has a debug run captured automatically from an error. The tab
+lists recent debug runs and lets you expand a run into its per-step
+request, response, token usage, retry attempts, errors, and policy
+metadata. An automatically captured run shows only the failing step and
+its error; it has no request, response, usage, or retry detail to expand.
 
 ## Export debug logs
 
