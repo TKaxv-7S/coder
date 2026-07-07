@@ -1549,7 +1549,7 @@ func resolveFallbackModelConfigID(
 ) (uuid.UUID, error) {
 	chatdCtx := chatdModelConfigLookupContext(ctx)
 	if modelConfigID != uuid.Nil {
-		if _, err := store.GetChatModelConfigByID(chatdCtx, modelConfigID); err == nil {
+		if _, err := store.GetEnabledChatModelConfigByID(chatdCtx, modelConfigID); err == nil {
 			return modelConfigID, nil
 		} else if !errors.Is(err, sql.ErrNoRows) {
 			return uuid.Nil, xerrors.Errorf(
@@ -1558,6 +1558,8 @@ func resolveFallbackModelConfigID(
 				err,
 			)
 		}
+		// The chat's last model or its provider was disabled or
+		// deleted, fall through to the default.
 	}
 
 	defaultConfig, err := store.GetDefaultChatModelConfig(chatdCtx)
@@ -1566,6 +1568,22 @@ func resolveFallbackModelConfigID(
 			return uuid.Nil, ErrNoDefaultChatModelConfig
 		}
 		return uuid.Nil, xerrors.Errorf("get default chat model config: %w", err)
+	}
+	// A disabled default (or one under a disabled provider) would only
+	// fail later at generation time, so reject it at admission instead.
+	if _, err := store.GetEnabledChatModelConfigByID(chatdCtx, defaultConfig.ID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return uuid.Nil, xerrors.Errorf(
+				"%w: default model config %s or its provider is disabled",
+				ErrNoDefaultChatModelConfig,
+				defaultConfig.ID,
+			)
+		}
+		return uuid.Nil, xerrors.Errorf(
+			"get default chat model config %s: %w",
+			defaultConfig.ID,
+			err,
+		)
 	}
 	return defaultConfig.ID, nil
 }
