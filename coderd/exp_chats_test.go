@@ -8551,7 +8551,7 @@ func TestCompactChat(t *testing.T) {
 
 		_, err = client.CompactChat(ctx, chat.ID)
 		sdkErr := requireSDKError(t, err, http.StatusConflict)
-		require.Contains(t, sdkErr.Message, "Chat is busy")
+		require.Contains(t, sdkErr.Message, "Cannot compact the chat in its current state")
 	})
 
 	t.Run("Archived", func(t *testing.T) {
@@ -8579,6 +8579,38 @@ func TestCompactChat(t *testing.T) {
 		_ = coderdtest.CreateFirstUser(t, client.Client)
 
 		_, err := client.CompactChat(ctx, uuid.New())
+		requireSDKError(t, err, http.StatusNotFound)
+	})
+
+	// Even the owner needs RBAC update permission on the chat.
+	t.Run("UpdateDenied", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := testutil.Context(t, testutil.WaitLong)
+		clientRaw, _, api := coderdtest.NewWithAPI(t, &coderdtest.Options{
+			Authorizer: &coderdtest.FakeAuthorizer{
+				ConditionalReturn: func(_ context.Context, subject rbac.Subject, action policy.Action, object rbac.Object) error {
+					// dbgen seeds rows with a synthetic "owner" subject;
+					// message inserts need chat update, so let them pass.
+					if subject.ID == "owner" {
+						return nil
+					}
+					if action == policy.ActionUpdate && object.Type == rbac.ResourceChat.Type {
+						return xerrors.New("denied")
+					}
+					return nil
+				},
+			},
+			DeploymentValues: coderdtest.DeploymentValues(t),
+		})
+		aibridgedtest.StartTestAIBridgeDaemon(t.Context(), t, api, nil)
+		db := api.Database
+		client := codersdk.NewExperimentalClient(clientRaw)
+		user := coderdtest.CreateFirstUser(t, client.Client)
+		modelConfig := createChatModelConfig(t, client)
+		chat := seedCompactableChat(t, db, user.OrganizationID, user.UserID, modelConfig.ID)
+
+		_, err := client.CompactChat(ctx, chat.ID)
 		requireSDKError(t, err, http.StatusNotFound)
 	})
 }

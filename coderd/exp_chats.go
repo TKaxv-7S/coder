@@ -3798,8 +3798,11 @@ func (api *API) compactChat(rw http.ResponseWriter, r *http.Request) {
 				Detail:  "The chat has no conversation to summarize after the latest compaction.",
 			})
 		case errors.Is(err, chatstate.ErrTransitionNotAllowed):
+			// Covers every non-waiting state: running, interrupting,
+			// requires-action, and error. "Busy" would misdescribe an
+			// errored chat, so keep the message state-neutral.
 			httpapi.Write(ctx, rw, http.StatusConflict, codersdk.Response{
-				Message: "Chat is busy.",
+				Message: "Cannot compact the chat in its current state.",
 				Detail:  "Compaction is only available while the chat is idle.",
 			})
 		default:

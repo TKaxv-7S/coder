@@ -15,12 +15,6 @@ export type PersonalSkillFormValues = {
 	body: string;
 };
 
-type RankedPersonalSkill = {
-	skill: TypesGen.UserSkillMetadata;
-	rank: number;
-	index: number;
-};
-
 export const personalSkillTriggerText = (
 	skill: TypesGen.UserSkillMetadata,
 ): string => `/${skill.name}`;
@@ -48,22 +42,26 @@ export const isPersonalSkillTriggerToken = (token: string): boolean =>
 	/^\/\S*$/.test(token);
 
 /**
- * Filters personal skills by name and description. Matches are ranked by
- * name prefix, name substring, then description substring.
+ * Filters named items by name and description. Matches are ranked by
+ * name prefix, name substring, then description substring; an empty
+ * query sorts by name. Shared by personal skills and built-in slash
+ * commands so the "/" menu ranks both groups consistently.
  */
-export const filterPersonalSkills = (
-	skills: readonly TypesGen.UserSkillMetadata[],
+export const filterByNameAndDescription = <
+	T extends { name: string; description: string },
+>(
+	items: readonly T[],
 	query: string,
-): TypesGen.UserSkillMetadata[] => {
+): T[] => {
 	const normalizedQuery = query.toLocaleLowerCase("en-US");
 	if (!normalizedQuery) {
-		return skills.toSorted((a, b) => a.name.localeCompare(b.name, "en-US"));
+		return items.toSorted((a, b) => a.name.localeCompare(b.name, "en-US"));
 	}
 
-	const rankedSkills: RankedPersonalSkill[] = [];
-	for (const [index, skill] of skills.entries()) {
-		const name = skill.name.toLocaleLowerCase("en-US");
-		const description = skill.description.toLocaleLowerCase("en-US");
+	const ranked: { item: T; rank: number; index: number }[] = [];
+	for (const [index, item] of items.entries()) {
+		const name = item.name.toLocaleLowerCase("en-US");
+		const description = item.description.toLocaleLowerCase("en-US");
 		let rank: number | undefined;
 		if (name.startsWith(normalizedQuery)) {
 			rank = 0;
@@ -73,20 +71,29 @@ export const filterPersonalSkills = (
 			rank = 2;
 		}
 		if (rank !== undefined) {
-			rankedSkills.push({ skill, rank, index });
+			ranked.push({ item, rank, index });
 		}
 	}
 
-	return rankedSkills
+	return ranked
 		.toSorted((a, b) => {
 			if (a.rank !== b.rank) {
 				return a.rank - b.rank;
 			}
-			const nameOrder = a.skill.name.localeCompare(b.skill.name, "en-US");
+			const nameOrder = a.item.name.localeCompare(b.item.name, "en-US");
 			return nameOrder === 0 ? a.index - b.index : nameOrder;
 		})
-		.map(({ skill }) => skill);
+		.map(({ item }) => item);
 };
+
+/**
+ * Filters personal skills by name and description. Matches are ranked by
+ * name prefix, name substring, then description substring.
+ */
+export const filterPersonalSkills = (
+	skills: readonly TypesGen.UserSkillMetadata[],
+	query: string,
+): TypesGen.UserSkillMetadata[] => filterByNameAndDescription(skills, query);
 
 class PersonalSkillMarkdownError extends Error {}
 

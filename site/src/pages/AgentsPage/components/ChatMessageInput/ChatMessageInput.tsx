@@ -616,7 +616,12 @@ const ChatMessageInput = ({
 		staleTime: 60_000,
 	});
 	const personalSkills = personalSkillsOverride ?? skillsQuery.data ?? [];
-	const availableSlashCommands = slashCommands ?? [];
+	// A personal skill with the same name takes precedence over a
+	// built-in command: the composer's submit intercept defers to the
+	// skill, so the menu must not advertise a dead command entry.
+	const availableSlashCommands = (slashCommands ?? []).filter(
+		(command) => !personalSkills.some((skill) => skill.name === command.name),
+	);
 	const hasSlashCommands = availableSlashCommands.length > 0;
 	// A stale empty cache with a refetch in flight must not dismiss the menu.
 	const isResolvedEmptySkillsList = hasPersonalSkillsOverride
@@ -667,7 +672,7 @@ const ChatMessageInput = ({
 		setSkillsTrigger(trigger);
 	};
 
-	const replaceActiveSkillsTrigger = (item: SlashMenuItem) => {
+	const replaceActiveSlashTrigger = (item: SlashMenuItem) => {
 		const editor = editorRef.current;
 		const trigger = skillsTrigger;
 		if (!editor || !trigger) {
@@ -921,7 +926,7 @@ const ChatMessageInput = ({
 					selectedIndex={selectedSkillIndex}
 					onSelectedIndexChange={setSkillsMenuSelectedIndex}
 					onTriggerChange={handleSkillsTriggerChange}
-					onItemSelect={replaceActiveSkillsTrigger}
+					onItemSelect={replaceActiveSlashTrigger}
 				/>
 				<EditableStatePlugin disabled={Boolean(disabled)} />
 				{autoFocus && <AutoFocusPlugin />}
@@ -938,7 +943,7 @@ const ChatMessageInput = ({
 					onSelectedIndexChange={setSkillsMenuSelectedIndex}
 					isError={skillsMenuOpen && skillsQuery.isError}
 					selectedIndex={selectedSkillIndex}
-					onSelect={replaceActiveSkillsTrigger}
+					onSelect={replaceActiveSlashTrigger}
 					onClose={() => handleSkillsTriggerChange(null)}
 				/>
 			</div>

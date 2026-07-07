@@ -3341,7 +3341,9 @@ func (c *ExperimentalClient) CompactChat(ctx context.Context, chatID uuid.UUID) 
 	}
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
-		return Chat{}, ReadBodyAsError(res)
+		// Compaction runs LLM inference, so spend-limit rejections
+		// carry the structured usage-limit payload.
+		return Chat{}, readBodyAsChatUsageLimitError(res)
 	}
 	var chat Chat
 	return chat, json.NewDecoder(res.Body).Decode(&chat)

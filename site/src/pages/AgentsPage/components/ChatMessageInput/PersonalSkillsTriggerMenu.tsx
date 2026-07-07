@@ -111,8 +111,9 @@ export const PersonalSkillsTriggerMenu = ({
 
 	// Groups render per item kind straight from the combined list.
 	// Commands always precede skills in it, so the partitioned groups
-	// match keyboard selection order. Boolean flags (not derived
-	// arrays) keep the component memoizable by the React compiler.
+	// match keyboard selection order. Boolean flags instead of derived
+	// arrays: scripts/check-compiler.mjs rejects unmemoized derived
+	// arrays feeding reactive scopes.
 	const hasCommandItems = menuItems.some((item) => item.kind === "command");
 	const hasSkillItems = menuItems.some((item) => item.kind === "skill");
 	const highlightedItem = menuItems[menuSelectedIndex];
@@ -163,7 +164,7 @@ export const PersonalSkillsTriggerMenu = ({
 							<CommandGroup heading="Commands">
 								{menuItems.map((item) =>
 									item.kind === "command" ? (
-										<SlashMenuCommandItem
+										<SlashMenuItemRow
 											key={slashMenuItemValue(item)}
 											item={item}
 											description={item.command.description}
@@ -185,7 +186,7 @@ export const PersonalSkillsTriggerMenu = ({
 							<CommandGroup heading="Personal skills">
 								{menuItems.map((item) =>
 									item.kind === "skill" ? (
-										<SlashMenuCommandItem
+										<SlashMenuItemRow
 											key={item.skill.id}
 											item={item}
 											description={item.skill.description}
@@ -208,17 +209,17 @@ export const PersonalSkillsTriggerMenu = ({
 	);
 };
 
-type SlashMenuCommandItemProps = {
+type SlashMenuItemRowProps = {
 	item: SlashMenuItem;
 	description: string;
 	onSelect: (item: SlashMenuItem) => void;
 };
 
-const SlashMenuCommandItem = ({
+const SlashMenuItemRow = ({
 	item,
 	description,
 	onSelect,
-}: SlashMenuCommandItemProps) => (
+}: SlashMenuItemRowProps) => (
 	<CommandItem
 		value={slashMenuItemValue(item)}
 		className="items-start"

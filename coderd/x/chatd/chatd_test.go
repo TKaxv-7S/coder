@@ -5900,8 +5900,8 @@ func TestActiveServer_ManualCompaction(t *testing.T) {
 		ctx := testutil.Context(t, testutil.WaitLong)
 		db, ps := dbtestutil.NewDB(t)
 		release := make(chan struct{})
+		releaseOnce := sync.OnceFunc(func() { close(release) })
 		streamStarted := make(chan struct{}, 1)
-		var once sync.Once
 		anthropicURL := chattest.NewAnthropic(t, func(req *chattest.AnthropicRequest) chattest.AnthropicResponse {
 			if !req.Stream {
 				return chattest.AnthropicNonStreamingResponse("title")
@@ -5922,7 +5922,7 @@ func TestActiveServer_ManualCompaction(t *testing.T) {
 		// Registered after newActiveTestServer so this cleanup runs
 		// before server shutdown: a failed assertion must not leave
 		// shutdown waiting on the blocked stream.
-		t.Cleanup(func() { once.Do(func() { close(release) }) })
+		t.Cleanup(releaseOnce)
 		chat := createChatThroughServer(ctx, t, db, server, org.ID, user.ID, model.ID, "stay busy")
 		// Wait for the generation to reach the blocked LLM call: the
 		// chat is then running with an owning worker.
@@ -5931,7 +5931,7 @@ func TestActiveServer_ManualCompaction(t *testing.T) {
 		_, err := server.CompactChat(ctx, chat)
 		require.ErrorIs(t, err, chatstate.ErrTransitionNotAllowed)
 
-		once.Do(func() { close(release) })
+		releaseOnce()
 		waitForChatStatus(ctx, t, db, chat.ID, database.ChatStatusWaiting)
 	})
 }

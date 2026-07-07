@@ -39,6 +39,7 @@ import {
 	userCompactionThresholds,
 } from "#/api/queries/chats";
 import { deploymentSSHConfig } from "#/api/queries/deployment";
+import { userSkills } from "#/api/queries/userSkills";
 import { preferenceSettings } from "#/api/queries/users";
 import {
 	workspaceById,
@@ -97,6 +98,10 @@ import {
 	resolveModelSelector,
 } from "./utils/modelOptions";
 import { parsePullRequestUrl } from "./utils/pullRequest";
+import {
+	COMPACT_SLASH_COMMAND,
+	chatSlashCommandTriggerText,
+} from "./utils/slashCommands";
 import {
 	type ChatDetailError,
 	formatUsageLimitMessage,
@@ -1001,6 +1006,18 @@ const AgentChatPage: FC = () => {
 	const { isPending: isCompactPending, mutateAsync: compact } = useMutation(
 		compactChat(queryClient, agentId ?? ""),
 	);
+	// A personal skill named "compact" must keep working as a skill
+	// trigger, so the built-in /compact command yields to it. Shares
+	// the composer trigger menu's query cache.
+	const personalSkillsQuery = useQuery({
+		...userSkills(),
+		staleTime: 60_000,
+	});
+	const hasCompactPersonalSkill = Boolean(
+		personalSkillsQuery.data?.some(
+			(skill) => skill.name === COMPACT_SLASH_COMMAND.name,
+		),
+	);
 	const { mutateAsync: deleteQueuedMessage } = useMutation(
 		deleteChatQueuedMessage(queryClient, agentId ?? ""),
 	);
@@ -1441,19 +1458,30 @@ const AgentChatPage: FC = () => {
 		// "/compact" on its own (no attachments or file references)
 		// requests a manual context compaction instead of sending a
 		// message. Only new sends are intercepted; edits keep their
-		// original meaning.
+		// original meaning, and a personal skill named "compact"
+		// takes precedence so the command cannot shadow it.
 		const isCompactCommand =
 			editedMessageID === undefined &&
+			!hasCompactPersonalSkill &&
 			content.length === 1 &&
 			content[0].type === "text" &&
-			content[0].text?.trim() === "/compact";
+			content[0].text?.trim() ===
+				chatSlashCommandTriggerText(COMPACT_SLASH_COMMAND);
 		if (isCompactCommand) {
+			// Optimistically show the running state before awaiting so
+			// a fast compaction cannot race this write: the worker's
+			// authoritative waiting status may arrive over the stream
+			// before the POST resolves and must not be overwritten.
+			const previousSnapshot = store.getSnapshot();
 			clearChatErrorReason(agentId);
 			clearStreamError();
+			store.clearStreamState();
+			store.setChatStatus("running");
 			scrollToBottomRef.current?.();
 			try {
 				await compact();
 			} catch (error) {
+				restoreOptimisticRequestSnapshot(store, previousSnapshot);
 				if (
 					isApiError(error) &&
 					error.response?.status === 409 &&
@@ -1465,9 +1493,6 @@ const AgentChatPage: FC = () => {
 				}
 				throw error;
 			}
-			// The worker streams the compaction like a normal turn.
-			store.clearStreamState();
-			store.setChatStatus("running");
 			return;
 		}
 
