@@ -14,7 +14,6 @@ export const ChatSummaryPanel: FC<ChatSummaryPanelProps> = ({
 	chatId,
 	isVisible,
 }) => {
-	// chat() stays live via AgentsPage's watchChats merge; cost is fetched on demand.
 	const chatQuery = useQuery({ ...chat(chatId), enabled: isVisible });
 	const costQuery = useQuery({ ...chatCost(chatId), enabled: isVisible });
 
