@@ -220,8 +220,8 @@ func TestTunnel_Wake(t *testing.T) {
 		return testutil.TryReceive(ctx, t, wakeCh)
 	}
 	requireNoRebind := func() {
-		// The tunnel rebinds before replying to the wake RPC, so by the
-		// time we have the response any rebind would already be buffered.
+		// Rebinds happen before the RPC reply, so any rebind would
+		// already be buffered by now.
 		select {
 		case <-conn.rebinds:
 			t.Fatal("unexpected rebind")
