@@ -72,7 +72,7 @@ interface GitPanelProps {
 	repositories: ReadonlyMap<string, WorkspaceAgentRepoChanges>;
 	/** Callback to send a refresh to the git watcher. Returns false when disconnected. */
 	onRefresh: () => boolean;
-	/** Called when the user clicks the Commit button in any repo tab. */
+	/** Called when the user clicks the Commit button for a working repo. */
 	onCommit: (repoRoot: string) => void;
 	/** Whether the panel is in expanded/fullscreen mode. */
 	isExpanded?: boolean;
@@ -172,8 +172,8 @@ export const GitPanel: FC<GitPanelProps> = ({
 		return Array.from(roots).sort((a, b) => a.localeCompare(b));
 	}, [repoStats, everDirty, repositories]);
 
-	// Default to the first local repo when there are only local
-	// changes and no remote stats.
+	// Default to the first local repo when nothing has been pushed
+	// upstream yet, so the panel opens on the diff the user just made.
 	const [view, setView] = useState<GitView>(() => {
 		if (!showRemoteTab && localRepos.length > 0) {
 			return { type: "local", repoRoot: localRepos[0] };
@@ -291,11 +291,10 @@ export const GitPanel: FC<GitPanelProps> = ({
 		...localItems,
 	];
 
-	// Compute the effective view inline so a stale `view.repoRoot`
-	// (from a repo that has left `localRepos`) never renders as "No
-	// changes" for a frame before the effect above corrects it. When
-	// nothing is available the remote view still renders, which the
-	// RemoteContent panel handles as its own empty/loading state.
+	// Reconcile a stale `view` inline so a repo removal never renders
+	// as "No changes" for a frame before the effect above updates.
+	// When nothing else is available, the remote view falls through;
+	// RemoteContent handles its own empty/loading state.
 	const effectiveView: GitView =
 		view.type === "remote"
 			? showRemoteTab
@@ -400,9 +399,8 @@ export const GitPanel: FC<GitPanelProps> = ({
 					</span>
 				</div>
 			</div>
-			{/* PR title row: shown below the switcher when the PR view is
-			   active and a title is known. Truncated, with the full title
-			   in a hover tooltip only when the visible text is cut off. */}
+			{/* PR title row: truncates with a hover tooltip only when the
+			   visible text is cut off. */}
 			{showPrTitleRow && (
 				<div className="flex shrink-0 items-center px-3">
 					<Tooltip open={isPrTitleTruncated ? undefined : false}>

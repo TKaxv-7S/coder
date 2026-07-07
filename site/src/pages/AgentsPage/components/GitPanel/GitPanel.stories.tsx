@@ -140,22 +140,16 @@ export const PullRequestAndWorkingChanges: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		// The branch row exposes a button that copies the PR head
-		// branch name. The aria-label embeds the branch so a single
-		// query is enough to assert both presence and target.
+		// The aria-label embeds the head branch, so a single query
+		// asserts both presence and target.
 		await expect(
 			canvas.getByLabelText("Copy branch name: feat/add-mcp-config"),
 		).toBeVisible();
 
-		// The view switcher trigger reads the PR state on the left
-		// and the PR number on the right; both are visible when the
-		// dropdown is collapsed.
 		const switcher = canvas.getByTestId("git-panel-view-switcher");
 		await expect(switcher).toHaveTextContent("Open");
 		await expect(switcher).toHaveTextContent("PR #23020");
 
-		// The PR title sits below the switcher (truncated in a
-		// span with a hover tooltip).
 		const title = canvas.getByTestId("git-panel-pr-title");
 		await expect(title).toHaveTextContent(
 			"feat(agents): add MCP server configuration to agents",
@@ -164,9 +158,8 @@ export const PullRequestAndWorkingChanges: Story = {
 };
 
 /**
- * Opens the view switcher dropdown, verifies both the PR and each
- * dirty local repo appear in the menu, then clicks the second local
- * repo to exercise the click path that swaps the active view.
+ * Opens the dropdown, asserts the PR + working repos appear, then
+ * clicks a working entry to verify the view swap.
  */
 export const ViewSwitcherOpen: Story = {
 	args: {
@@ -211,8 +204,8 @@ export const ViewSwitcherOpen: Story = {
 		await expect(menu).toHaveTextContent("coder");
 		await expect(menu).toHaveTextContent("other-project");
 
-		// Click the "other-project" working entry and verify the
-		// trigger swaps to that view.
+		// Selecting a menu item swaps the active view and the trigger
+		// identifier reflects the new selection.
 		const otherProjectItem = within(menu).getByText("other-project");
 		await userEvent.click(otherProjectItem);
 		await waitFor(() => {
@@ -459,11 +452,8 @@ export const LargeDiff: Story = {
 };
 
 /**
- * Regression: when a repo was dirty during this session and then went
- * clean (empty unified_diff), the switcher must keep the entry visible.
- * Before the ever-dirty fix, the entry vanished the moment the diff
- * became empty, which is what users saw as "diff disappears between
- * edit_files".
+ * Regression: a repo that was dirty earlier in the session must
+ * keep its switcher entry even after its unified_diff empties.
  */
 export const EverDirtyRepoGoneClean: Story = {
 	args: {
@@ -473,17 +463,16 @@ export const EverDirtyRepoGoneClean: Story = {
 		everDirty: new Set(["/home/coder/coder"]),
 	},
 	play: async ({ canvasElement }) => {
-		// The switcher trigger is still rendered (identified by its
-		// stable test id) even though the current diff is empty,
-		// because the repo was dirty earlier in the session. It reads
-		// "Working coder" for the single available view.
+		// Before the ever-dirty fix, the entry vanished the moment the
+		// diff emptied and users saw the diff "disappear between
+		// edit_files". The entry must persist here.
 		const switcher = canvasElement.querySelector(
 			"[data-testid='git-panel-view-switcher']",
 		);
 		expect(switcher).not.toBeNull();
 		expect(switcher?.textContent ?? "").toContain("Working");
 
-		// The content pane shows the diff viewer's empty-diff state.
+		// The content pane falls through to the diff viewer's empty state.
 		expect(canvasElement.textContent ?? "").toContain("No file changes");
 	},
 };
@@ -501,8 +490,6 @@ export const CleanRepoFromStart: Story = {
 		everDirty: new Set(),
 	},
 	play: async ({ canvasElement }) => {
-		// With no dirty repos and no remote diff, the switcher renders
-		// its empty-state pill ("No changes") and no "Working" entry.
 		const switcher = canvasElement.querySelector(
 			"[data-testid='git-panel-view-switcher']",
 		);
