@@ -2,14 +2,14 @@ import { SparklesIcon } from "lucide-react";
 import type { FC } from "react";
 import { cn } from "#/utils/cn";
 
-interface BlinkButtonProps {
+interface CoderAgentButtonProps {
 	open: boolean;
 	onToggle: () => void;
 	isThinking?: boolean;
 	hasUnread?: boolean;
 }
 
-export const BlinkButton: FC<BlinkButtonProps> = ({
+export const CoderAgentButton: FC<CoderAgentButtonProps> = ({
 	open,
 	onToggle,
 	isThinking = false,
@@ -19,7 +19,7 @@ export const BlinkButton: FC<BlinkButtonProps> = ({
 		<button
 			type="button"
 			onClick={onToggle}
-			aria-label={open ? "Close Blink assistant" : "Open Blink assistant"}
+			aria-label={open ? "Close Coder Agent" : "Open Coder Agent"}
 			aria-expanded={open}
 			className={cn(
 				"fixed bottom-6 right-6 z-50",

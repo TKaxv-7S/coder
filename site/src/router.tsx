@@ -15,7 +15,7 @@ import { RequireAuth } from "./contexts/auth/RequireAuth";
 import { useAuthenticated } from "./hooks/useAuthenticated";
 import { DashboardLayout } from "./modules/dashboard/DashboardLayout";
 import AuditPage from "./pages/AuditPage/AuditPage";
-import { BlinkIntroPage } from "./pages/BlinkIntroPage/BlinkIntroPage";
+import { CoderAgentIntroPage } from "./pages/CoderAgentIntroPage/CoderAgentIntroPage";
 import ConnectionLogPage from "./pages/ConnectionLogPage/ConnectionLogPage";
 import { HealthLayout } from "./pages/HealthPage/HealthLayout";
 import LoginOAuthDevicePage from "./pages/LoginOAuthDevicePage/LoginOAuthDevicePage";
@@ -565,7 +565,7 @@ export const router = createBrowserRouter(
 			<Route path="login" element={<LoginPage />} />
 			<Route path="login/device" element={<LoginOAuthDevicePage />} />
 			<Route path="setup" element={<SetupPage />} />
-			<Route path="setup/blink" element={<BlinkIntroPage />} />
+			<Route path="setup/agent" element={<CoderAgentIntroPage />} />
 			<Route path="reset-password">
 				<Route index element={<RequestOTPPage />} />
 				<Route path="change" element={<ChangePasswordPage />} />

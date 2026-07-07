@@ -157,7 +157,7 @@ export const SetupPageView: FC<SetupPageViewProps> = ({
 	isLoading,
 	authMethods,
 }) => {
-	const [blinkEnabled, setBlinkEnabled] = useState(false);
+	const [agentEnabled, setAgentEnabled] = useState(false);
 	const form: FormikContextType<TypesGen.CreateFirstUserRequest> =
 		useFormik<TypesGen.CreateFirstUserRequest>({
 			initialValues: {
@@ -182,9 +182,15 @@ export const SetupPageView: FC<SetupPageViewProps> = ({
 			},
 			validationSchema,
 			onSubmit: (values) => {
-				// Persist Blink preference alongside form submission.
+				// Persist the Coder Agent preference alongside form submission.
+				// A fresh setup that enables the agent should always see the
+				// intro, so clear any stale completion flag from a previous
+				// session in this browser.
 				try {
-					localStorage.setItem("blink_enabled", String(blinkEnabled));
+					localStorage.setItem("coder_agent_enabled", String(agentEnabled));
+					if (agentEnabled) {
+						localStorage.removeItem("coder_agent_intro_completed");
+					}
 				} catch {
 					// Storage may be unavailable.
 				}
@@ -414,26 +420,25 @@ export const SetupPageView: FC<SetupPageViewProps> = ({
 						</p>
 					</div>
 
-					{/* Blink assistant */}
+					{/* Coder Agent assistant */}
 					<label
-						htmlFor="blink-toggle"
+						htmlFor="coder-agent-toggle"
 						className="flex cursor-pointer gap-3 items-start p-4 rounded-lg border border-border hover:border-border-secondary transition-colors"
 					>
 						<Switch
-							id="blink-toggle"
-							checked={blinkEnabled}
-							onCheckedChange={(checked) => setBlinkEnabled(checked === true)}
-							data-testid="blink-toggle"
+							id="coder-agent-toggle"
+							checked={agentEnabled}
+							onCheckedChange={(checked) => setAgentEnabled(checked === true)}
+							data-testid="coder-agent-toggle"
 							className="mt-0.5"
 						/>
 						<div className="flex flex-col gap-0.5">
-							<span className="text-sm font-semibold">
-								Enable Blink assistant
-							</span>
+							<span className="text-sm font-semibold">Enable Coder Agent</span>
 							<span className="text-xs text-content-secondary leading-relaxed">
-								Blink is an AI assistant that lives in your dashboard. It can
-								help manage templates, create workspaces, and answer questions
-								about your deployment. Requires an AI provider to be configured.
+								The Coder Agent is an AI assistant that lives in your dashboard.
+								It can help manage templates, create workspaces, and answer
+								questions about your deployment. Requires an AI provider to be
+								configured.
 							</span>
 						</div>
 					</label>

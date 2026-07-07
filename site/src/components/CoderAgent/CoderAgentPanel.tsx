@@ -8,23 +8,23 @@ import {
 } from "react";
 import { cn } from "#/utils/cn";
 
-export interface BlinkMessage {
+export interface CoderAgentMessage {
 	id: string;
 	role: "user" | "assistant";
 	content: string;
 	timestamp: Date;
 }
 
-interface BlinkPanelProps {
+interface CoderAgentPanelProps {
 	open: boolean;
 	onClose: () => void;
 	onNewChat: () => void;
-	messages: BlinkMessage[];
+	messages: CoderAgentMessage[];
 	onSendMessage: (text: string) => void;
 	isThinking: boolean;
 }
 
-export const BlinkPanel: FC<BlinkPanelProps> = ({
+export const CoderAgentPanel: FC<CoderAgentPanelProps> = ({
 	open,
 	onClose,
 	onNewChat,
@@ -88,7 +88,9 @@ export const BlinkPanel: FC<BlinkPanelProps> = ({
 			>
 				<div className="flex items-center gap-2">
 					<SparklesIcon className="size-4 text-content-link" />
-					<h2 className="text-sm font-semibold text-content-primary">Blink</h2>
+					<h2 className="text-sm font-semibold text-content-primary">
+						Coder Agent
+					</h2>
 				</div>
 				<div className="flex items-center gap-1">
 					<button
@@ -107,7 +109,7 @@ export const BlinkPanel: FC<BlinkPanelProps> = ({
 					<button
 						type="button"
 						onClick={onClose}
-						aria-label="Close Blink"
+						aria-label="Close Coder Agent"
 						className={cn(
 							"p-1.5 rounded-md",
 							"text-content-secondary hover:text-content-primary",
@@ -127,7 +129,7 @@ export const BlinkPanel: FC<BlinkPanelProps> = ({
 						<SparklesIcon className="size-8 text-content-disabled" />
 						<div>
 							<p className="text-sm font-medium text-content-primary">
-								Hi, I'm Blink
+								Hi, I'm your Coder Agent
 							</p>
 							<p className="text-xs text-content-secondary mt-1">
 								Your AI assistant for Coder. Ask me anything about your
@@ -155,7 +157,7 @@ export const BlinkPanel: FC<BlinkPanelProps> = ({
 						>
 							{msg.role === "assistant" && (
 								<p className="text-xs font-medium text-content-secondary mb-1">
-									Blink
+									Coder Agent
 								</p>
 							)}
 							<p className="text-sm whitespace-pre-wrap">{msg.content}</p>
@@ -167,7 +169,7 @@ export const BlinkPanel: FC<BlinkPanelProps> = ({
 					<div className="flex justify-start">
 						<div className="bg-surface-secondary rounded-lg px-3 py-2">
 							<p className="text-xs font-medium text-content-secondary mb-1">
-								Blink
+								Coder Agent
 							</p>
 							<span className="inline-flex items-center gap-1 text-sm text-content-secondary">
 								<span className="animate-bounce [animation-delay:0ms]">.</span>
@@ -194,8 +196,8 @@ export const BlinkPanel: FC<BlinkPanelProps> = ({
 						value={inputValue}
 						onChange={(e) => setInputValue(e.target.value)}
 						onKeyDown={handleKeyDown}
-						placeholder="Ask Blink..."
-						aria-label="Message Blink"
+						placeholder="Ask Coder Agent..."
+						aria-label="Message Coder Agent"
 						className={cn(
 							"flex-1 min-w-0",
 							"px-3 py-2 text-sm",

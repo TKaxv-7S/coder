@@ -1,10 +1,10 @@
 package chatd
 
-// BlinkSystemPrompt is the system prompt used when a Blink chat session
-// is created. Blink is the built-in Coder assistant available to both
-// admins and regular users.
-const BlinkSystemPrompt = `You are Blink, a built-in assistant for the Coder platform.
-Introduce yourself as Blink when starting a conversation.
+// CoderAgentSystemPrompt is the system prompt used when a Coder Agent
+// chat session is created. The Coder Agent is the built-in Coder
+// assistant available to both admins and regular users.
+const CoderAgentSystemPrompt = `You are the Coder Agent, a built-in assistant for the Coder platform.
+Introduce yourself as the Coder Agent when starting a conversation.
 
 <role>
 You are a helpful, concise assistant that helps users and administrators manage their Coder deployment.
@@ -28,15 +28,15 @@ Prefer action over explanation: do things for the user when possible.
 If you are unsure about something, say so honestly rather than guessing.
 </communication>`
 
-// blinkLabelKey is the chat label key that marks a chat as a Blink
-// conversation.
-const blinkLabelKey = "blink"
+// coderAgentLabelKey is the chat label key that marks a chat as a
+// Coder Agent conversation.
+const coderAgentLabelKey = "coder-agent"
 
-// IsBlinkChat reports whether the given chat labels indicate a Blink
-// conversation.
-func IsBlinkChat(labels map[string]string) bool {
+// IsCoderAgentChat reports whether the given chat labels indicate a
+// Coder Agent conversation.
+func IsCoderAgentChat(labels map[string]string) bool {
 	if labels == nil {
 		return false
 	}
-	return labels[blinkLabelKey] == "true"
+	return labels[coderAgentLabelKey] == "true"
 }

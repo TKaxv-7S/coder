@@ -1,16 +1,16 @@
 import { type FC, useCallback, useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router";
-import { Blink } from "#/components/Blink/Blink";
-import {
-	BlinkProvider,
-	useBlinkContext,
-} from "#/components/Blink/BlinkProvider";
 import { Button } from "#/components/Button/Button";
+import { CoderAgent } from "#/components/CoderAgent/CoderAgent";
+import {
+	CoderAgentProvider,
+	useCoderAgentContext,
+} from "#/components/CoderAgent/CoderAgentProvider";
 import { ProductLogo } from "#/components/Icons/ProductLogo";
 import { Loader } from "#/components/Loader/Loader";
 import { useAuthContext } from "#/contexts/auth/AuthProvider";
 import { pageTitle } from "#/utils/page";
-import { BlinkProviderSetup } from "./BlinkProviderSetup";
+import { CoderAgentProviderSetup } from "./CoderAgentProviderSetup";
 
 function readLS(key: string): string | null {
 	try {
@@ -29,54 +29,56 @@ function writeLS(key: string, value: string): void {
 }
 
 /**
- * Shown once after first-user setup when Blink was enabled.
+ * Shown once after first-user setup when the Coder Agent was enabled.
  * Introduces the floating assistant and nudges the user to try it.
  */
-const BlinkIntroContent: FC<{ providerConfigured: boolean }> = ({
+const CoderAgentIntroContent: FC<{ providerConfigured: boolean }> = ({
 	providerConfigured,
 }) => {
 	const navigate = useNavigate();
-	const { toggle, open } = useBlinkContext();
+	const { toggle, open } = useCoderAgentContext();
 
-	// Mark the intro as seen however the user opens Blink, including
-	// clicking the floating button directly. Safe to write mid-session
-	// because the parent captures the flag once on mount.
+	// Mark the intro as seen however the user opens the Coder Agent,
+	// including clicking the floating button directly. Safe to write
+	// mid-session because the parent captures the flag once on mount.
 	useEffect(() => {
 		if (open) {
-			writeLS("blink_intro_completed", "true");
+			writeLS("coder_agent_intro_completed", "true");
 		}
 	}, [open]);
 
-	const handleTryBlink = useCallback(() => {
+	const handleTryCoderAgent = useCallback(() => {
 		// The user has seen the intro; don't show it again. They stay
-		// on this page to interact with Blink until they leave.
-		writeLS("blink_intro_completed", "true");
+		// on this page to interact with the Coder Agent until they leave.
+		writeLS("coder_agent_intro_completed", "true");
 		toggle();
 	}, [toggle]);
 
 	const handleSkip = useCallback(() => {
-		writeLS("blink_intro_completed", "true");
+		writeLS("coder_agent_intro_completed", "true");
 		void navigate("/templates");
 	}, [navigate]);
 
 	return (
 		<>
-			<title>{pageTitle("Meet Blink")}</title>
+			<title>{pageTitle("Meet your Coder Agent")}</title>
 			<div className="grow basis-0 min-h-screen flex justify-center items-center py-12">
 				<div className="flex flex-col items-center w-full max-w-[480px] px-4 text-center gap-8">
 					<header className="flex flex-col items-center gap-4">
 						<ProductLogo className="h-10" />
-						<h1 className="text-3xl font-semibold m-0">Meet Blink</h1>
+						<h1 className="text-3xl font-semibold m-0">
+							Meet your Coder Agent
+						</h1>
 						<p className="text-sm text-content-secondary m-0 leading-relaxed max-w-sm">
-							Blink is your Coder assistant. It lives in the bottom-right corner
-							of your dashboard and can help you set up templates, create
-							workspaces, manage users, and answer questions about your
-							deployment.
+							The Coder Agent is your Coder assistant. It lives in the
+							bottom-right corner of your dashboard and can help you set up
+							templates, create workspaces, manage users, and answer questions
+							about your deployment.
 						</p>
 						{!providerConfigured && (
 							<p className="text-xs text-content-secondary m-0 leading-relaxed max-w-sm">
-								Note: no AI provider is configured yet, so Blink can't respond
-								until one is added in Admin settings &gt; AI.
+								Note: no AI provider is configured yet, so the Coder Agent can't
+								respond until one is added in Admin settings &gt; AI.
 							</p>
 						)}
 					</header>
@@ -109,22 +111,22 @@ const BlinkIntroContent: FC<{ providerConfigured: boolean }> = ({
 						<Button variant="outline" onClick={handleSkip}>
 							Skip to dashboard
 						</Button>
-						<Button onClick={handleTryBlink}>Try Blink</Button>
+						<Button onClick={handleTryCoderAgent}>Try Coder Agent</Button>
 					</div>
 				</div>
 			</div>
 
-			{/* Blink floats here so user can interact with it */}
-			<Blink />
+			{/* The Coder Agent floats here so user can interact with it */}
+			<CoderAgent />
 		</>
 	);
 };
 
-export const BlinkIntroPage: FC = () => {
+export const CoderAgentIntroPage: FC = () => {
 	const { isLoading, isSignedIn } = useAuthContext();
 
-	// The flow has two steps: configure an AI provider so Blink can
-	// actually respond, then meet Blink itself.
+	// The flow has two steps: configure an AI provider so the Coder Agent
+	// can actually respond, then meet the Coder Agent itself.
 	const [step, setStep] = useState<"provider" | "intro">("provider");
 	const [providerConfigured, setProviderConfigured] = useState(false);
 
@@ -132,7 +134,7 @@ export const BlinkIntroPage: FC = () => {
 	// render would yank the user off the page as soon as the flag is
 	// written mid-session (e.g. right after they open the panel).
 	const [introAlreadyCompleted] = useState(
-		() => readLS("blink_intro_completed") === "true",
+		() => readLS("coder_agent_intro_completed") === "true",
 	);
 
 	if (!isLoading && !isSignedIn) {
@@ -150,10 +152,10 @@ export const BlinkIntroPage: FC = () => {
 	if (step === "provider") {
 		return (
 			<>
-				<title>{pageTitle("Set up Blink")}</title>
+				<title>{pageTitle("Set up your Coder Agent")}</title>
 				<div className="grow basis-0 min-h-screen flex justify-center items-center py-12">
 					<div className="flex flex-col items-center w-full max-w-[480px] px-4">
-						<BlinkProviderSetup
+						<CoderAgentProviderSetup
 							onComplete={() => {
 								setProviderConfigured(true);
 								setStep("intro");
@@ -167,8 +169,8 @@ export const BlinkIntroPage: FC = () => {
 	}
 
 	return (
-		<BlinkProvider forceEnabled>
-			<BlinkIntroContent providerConfigured={providerConfigured} />
-		</BlinkProvider>
+		<CoderAgentProvider forceEnabled>
+			<CoderAgentIntroContent providerConfigured={providerConfigured} />
+		</CoderAgentProvider>
 	);
 };

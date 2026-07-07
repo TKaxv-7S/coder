@@ -1,9 +1,9 @@
 import { type FC, useEffect, useState } from "react";
-import { BlinkButton } from "./BlinkButton";
-import { BlinkPanel } from "./BlinkPanel";
-import { useBlinkContext } from "./BlinkProvider";
+import { CoderAgentButton } from "./CoderAgentButton";
+import { CoderAgentPanel } from "./CoderAgentPanel";
+import { useCoderAgentContext } from "./CoderAgentProvider";
 
-export const Blink: FC = () => {
+export const CoderAgent: FC = () => {
 	const {
 		enabled,
 		open,
@@ -13,7 +13,7 @@ export const Blink: FC = () => {
 		sendMessage,
 		startNewChat,
 		isThinking,
-	} = useBlinkContext();
+	} = useCoderAgentContext();
 
 	// Track how many messages the user has seen so the unread
 	// indicator only pulses for genuinely new messages.
@@ -31,7 +31,7 @@ export const Blink: FC = () => {
 
 	return (
 		<>
-			<BlinkPanel
+			<CoderAgentPanel
 				open={open}
 				onClose={close}
 				onNewChat={startNewChat}
@@ -39,7 +39,7 @@ export const Blink: FC = () => {
 				onSendMessage={sendMessage}
 				isThinking={isThinking}
 			/>
-			<BlinkButton
+			<CoderAgentButton
 				open={open}
 				onToggle={toggle}
 				isThinking={isThinking}

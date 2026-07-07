@@ -3,9 +3,9 @@ import Snackbar from "@mui/material/Snackbar";
 import { InfoIcon } from "lucide-react";
 import { type FC, type HTMLAttributes, Suspense } from "react";
 import { Outlet } from "react-router";
-import { Blink } from "#/components/Blink/Blink";
-import { BlinkProvider } from "#/components/Blink/BlinkProvider";
 import { Button } from "#/components/Button/Button";
+import { CoderAgent } from "#/components/CoderAgent/CoderAgent";
+import { CoderAgentProvider } from "#/components/CoderAgent/CoderAgentProvider";
 import { Loader } from "#/components/Loader/Loader";
 import { useAuthenticated } from "#/hooks/useAuthenticated";
 import { AnnouncementBanners } from "#/modules/dashboard/AnnouncementBanners/AnnouncementBanners";
@@ -108,10 +108,10 @@ export const DashboardLayout: FC = () => {
 				/>
 			</div>
 
-			{/* Blink floating assistant */}
-			<BlinkProvider>
-				<Blink />
-			</BlinkProvider>
+			{/* Coder Agent floating assistant */}
+			<CoderAgentProvider>
+				<CoderAgent />
+			</CoderAgentProvider>
 		</>
 	);
 };

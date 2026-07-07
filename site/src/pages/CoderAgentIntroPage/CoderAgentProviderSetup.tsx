@@ -9,7 +9,7 @@ import { Label } from "#/components/Label/Label";
 import { Spinner } from "#/components/Spinner/Spinner";
 import { cn } from "#/utils/cn";
 
-interface BlinkProviderSetupProps {
+interface CoderAgentProviderSetupProps {
 	onComplete: () => void;
 	onSkip: () => void;
 }
@@ -47,11 +47,11 @@ const providers: ProviderOption[] = [
 ];
 
 /**
- * Provider setup shown as the first step of the Blink intro flow.
- * Creates an AI provider and a default model config so Blink has a
- * working backend before the user first talks to it.
+ * Provider setup shown as the first step of the Coder Agent intro flow.
+ * Creates an AI provider and a default model config so the Coder Agent
+ * has a working backend before the user first talks to it.
  */
-export const BlinkProviderSetup: FC<BlinkProviderSetupProps> = ({
+export const CoderAgentProviderSetup: FC<CoderAgentProviderSetupProps> = ({
 	onComplete,
 	onSkip,
 }) => {
@@ -108,10 +108,10 @@ export const BlinkProviderSetup: FC<BlinkProviderSetupProps> = ({
 	return (
 		<div className="flex flex-col gap-6 w-full">
 			<header className="text-center">
-				<h2 className="text-2xl font-semibold m-0">Set up Blink</h2>
+				<h2 className="text-2xl font-semibold m-0">Set up your Coder Agent</h2>
 				<p className="text-sm text-content-secondary mt-2 mb-0">
-					Blink needs an AI provider to work. Connect one now so it's ready when
-					you are.
+					The Coder Agent needs an AI provider to work. Connect one now so it's
+					ready when you are.
 				</p>
 			</header>
 
@@ -140,9 +140,9 @@ export const BlinkProviderSetup: FC<BlinkProviderSetupProps> = ({
 				<div className="flex flex-col gap-4">
 					{/* API Key */}
 					<div className="flex flex-col gap-2">
-						<Label htmlFor="blink-api-key">API Key</Label>
+						<Label htmlFor="agent-api-key">API Key</Label>
 						<Input
-							id="blink-api-key"
+							id="agent-api-key"
 							type="text"
 							value={apiKey}
 							onChange={(e) => setApiKey(e.target.value)}
@@ -153,9 +153,9 @@ export const BlinkProviderSetup: FC<BlinkProviderSetupProps> = ({
 
 					{/* Base URL */}
 					<div className="flex flex-col gap-2">
-						<Label htmlFor="blink-base-url">Base URL (optional)</Label>
+						<Label htmlFor="agent-base-url">Base URL (optional)</Label>
 						<Input
-							id="blink-base-url"
+							id="agent-base-url"
 							type="text"
 							value={baseUrl}
 							onChange={(e) => setBaseUrl(e.target.value)}
@@ -170,7 +170,7 @@ export const BlinkProviderSetup: FC<BlinkProviderSetupProps> = ({
 							{selectedProvider.models.map((model) => (
 								<label
 									key={model}
-									htmlFor={`blink-model-${model}`}
+									htmlFor={`agent-model-${model}`}
 									className={cn(
 										"flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-colors",
 										selectedModel === model
@@ -180,8 +180,8 @@ export const BlinkProviderSetup: FC<BlinkProviderSetupProps> = ({
 								>
 									<input
 										type="radio"
-										id={`blink-model-${model}`}
-										name="blink-model"
+										id={`agent-model-${model}`}
+										name="agent-model"
 										value={model}
 										checked={selectedModel === model}
 										onChange={() => setSelectedModel(model)}

@@ -8,21 +8,21 @@ import {
 	useRef,
 	useState,
 } from "react";
-import type { BlinkMessage } from "./BlinkPanel";
+import type { CoderAgentMessage } from "./CoderAgentPanel";
 
-interface BlinkContextValue {
+interface CoderAgentContextValue {
 	enabled: boolean;
 	open: boolean;
 	toggle: () => void;
 	close: () => void;
-	messages: BlinkMessage[];
+	messages: CoderAgentMessage[];
 	sendMessage: (text: string) => void;
 	startNewChat: () => void;
 	isThinking: boolean;
 	chatId: string | null;
 }
 
-const BlinkContext = createContext<BlinkContextValue | null>(null);
+const CoderAgentContext = createContext<CoderAgentContextValue | null>(null);
 
 function readLocalStorage(key: string, fallback: string): string {
 	try {
@@ -40,17 +40,19 @@ function writeLocalStorage(key: string, value: string): void {
 	}
 }
 
-export const BlinkProvider: FC<
+export const CoderAgentProvider: FC<
 	PropsWithChildren<{ forceEnabled?: boolean }>
 > = ({ children, forceEnabled }) => {
 	const [enabled] = useState(
-		() => forceEnabled || readLocalStorage("blink_enabled", "false") === "true",
+		() =>
+			forceEnabled ||
+			readLocalStorage("coder_agent_enabled", "false") === "true",
 	);
 	const [open, setOpen] = useState(false);
-	const [messages, setMessages] = useState<BlinkMessage[]>([]);
+	const [messages, setMessages] = useState<CoderAgentMessage[]>([]);
 	const [isThinking, setIsThinking] = useState(false);
 	const [chatId, setChatId] = useState<string | null>(
-		() => readLocalStorage("blink_chat_id", "") || null,
+		() => readLocalStorage("coder_agent_chat_id", "") || null,
 	);
 
 	// Track pending timeout so we can cancel it on unmount or new chat.
@@ -73,7 +75,7 @@ export const BlinkProvider: FC<
 	}, []);
 
 	const sendMessage = useCallback((text: string) => {
-		const userMessage: BlinkMessage = {
+		const userMessage: CoderAgentMessage = {
 			id: crypto.randomUUID(),
 			role: "user",
 			content: text,
@@ -92,11 +94,11 @@ export const BlinkProvider: FC<
 		// This will be wired to createChatMessage later.
 		pendingTimeout.current = setTimeout(() => {
 			pendingTimeout.current = null;
-			const assistantMessage: BlinkMessage = {
+			const assistantMessage: CoderAgentMessage = {
 				id: crypto.randomUUID(),
 				role: "assistant",
 				content:
-					"This is a prototype response. Blink will be connected to the AI backend soon.",
+					"This is a prototype response. The Coder Agent will be connected to the AI backend soon.",
 				timestamp: new Date(),
 			};
 			setMessages((prev) => [...prev, assistantMessage]);
@@ -114,11 +116,11 @@ export const BlinkProvider: FC<
 		setIsThinking(false);
 		const newId = crypto.randomUUID();
 		setChatId(newId);
-		writeLocalStorage("blink_chat_id", newId);
+		writeLocalStorage("coder_agent_chat_id", newId);
 	}, []);
 
 	return (
-		<BlinkContext.Provider
+		<CoderAgentContext.Provider
 			value={{
 				enabled,
 				open,
@@ -132,14 +134,16 @@ export const BlinkProvider: FC<
 			}}
 		>
 			{children}
-		</BlinkContext.Provider>
+		</CoderAgentContext.Provider>
 	);
 };
 
-export function useBlinkContext(): BlinkContextValue {
-	const ctx = useContext(BlinkContext);
+export function useCoderAgentContext(): CoderAgentContextValue {
+	const ctx = useContext(CoderAgentContext);
 	if (!ctx) {
-		throw new Error("useBlinkContext must be used within a BlinkProvider");
+		throw new Error(
+			"useCoderAgentContext must be used within a CoderAgentProvider",
+		);
 	}
 	return ctx;
 }
