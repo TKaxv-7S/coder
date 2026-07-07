@@ -104,6 +104,11 @@ const TextField: FC<TextFieldDefinition> = ({
 		description={description}
 		required={required}
 		placeholder={placeholder}
+		// Placeholder text is instructional (a hint of what to enter),
+		// so it uses the dimmer content-disabled tone instead of the
+		// default content-secondary. The important flag beats the base
+		// Input class.
+		className="placeholder:!text-content-disabled"
 	/>
 );
 
