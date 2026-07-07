@@ -23,6 +23,13 @@ type SelectedModule = {
 
 type SelectionSummaryProps = {
 	currentStep: number;
+	/**
+	 * The highest group number the user has reached. Groups at or below
+	 * this value stay clickable and rendered as `complete` even when the
+	 * current step is lower, so the sidebar behaves like a browser back
+	 * stack. Groups strictly above are `upcoming` and inert.
+	 */
+	maxReachedStep: number;
 	selectedTemplate?: SelectedTemplate;
 	selectedModules?: SelectedModule[];
 	onDeselectModule: (moduleId: string) => void;
@@ -41,6 +48,7 @@ type SelectionSummaryProps = {
 
 export const SelectionSummary: React.FC<SelectionSummaryProps> = ({
 	currentStep,
+	maxReachedStep,
 	selectedTemplate,
 	selectedModules,
 	onDeselectModule,
@@ -49,9 +57,10 @@ export const SelectionSummary: React.FC<SelectionSummaryProps> = ({
 }) => {
 	const variant = (step: number) => {
 		if (currentStep === step) return "current";
-		if (currentStep > step) return "complete";
+		if (step <= maxReachedStep) return "complete";
 		return "upcoming";
 	};
+	const reachable = (step: number) => step <= maxReachedStep;
 	return (
 		<div>
 			<h2 className="text-xl font-semibold">Selection</h2>
@@ -60,7 +69,9 @@ export const SelectionSummary: React.FC<SelectionSummaryProps> = ({
 					<StepIndicator
 						step={1}
 						onClick={
-							onNavigateStep ? () => onNavigateStep("base-infra") : undefined
+							onNavigateStep && reachable(1)
+								? () => onNavigateStep("base-infra")
+								: undefined
 						}
 					>
 						Base Template
@@ -69,7 +80,7 @@ export const SelectionSummary: React.FC<SelectionSummaryProps> = ({
 						<BaseTemplateSelection
 							template={selectedTemplate}
 							onClick={
-								onNavigateStep
+								onNavigateStep && reachable(1)
 									? () => onNavigateStep("base-parameters")
 									: undefined
 							}
@@ -82,7 +93,9 @@ export const SelectionSummary: React.FC<SelectionSummaryProps> = ({
 					<StepIndicator
 						step={2}
 						onClick={
-							onNavigateStep ? () => onNavigateStep("module-select") : undefined
+							onNavigateStep && reachable(2)
+								? () => onNavigateStep("module-select")
+								: undefined
 						}
 					>
 						Modules
@@ -91,7 +104,7 @@ export const SelectionSummary: React.FC<SelectionSummaryProps> = ({
 						<ModuleSelection
 							modules={selectedModules}
 							onDeselectModule={onDeselectModule}
-							onSelectModule={onNavigateModule}
+							onSelectModule={reachable(2) ? onNavigateModule : undefined}
 						/>
 					) : (
 						<StepDivider />
@@ -101,7 +114,7 @@ export const SelectionSummary: React.FC<SelectionSummaryProps> = ({
 					<StepIndicator
 						step={3}
 						onClick={
-							onNavigateStep
+							onNavigateStep && reachable(3)
 								? () => onNavigateStep("customizations")
 								: undefined
 						}

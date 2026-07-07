@@ -63,15 +63,15 @@ export const TemplateCard: React.FC<TemplateCardProps> = ({
 			<div>
 				<h3
 					id={nameId}
-					className="flex items-center gap-1.5 text-md font-semibold text-content-primary"
+					className="flex items-start gap-1.5 text-md font-semibold text-content-primary"
 				>
-					{name}
+					<span className="line-clamp-2">{name}</span>
 					{official && (
-						<BadgeCheckIcon className="size-4 text-highlight-sky shrink-0" />
+						<BadgeCheckIcon className="size-4 text-highlight-sky shrink-0 mt-1" />
 					)}
 				</h3>
 				<div>
-					<p className="text-sm font-normal text-content-secondary">
+					<p className="text-sm font-normal text-content-secondary line-clamp-2">
 						{description}
 					</p>
 

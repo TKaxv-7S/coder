@@ -151,12 +151,13 @@ export const ModuleSettingsStep: FC<ModuleSettingsStepProps> = ({
 
 					return (
 						// The id target is how the SelectionSummary jumps to a
-						// specific module. `scroll-mt-4` gives a small breathing
-						// margin when scrolled into view.
+						// specific module. `scroll-mt-24` accounts for the sticky
+						// top navigation so the module title is not covered when
+						// scrolled into view.
 						<div
 							key={mod.id}
 							id={`module-config-${mod.id}`}
-							className="scroll-mt-4"
+							className="scroll-mt-24"
 						>
 							<ModuleConfiguration
 								name={mod.display_name}

@@ -70,6 +70,7 @@ export const TemplateBuilderPageView: FC<TemplateBuilderPageViewProps> = ({
 }) => {
 	const [state, dispatch] = useReducer(wizardReducer, initialWizardState);
 	const [stepIndex, setStepIndex] = useState(0);
+	const [maxReachedGroup, setMaxReachedGroup] = useState<1 | 2 | 3>(1);
 	const modulesQuery = useQuery(templateBuilderModules(state.selectedBase?.id));
 
 	const moduleVarMap = Object.fromEntries(
@@ -83,6 +84,12 @@ export const TemplateBuilderPageView: FC<TemplateBuilderPageViewProps> = ({
 	const prevIndex = findPrevVisibleIndex(currentIndex, state);
 	const isFirstStep = prevIndex === -1;
 	const isLastStep = nextIndex === -1;
+
+	// Keep maxReachedGroup at least as high as the current group; navigating
+	// backward via the sidebar must not shrink it.
+	if (currentStep.group > maxReachedGroup) {
+		setMaxReachedGroup(currentStep.group);
+	}
 
 	const canContinue = computeCanContinue(
 		currentStep.id,
@@ -218,6 +225,7 @@ export const TemplateBuilderPageView: FC<TemplateBuilderPageViewProps> = ({
 				<div className="w-64 shrink-0 hidden md:block sticky top-[72px] self-start">
 					<SelectionSummary
 						currentStep={currentStep.group}
+						maxReachedStep={maxReachedGroup}
 						selectedTemplate={
 							state.selectedBase
 								? {

@@ -6,6 +6,7 @@ const meta: Meta<typeof SelectionSummary> = {
 	title: "pages/TemplateBuilder/SelectionSummary",
 	component: SelectionSummary,
 	args: {
+		maxReachedStep: 3,
 		onDeselectModule: fn(),
 		onNavigateStep: fn(),
 		onNavigateModule: fn(),
@@ -18,6 +19,7 @@ type Story = StoryObj<typeof SelectionSummary>;
 export const NoSelection: Story = {
 	args: {
 		currentStep: 0,
+		maxReachedStep: 1,
 		selectedTemplate: undefined,
 		selectedModules: undefined,
 	},
@@ -26,6 +28,7 @@ export const NoSelection: Story = {
 export const BaseTemplateStep: Story = {
 	args: {
 		currentStep: 1,
+		maxReachedStep: 1,
 		selectedTemplate: undefined,
 		selectedModules: undefined,
 	},
@@ -34,6 +37,7 @@ export const BaseTemplateStep: Story = {
 export const WithBaseTemplate: Story = {
 	args: {
 		currentStep: 1,
+		maxReachedStep: 1,
 		selectedTemplate: {
 			name: "Docker Containers",
 			iconUrl: "/icon/docker.svg",
@@ -44,6 +48,7 @@ export const WithBaseTemplate: Story = {
 export const ModulesStep: Story = {
 	args: {
 		currentStep: 2,
+		maxReachedStep: 2,
 		selectedTemplate: {
 			name: "Docker Containers",
 			iconUrl: "/icon/docker.svg",
@@ -151,6 +156,43 @@ export const Customizations: Story = {
 			{ id: "claude-code", name: "Claude Code", iconUrl: "/icon/claude.svg" },
 			{ id: "cursor", name: "Cursor IDE", iconUrl: "/icon/cursor.svg" },
 		],
+	},
+};
+
+export const BackwardNavigation: Story = {
+	// User advanced to step 3, then clicked back to step 1. Step 3 should
+	// still look reachable and clickable; nothing beyond max-reached should
+	// appear as an upcoming step.
+	args: {
+		currentStep: 1,
+		maxReachedStep: 3,
+		selectedTemplate: {
+			name: "Docker Containers",
+			iconUrl: "/icon/docker.svg",
+		},
+		selectedModules: [
+			{ id: "claude-code", name: "Claude Code", iconUrl: "/icon/claude.svg" },
+		],
+	},
+};
+
+export const UpcomingStepsInert: Story = {
+	// User is on step 1 with nothing selected yet. Steps 2 and 3 must be
+	// rendered without a button so they are not clickable and have no
+	// hover treatment.
+	args: {
+		currentStep: 1,
+		maxReachedStep: 1,
+		selectedTemplate: undefined,
+		selectedModules: undefined,
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		const modulesLabel = canvas.getByText("Modules");
+		const customizationsLabel = canvas.getByText("Customizations");
+		// Neither label should be inside a button element.
+		await expect(modulesLabel.closest("button")).toBeNull();
+		await expect(customizationsLabel.closest("button")).toBeNull();
 	},
 };
 
