@@ -41,7 +41,7 @@ func TestCASecretRoundTrip(t *testing.T) {
 		require.True(t, cert.MaxPathLenZero)
 		require.Equal(t, x509.KeyUsageCertSign, cert.KeyUsage)
 		require.Equal(t, now.Add(-clockSkewTolerance), cert.NotBefore)
-		require.Equal(t, now.Add(keyDuration+NATSCAKeyRetention+clockSkewTolerance), cert.NotAfter)
+		require.Equal(t, now.Add(keyDuration+NATSCAOverlap), cert.NotAfter)
 		require.Equal(t, cert.PublicKey, signer.Public())
 
 		// The cert must outlive its active-signer window so leaves signed at

@@ -23,14 +23,16 @@ import (
 )
 
 const (
-	// leafCertValidity is the lifetime of an ephemeral cluster leaf
-	// certificate. Leaves are re-minted before expiry and whenever the active
-	// CA rotates, so this can be well under the CA retention window
-	// (cryptokeys.NATSCAKeyRetention).
+	// leafCertValidity is the desired lifetime of an ephemeral cluster leaf
+	// certificate. The actual NotAfter is clamped to expire before the signing
+	// CA's own NotAfter (see mintLeaf), so near a CA's end a leaf is shorter.
 	leafCertValidity = 24 * time.Hour
-	// leafRenewBefore re-mints the leaf this long before it expires so an
-	// in-flight handshake never races expiry.
+	// leafRenewBefore re-mints the cached leaf this long before it expires so an
+	// in-flight handshake never races expiry. It is unrelated to the CA clamp.
 	leafRenewBefore = time.Hour
+	// leafClampBuffer is how far before the signing CA's NotAfter a leaf is
+	// forced to expire, so a leaf never outlives the CA that signed it.
+	leafClampBuffer = time.Minute
 	// clusterTLSTimeout is the route TLS handshake timeout. NATS defaults to a
 	// tight 2s, which is flaky under load and in CI.
 	clusterTLSTimeout = 10 * time.Second
@@ -41,11 +43,12 @@ const (
 	clockSkewToleranceTLS = time.Hour
 )
 
-// Leaves must never outlive the CA retention window, or a rotated-out CA could
-// be deleted while an in-flight leaf still chains to it, breaking verification
-// during a rotation overlap. Converting a negative duration to uint fails to
-// compile, mechanically enforcing leafCertValidity <= NATSCAKeyRetention.
-const _ = uint(cryptokeys.NATSCAKeyRetention - leafCertValidity)
+// Sanity check that a CA's active-signing window comfortably exceeds a leaf's
+// lifetime; otherwise a freshly minted leaf would always be clamped short.
+// Converting a negative duration to an unsigned type fails to compile. uint64
+// (not uint) is required because the positive difference exceeds 32-bit uint on
+// 32-bit build targets.
+const _ = uint64(cryptokeys.DefaultKeyDuration - leafCertValidity)
 
 // ClusterCAKeycache is the read-only view of the nats_ca signing key cache that
 // the cluster TLS layer needs. cryptokeys.SigningKeycache satisfies it, so the
@@ -273,6 +276,20 @@ func mintLeaf(ca *cryptokeys.NATSCA, ip net.IP, now time.Time) (*tls.Certificate
 		return nil, xerrors.Errorf("generate serial: %w", err)
 	}
 
+	// Clamp the leaf's expiry to just before the signing CA's own NotAfter so a
+	// leaf never outlives the CA that signed it (which would fail chain
+	// verification once the CA expires). Near a CA's end the leaf is simply
+	// shorter; the cache switches to the newer CA before then under healthy
+	// rotation.
+	notAfter := now.Add(leafCertValidity)
+	if caLimit := ca.Cert.NotAfter.Add(-leafClampBuffer); notAfter.After(caLimit) {
+		notAfter = caLimit
+	}
+	if !notAfter.After(now) {
+		return nil, xerrors.Errorf("signing CA (seq %d) expires too soon to mint a leaf: CA NotAfter %s",
+			ca.Sequence, ca.Cert.NotAfter)
+	}
+
 	template := &x509.Certificate{
 		SerialNumber: serial,
 		Subject: pkix.Name{
@@ -283,7 +300,7 @@ func mintLeaf(ca *cryptokeys.NATSCA, ip net.IP, now time.Time) (*tls.Certificate
 		},
 		IPAddresses:           []net.IP{ip},
 		NotBefore:             now.Add(-clockSkewToleranceTLS),
-		NotAfter:              now.Add(leafCertValidity),
+		NotAfter:              notAfter,
 		KeyUsage:              x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 		BasicConstraintsValid: true,

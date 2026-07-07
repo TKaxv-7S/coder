@@ -21,14 +21,15 @@ const (
 	WorkspaceAppsTokenDuration = time.Minute
 	OIDCConvertTokenDuration   = time.Minute * 5
 	TailnetResumeTokenDuration = time.Hour * 24
-	// NATSCAKeyRetention is how long a rotated-out NATS cluster CA is kept as a
-	// valid trust root after it stops being the active signer. A replica may
-	// still present a leaf signed by the old CA until that leaf expires, so the
-	// old CA must remain verifiable for at least the leaf lifetime. This is a CA
-	// retention budget, not a leaf lifetime: it must be >= the leaf validity
-	// used when minting (coderd/x/nats leafCertValidity), which is enforced by a
-	// compile-time assertion there.
-	NATSCAKeyRetention = time.Hour * 24 * 30
+	// NATSCAOverlap is how long a NATS cluster CA certificate stays valid past
+	// the end of its active-signing window (startsAt + keyDuration). The next CA
+	// becomes the active signer at the window's end, but replicas keep minting
+	// leaves with the old CA until their key cache refreshes onto the new one.
+	// This overlap keeps the old CA valid through that transition, so it must
+	// exceed the cache refresh interval (plus a small leaf clamp buffer). Leaf
+	// lifetime imposes nothing here: leaves are clamped to just before their
+	// signing CA's NotAfter (see coderd/x/nats mintLeaf).
+	NATSCAOverlap = time.Minute * 30
 
 	// defaultRotationInterval is the default interval at which keys are checked for rotation.
 	defaultRotationInterval = time.Minute * 10
@@ -300,7 +301,10 @@ func tokenDuration(feature database.CryptoKeyFeature) time.Duration {
 	case database.CryptoKeyFeatureTailnetResume:
 		return TailnetResumeTokenDuration
 	case database.CryptoKeyFeatureNATSCA:
-		return NATSCAKeyRetention
+		// The old CA row only needs to outlive its own certificate, which stays
+		// valid for NATSCAOverlap past the active-signing window. Keeping the
+		// row (and thus its trust-root status) beyond cert expiry is pointless.
+		return NATSCAOverlap
 	default:
 		return 0
 	}

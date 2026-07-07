@@ -353,3 +353,69 @@ func TestClusterTLS_verifyPool(t *testing.T) {
 	_, ok = ct.verifyPools["2"]
 	require.True(t, ok)
 }
+
+// generateTestCAWithValidity is like generateTestCA but lets a test control the
+// CA certificate's NotAfter, so leaf-clamp behavior near CA expiry is testable.
+func generateTestCAWithValidity(t *testing.T, sequence int32, notAfter time.Time) *cryptokeys.NATSCA {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+
+	template := &x509.Certificate{
+		SerialNumber:          big.NewInt(int64(sequence)),
+		Subject:               pkix.Name{CommonName: "coder-nats-ca-test"},
+		NotBefore:             notAfter.Add(-90 * 24 * time.Hour),
+		NotAfter:              notAfter,
+		KeyUsage:              x509.KeyUsageCertSign,
+		BasicConstraintsValid: true,
+		IsCA:                  true,
+	}
+	der, err := x509.CreateCertificate(rand.Reader, template, template, key.Public(), key)
+	require.NoError(t, err)
+	cert, err := x509.ParseCertificate(der)
+	require.NoError(t, err)
+
+	return &cryptokeys.NATSCA{Sequence: sequence, Cert: cert, Key: crypto.Signer(key)}
+}
+
+// TestMintLeaf_ClampsToCA asserts a leaf's NotAfter is the lesser of the desired
+// leaf validity and just before the signing CA's NotAfter, and that minting
+// against an already-expired CA fails rather than emitting a dead leaf.
+func TestMintLeaf_ClampsToCA(t *testing.T) {
+	t.Parallel()
+
+	ip := net.IPv4(127, 0, 0, 1)
+
+	t.Run("FullValidityWhenCAHasHeadroom", func(t *testing.T) {
+		t.Parallel()
+		now := time.Now()
+		// CA good for well over a leaf lifetime: leaf gets its full validity.
+		ca := generateTestCAWithValidity(t, 1, now.Add(30*24*time.Hour))
+		leaf, err := mintLeaf(ca, ip, now)
+		require.NoError(t, err)
+		require.WithinDuration(t, now.Add(leafCertValidity), leaf.Leaf.NotAfter, time.Second)
+	})
+
+	t.Run("ClampedNearCAExpiry", func(t *testing.T) {
+		t.Parallel()
+		now := time.Now()
+		// CA expires in 2h, well under the 24h desired leaf validity.
+		caNotAfter := now.Add(2 * time.Hour)
+		ca := generateTestCAWithValidity(t, 1, caNotAfter)
+		leaf, err := mintLeaf(ca, ip, now)
+		require.NoError(t, err)
+		require.WithinDuration(t, caNotAfter.Add(-leafClampBuffer), leaf.Leaf.NotAfter, time.Second)
+		require.True(t, leaf.Leaf.NotAfter.Before(ca.Cert.NotAfter),
+			"leaf must expire before its signing CA")
+	})
+
+	t.Run("ErrorsWhenCAAlreadyExpired", func(t *testing.T) {
+		t.Parallel()
+		now := time.Now()
+		// CA is within the clamp buffer of expiry: no usable leaf can be minted.
+		ca := generateTestCAWithValidity(t, 1, now.Add(leafClampBuffer/2))
+		_, err := mintLeaf(ca, ip, now)
+		require.Error(t, err)
+		require.ErrorContains(t, err, "expires too soon")
+	})
+}

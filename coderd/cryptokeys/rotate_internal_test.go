@@ -138,9 +138,10 @@ func Test_rotateKeys(t *testing.T) {
 		err := kr.rotateKeys(ctx)
 		require.NoError(t, err)
 
-		// The old CA must remain a valid trust root for the maximum leaf
-		// lifetime after rotation.
-		expectedDeletesAt := oldKey.ExpiresAt(keyDuration).Add(NATSCAKeyRetention + time.Hour)
+		// The old CA row is retained roughly as long as its certificate is
+		// valid: NATSCAOverlap past the active-signing window, plus the
+		// rotator's standard 1h propagation buffer.
+		expectedDeletesAt := oldKey.ExpiresAt(keyDuration).Add(NATSCAOverlap + time.Hour)
 		oldKey, err = db.GetCryptoKeyByFeatureAndSequence(ctx, database.GetCryptoKeyByFeatureAndSequenceParams{
 			Feature:  oldKey.Feature,
 			Sequence: oldKey.Sequence,

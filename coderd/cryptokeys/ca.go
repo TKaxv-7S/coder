@@ -42,15 +42,15 @@ type NATSCA struct {
 
 // generateCASecret generates a new self-signed CA certificate and private key
 // for signing NATS cluster leaf certificates, PEM-encoded into a single
-// bundle for storage in the crypto_keys secret column. It is exported so test
-// helpers (for example coderd/database/dbgen) can produce nats_ca rows in the
-// exact format the rotator writes, rather than duplicating the bundle format.
+// bundle for storage in the crypto_keys secret column.
 //
 // anchorTime is the key row's starts_at (which may be in the future for a
 // rotated-in key). keyDuration is the rotator's key duration: the row stays the
-// active signer for that long. The certificate must outlive that window plus
-// the longest leaf it could sign (NATSCAKeyRetention) plus clock-skew slack, so
-// leaves minted just before rotation still chain to a valid CA.
+// active signer for that long. The certificate stays valid for NATSCAOverlap
+// past that window so that, once the next CA becomes the active signer, this CA
+// is still valid while replicas' key caches refresh onto the new one. Leaves
+// are separately clamped to expire before this NotAfter (see coderd/x/nats
+// mintLeaf), so the overlap only needs to cover the cache-refresh transition.
 func generateCASecret(anchorTime time.Time, keyDuration time.Duration) (string, error) {
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
@@ -69,7 +69,7 @@ func generateCASecret(anchorTime time.Time, keyDuration time.Duration) (string, 
 			CommonName: "coder-nats-ca",
 		},
 		NotBefore:             anchorTime.Add(-clockSkewTolerance),
-		NotAfter:              anchorTime.Add(keyDuration + NATSCAKeyRetention + clockSkewTolerance),
+		NotAfter:              anchorTime.Add(keyDuration + NATSCAOverlap),
 		KeyUsage:              x509.KeyUsageCertSign,
 		BasicConstraintsValid: true,
 		IsCA:                  true,
