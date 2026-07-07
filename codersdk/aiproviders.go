@@ -281,6 +281,13 @@ func (req CreateAIProviderRequest) Validate() []ValidationError {
 				Detail: "external_id is server-generated and cannot be set",
 			})
 		}
+		// The Mantle protocol signs requests with SigV4, which requires a region.
+		if req.Settings.Bedrock.ResolvedProtocol() == AIProviderBedrockProtocolMantle && req.Settings.Bedrock.Region == "" {
+			validations = append(validations, ValidationError{
+				Field:  "settings.region",
+				Detail: "region is required for the mantle protocol",
+			})
+		}
 	}
 	if req.Type == AIProviderTypeCopilot && len(req.APIKeys) > 0 {
 		validations = append(validations, ValidationError{
