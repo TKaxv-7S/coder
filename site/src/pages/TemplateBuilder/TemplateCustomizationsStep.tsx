@@ -129,8 +129,14 @@ export const TemplateCustomizationsStep: FC<
 						<p className="text-xs text-content-secondary">
 							Used by both humans and Agents to identify templates.
 						</p>
+					</div>
 
+					{/* Left column */}
+					<div className="flex flex-col gap-2">
+						<Label htmlFor="template-icon">Icon</Label>
 						<IconField
+							id="template-icon"
+							label=""
 							value={state.icon}
 							onChange={(e) => {
 								const target = e.target as HTMLInputElement;
