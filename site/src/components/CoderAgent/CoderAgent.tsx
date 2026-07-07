@@ -1,4 +1,8 @@
 import { type FC, useEffect, useState } from "react";
+import {
+	selectOrderedMessageIDs,
+	useChatSelector,
+} from "#/pages/AgentsPage/components/ChatConversation/chatStore";
 import { CoderAgentButton } from "./CoderAgentButton";
 import { CoderAgentPanel } from "./CoderAgentPanel";
 import { useCoderAgentContext } from "./CoderAgentProvider";
@@ -9,11 +13,16 @@ export const CoderAgent: FC = () => {
 		open,
 		toggle,
 		close,
-		messages,
+		chatId,
+		store,
+		persistedError,
 		sendMessage,
 		startNewChat,
 		isThinking,
 	} = useCoderAgentContext();
+
+	const orderedMessageIDs = useChatSelector(store, selectOrderedMessageIDs);
+	const messageCount = orderedMessageIDs.length;
 
 	// Track how many messages the user has seen so the unread
 	// indicator only pulses for genuinely new messages.
@@ -21,9 +30,9 @@ export const CoderAgent: FC = () => {
 
 	useEffect(() => {
 		if (open) {
-			setSeenCount(messages.length);
+			setSeenCount(messageCount);
 		}
-	}, [open, messages.length]);
+	}, [open, messageCount]);
 
 	if (!enabled) {
 		return null;
@@ -35,15 +44,17 @@ export const CoderAgent: FC = () => {
 				open={open}
 				onClose={close}
 				onNewChat={startNewChat}
-				messages={messages}
 				onSendMessage={sendMessage}
 				isThinking={isThinking}
+				chatId={chatId}
+				store={store}
+				persistedError={persistedError}
 			/>
 			<CoderAgentButton
 				open={open}
 				onToggle={toggle}
 				isThinking={isThinking}
-				hasUnread={messages.length > seenCount && !open}
+				hasUnread={messageCount > seenCount && !open}
 			/>
 		</>
 	);

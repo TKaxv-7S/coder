@@ -354,6 +354,9 @@ func (server *Server) prepareGeneration(
 			isRootChat:           isRootChat,
 		},
 	)
+	if IsCoderAgentChat(chat.Labels) {
+		prompt = chatprompt.InsertSystem(prompt, CoderAgentSystemPrompt)
+	}
 	if advisorRuntime != nil {
 		prompt = chatprompt.InsertSystem(prompt, chatadvisor.ParentGuidanceBlock)
 	}

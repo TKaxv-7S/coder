@@ -5,24 +5,50 @@ import {
 	useCallback,
 	useContext,
 	useEffect,
-	useRef,
 	useState,
 } from "react";
-import type { CoderAgentMessage } from "./CoderAgentPanel";
+import {
+	useInfiniteQuery,
+	useMutation,
+	useQuery,
+	useQueryClient,
+} from "react-query";
+import {
+	chat,
+	chatMessagesForInfiniteScroll,
+	createChat,
+	createChatMessage,
+} from "#/api/queries/chats";
+import type * as TypesGen from "#/api/typesGenerated";
+import { useAuthenticated } from "#/hooks/useAuthenticated";
+import {
+	type ChatStore,
+	selectChatStatus,
+	useChatSelector,
+} from "#/pages/AgentsPage/components/ChatConversation/chatStore";
+import { useChatStore } from "#/pages/AgentsPage/components/ChatConversation/useChatStore";
+import type { ChatDetailError } from "#/pages/AgentsPage/utils/usageLimitMessage";
 
 interface CoderAgentContextValue {
 	enabled: boolean;
 	open: boolean;
 	toggle: () => void;
 	close: () => void;
-	messages: CoderAgentMessage[];
+	chatId: string | null;
+	store: ChatStore;
+	persistedError: ChatDetailError | undefined;
 	sendMessage: (text: string) => void;
 	startNewChat: () => void;
 	isThinking: boolean;
-	chatId: string | null;
 }
 
 const CoderAgentContext = createContext<CoderAgentContextValue | null>(null);
+
+const CHAT_ID_STORAGE_KEY = "coder_agent_chat_id";
+
+// Key used to store an error from a failed chat creation, before any
+// chat ID exists.
+const PENDING_CHAT_ERROR_KEY = "pending";
 
 function readLocalStorage(key: string, fallback: string): string {
 	try {
@@ -32,9 +58,13 @@ function readLocalStorage(key: string, fallback: string): string {
 	}
 }
 
-function writeLocalStorage(key: string, value: string): void {
+function writeLocalStorage(key: string, value: string | null): void {
 	try {
-		localStorage.setItem(key, value);
+		if (value === null) {
+			localStorage.removeItem(key);
+		} else {
+			localStorage.setItem(key, value);
+		}
 	} catch {
 		// Storage may be unavailable in some contexts.
 	}
@@ -49,22 +79,113 @@ export const CoderAgentProvider: FC<
 			readLocalStorage("coder_agent_enabled", "false") === "true",
 	);
 	const [open, setOpen] = useState(false);
-	const [messages, setMessages] = useState<CoderAgentMessage[]>([]);
-	const [isThinking, setIsThinking] = useState(false);
-	const [chatId, setChatId] = useState<string | null>(
-		() => readLocalStorage("coder_agent_chat_id", "") || null,
+	const [chatId, setChatIdState] = useState<string | null>(
+		() => readLocalStorage(CHAT_ID_STORAGE_KEY, "") || null,
 	);
 
-	// Track pending timeout so we can cancel it on unmount or new chat.
-	const pendingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const queryClient = useQueryClient();
+	const { user } = useAuthenticated();
+	const organizationId = user.organization_ids[0];
 
-	useEffect(() => {
-		return () => {
-			if (pendingTimeout.current !== null) {
-				clearTimeout(pendingTimeout.current);
-			}
-		};
+	const setChatId = useCallback((id: string | null) => {
+		setChatIdState(id);
+		writeLocalStorage(CHAT_ID_STORAGE_KEY, id);
 	}, []);
+
+	// Error reasons keyed by chat ID, matching the callback contract
+	// that useChatStore expects.
+	const [errorReasons, setErrorReasons] = useState<
+		Record<string, ChatDetailError>
+	>({});
+	const setChatErrorReason = useCallback(
+		(chatID: string, reason: ChatDetailError) => {
+			setErrorReasons((prev) => ({ ...prev, [chatID]: reason }));
+		},
+		[],
+	);
+	const clearChatErrorReason = useCallback((chatID: string) => {
+		setErrorReasons((prev) => {
+			if (!(chatID in prev)) {
+				return prev;
+			}
+			const next = { ...prev };
+			delete next[chatID];
+			return next;
+		});
+	}, []);
+	const persistedError = errorReasons[chatId ?? PENDING_CHAT_ERROR_KEY];
+
+	const chatQuery = useQuery({
+		...chat(chatId ?? ""),
+		enabled: Boolean(chatId),
+		retry: false,
+	});
+	const chatMessagesQuery = useInfiniteQuery({
+		...chatMessagesForInfiniteScroll(chatId ?? ""),
+		enabled: Boolean(chatId),
+	});
+
+	// The stored chat may have been deleted since the last visit.
+	// Drop the stale ID so the next send creates a fresh chat.
+	const chatLoadFailed = chatQuery.isError || chatMessagesQuery.isError;
+	useEffect(() => {
+		if (chatId && chatLoadFailed) {
+			setChatId(null);
+		}
+	}, [chatId, chatLoadFailed, setChatId]);
+
+	// Flatten the infinite pages into a single chronological list,
+	// deduplicated by ID. Mirrors the wiring in AgentChatPage.
+	const chatMessagesList: TypesGen.ChatMessage[] | undefined = (() => {
+		const pages = chatMessagesQuery.data?.pages;
+		if (!pages) {
+			return undefined;
+		}
+		const all = pages.flatMap((p) => p.messages);
+		const byID = new Map(all.map((m) => [m.id, m]));
+		const deduped = Array.from(byID.values());
+		deduped.sort((a, b) => a.id - b.id);
+		return deduped;
+	})();
+
+	// Queued messages are only in the first page (most recent).
+	const chatQueuedMessages = chatMessagesQuery.data?.pages[0]?.queued_messages;
+
+	// Synthetic ChatMessagesResponse for backward compat with
+	// useChatStore, matching the shape built in AgentChatPage.
+	const chatMessagesData: TypesGen.ChatMessagesResponse | undefined =
+		chatMessagesList
+			? {
+					messages: chatMessagesList,
+					queued_messages: chatQueuedMessages ?? [],
+					has_more: chatMessagesQuery.data?.pages.at(-1)?.has_more ?? false,
+				}
+			: undefined;
+
+	const { store } = useChatStore({
+		chatID: chatId ?? undefined,
+		chatMessages: chatMessagesList,
+		chatRecord: chatQuery.data,
+		chatMessagesData,
+		chatQueuedMessages,
+		setChatErrorReason,
+		clearChatErrorReason,
+	});
+
+	const { isPending: isCreatePending, mutateAsync: createChatAsync } =
+		useMutation(createChat(queryClient));
+	const { isPending: isSendPending, mutateAsync: createMessageAsync } =
+		useMutation(createChatMessage(queryClient, chatId ?? ""));
+
+	// The store's status is hydrated from REST and kept fresh by the
+	// WebSocket, so it is the authoritative source for the thinking
+	// indicator.
+	const chatStatus = useChatSelector(store, selectChatStatus);
+	const isThinking =
+		isCreatePending ||
+		isSendPending ||
+		chatStatus === "running" ||
+		chatStatus === "pending";
 
 	const toggle = useCallback(() => {
 		setOpen((prev) => !prev);
@@ -74,50 +195,50 @@ export const CoderAgentProvider: FC<
 		setOpen(false);
 	}, []);
 
-	const sendMessage = useCallback((text: string) => {
-		const userMessage: CoderAgentMessage = {
-			id: crypto.randomUUID(),
-			role: "user",
-			content: text,
-			timestamp: new Date(),
-		};
-
-		setMessages((prev) => [...prev, userMessage]);
-		setIsThinking(true);
-
-		// Cancel any previously pending response.
-		if (pendingTimeout.current !== null) {
-			clearTimeout(pendingTimeout.current);
-		}
-
-		// Stub: simulate assistant response after a short delay.
-		// This will be wired to createChatMessage later.
-		pendingTimeout.current = setTimeout(() => {
-			pendingTimeout.current = null;
-			const assistantMessage: CoderAgentMessage = {
-				id: crypto.randomUUID(),
-				role: "assistant",
-				content:
-					"This is a prototype response. The Coder Agent will be connected to the AI backend soon.",
-				timestamp: new Date(),
-			};
-			setMessages((prev) => [...prev, assistantMessage]);
-			setIsThinking(false);
-		}, 1500);
-	}, []);
+	const sendMessage = useCallback(
+		(text: string) => {
+			const content: TypesGen.ChatInputPart[] = [{ type: "text", text }];
+			void (async () => {
+				try {
+					if (chatId) {
+						await createMessageAsync({ content });
+						return;
+					}
+					const created = await createChatAsync({
+						organization_id: organizationId,
+						content,
+						labels: { "coder-agent": "true" },
+						client_type: "ui",
+					});
+					clearChatErrorReason(PENDING_CHAT_ERROR_KEY);
+					setChatId(created.id);
+				} catch (error) {
+					const target = chatId ?? PENDING_CHAT_ERROR_KEY;
+					setChatErrorReason(target, {
+						kind: "generic",
+						message:
+							error instanceof Error
+								? error.message
+								: "Failed to send message.",
+					});
+				}
+			})();
+		},
+		[
+			chatId,
+			clearChatErrorReason,
+			createChatAsync,
+			createMessageAsync,
+			organizationId,
+			setChatErrorReason,
+			setChatId,
+		],
+	);
 
 	const startNewChat = useCallback(() => {
-		// Cancel any pending stub response.
-		if (pendingTimeout.current !== null) {
-			clearTimeout(pendingTimeout.current);
-			pendingTimeout.current = null;
-		}
-		setMessages([]);
-		setIsThinking(false);
-		const newId = crypto.randomUUID();
-		setChatId(newId);
-		writeLocalStorage("coder_agent_chat_id", newId);
-	}, []);
+		clearChatErrorReason(PENDING_CHAT_ERROR_KEY);
+		setChatId(null);
+	}, [clearChatErrorReason, setChatId]);
 
 	return (
 		<CoderAgentContext.Provider
@@ -126,11 +247,12 @@ export const CoderAgentProvider: FC<
 				open,
 				toggle,
 				close,
-				messages,
+				chatId,
+				store,
+				persistedError,
 				sendMessage,
 				startNewChat,
 				isThinking,
-				chatId,
 			}}
 		>
 			{children}

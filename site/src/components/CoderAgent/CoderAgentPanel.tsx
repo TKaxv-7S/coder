@@ -6,38 +6,44 @@ import {
 	useRef,
 	useState,
 } from "react";
+import {
+	type ChatStore,
+	selectOrderedMessageIDs,
+	useChatSelector,
+} from "#/pages/AgentsPage/components/ChatConversation/chatStore";
+import { ChatPageTimeline } from "#/pages/AgentsPage/components/ChatPageContent";
+import type { ChatDetailError } from "#/pages/AgentsPage/utils/usageLimitMessage";
 import { cn } from "#/utils/cn";
-
-export interface CoderAgentMessage {
-	id: string;
-	role: "user" | "assistant";
-	content: string;
-	timestamp: Date;
-}
 
 interface CoderAgentPanelProps {
 	open: boolean;
 	onClose: () => void;
 	onNewChat: () => void;
-	messages: CoderAgentMessage[];
 	onSendMessage: (text: string) => void;
 	isThinking: boolean;
+	chatId: string | null;
+	store: ChatStore;
+	persistedError: ChatDetailError | undefined;
 }
 
 export const CoderAgentPanel: FC<CoderAgentPanelProps> = ({
 	open,
 	onClose,
 	onNewChat,
-	messages,
 	onSendMessage,
 	isThinking,
+	chatId,
+	store,
+	persistedError,
 }) => {
 	const [inputValue, setInputValue] = useState("");
 	const messagesEndRef = useRef<HTMLDivElement>(null);
 	const inputRef = useRef<HTMLInputElement>(null);
 
+	const orderedMessageIDs = useChatSelector(store, selectOrderedMessageIDs);
+	const messageCount = orderedMessageIDs.length;
+
 	// Auto-scroll to bottom on new messages or thinking state change.
-	const messageCount = messages.length;
 	// biome-ignore lint/correctness/useExhaustiveDependencies: messageCount and isThinking are intentional scroll triggers
 	useEffect(() => {
 		messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -123,54 +129,15 @@ export const CoderAgentPanel: FC<CoderAgentPanelProps> = ({
 			</div>
 
 			{/* Messages */}
-			<div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
-				{messages.length === 0 && !isThinking && (
-					<div className="flex flex-col items-center justify-center h-full text-center gap-3">
-						<SparklesIcon className="size-8 text-content-disabled" />
-						<div>
-							<p className="text-sm font-medium text-content-primary">
-								Hi, I'm your Coder Agent
-							</p>
-							<p className="text-xs text-content-secondary mt-1">
-								Your AI assistant for Coder. Ask me anything about your
-								workspaces, templates, or development environment.
-							</p>
-						</div>
-					</div>
-				)}
-
-				{messages.map((msg) => (
-					<div
-						key={msg.id}
-						className={cn(
-							"flex",
-							msg.role === "user" ? "justify-end" : "justify-start",
-						)}
-					>
-						<div
-							className={cn(
-								"max-w-[85%] rounded-lg px-3 py-2",
-								msg.role === "user"
-									? "bg-surface-invert-primary text-surface-primary"
-									: "bg-surface-secondary text-content-primary",
-							)}
-						>
-							{msg.role === "assistant" && (
-								<p className="text-xs font-medium text-content-secondary mb-1">
-									Coder Agent
-								</p>
-							)}
-							<p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-						</div>
-					</div>
-				))}
-
-				{isThinking && (
-					<div className="flex justify-start">
-						<div className="bg-surface-secondary rounded-lg px-3 py-2">
-							<p className="text-xs font-medium text-content-secondary mb-1">
-								Coder Agent
-							</p>
+			<div className="flex-1 overflow-y-auto px-4">
+				{chatId ? (
+					<>
+						<ChatPageTimeline store={store} persistedError={persistedError} />
+						<div ref={messagesEndRef} />
+					</>
+				) : (
+					<div className="flex flex-col items-center justify-center h-full text-center gap-3 py-3">
+						{isThinking ? (
 							<span className="inline-flex items-center gap-1 text-sm text-content-secondary">
 								<span className="animate-bounce [animation-delay:0ms]">.</span>
 								<span className="animate-bounce [animation-delay:150ms]">
@@ -180,11 +147,27 @@ export const CoderAgentPanel: FC<CoderAgentPanelProps> = ({
 									.
 								</span>
 							</span>
-						</div>
+						) : (
+							<>
+								<SparklesIcon className="size-8 text-content-disabled" />
+								<div>
+									<p className="text-sm font-medium text-content-primary">
+										Hi, I'm your Coder Agent
+									</p>
+									<p className="text-xs text-content-secondary mt-1">
+										Your AI assistant for Coder. Ask me anything about your
+										workspaces, templates, or development environment.
+									</p>
+								</div>
+							</>
+						)}
+						{persistedError && (
+							<p className="text-xs text-content-destructive">
+								{persistedError.message}
+							</p>
+						)}
 					</div>
 				)}
-
-				<div ref={messagesEndRef} />
 			</div>
 
 			{/* Footer / Input */}
