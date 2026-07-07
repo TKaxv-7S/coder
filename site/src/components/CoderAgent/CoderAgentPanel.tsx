@@ -6,12 +6,13 @@ import {
 	XIcon,
 } from "lucide-react";
 import { type FC, useEffect, useRef } from "react";
-import { Link, useNavigate } from "react-router";
+import { useNavigate } from "react-router";
 import { Button } from "#/components/Button/Button";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuItem,
+	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "#/components/DropdownMenu/DropdownMenu";
 import {
@@ -29,13 +30,23 @@ import { buildAgentChatPath } from "#/pages/AgentsPage/utils/navigation";
 import type { ChatDetailError } from "#/pages/AgentsPage/utils/usageLimitMessage";
 import { cn } from "#/utils/cn";
 
+const SUGGESTED_PROMPTS = [
+	"What can you do?",
+	"Create a workspace for me",
+	"Help me build a template",
+];
+
 interface CoderAgentPanelProps {
 	open: boolean;
 	onClose: () => void;
 	onNewChat: () => void;
+	onDisable: () => void;
 	onSendMessage: (text: string) => void;
 	isThinking: boolean;
 	isSendPending: boolean;
+	isStreaming: boolean;
+	onInterrupt: () => void;
+	isInterruptPending: boolean;
 	chatId: string | null;
 	store: ChatStore;
 	persistedError: ChatDetailError | undefined;
@@ -52,9 +63,13 @@ export const CoderAgentPanel: FC<CoderAgentPanelProps> = ({
 	open,
 	onClose,
 	onNewChat,
+	onDisable,
 	onSendMessage,
 	isThinking,
 	isSendPending,
+	isStreaming,
+	onInterrupt,
+	isInterruptPending,
 	chatId,
 	store,
 	persistedError,
@@ -84,6 +99,22 @@ export const CoderAgentPanel: FC<CoderAgentPanelProps> = ({
 			inputRef.current?.focus();
 		}
 	}, [open]);
+
+	// Escape closes the panel. Radix layers (dropdowns, selects) call
+	// preventDefault when they consume Escape, so checking
+	// defaultPrevented keeps this from firing while a menu is open.
+	useEffect(() => {
+		if (!open) {
+			return;
+		}
+		const handleKeyDown = (event: KeyboardEvent) => {
+			if (event.key === "Escape" && !event.defaultPrevented) {
+				onClose();
+			}
+		};
+		document.addEventListener("keydown", handleKeyDown);
+		return () => document.removeEventListener("keydown", handleKeyDown);
+	}, [open, onClose]);
 
 	const handleSend = (text: string) => {
 		onSendMessage(text);
@@ -145,35 +176,14 @@ export const CoderAgentPanel: FC<CoderAgentPanelProps> = ({
 							>
 								AI settings
 							</DropdownMenuItem>
+							<DropdownMenuSeparator />
+							<DropdownMenuItem onClick={onDisable}>
+								Disable assistant
+							</DropdownMenuItem>
 						</DropdownMenuContent>
 					</DropdownMenu>
 				</div>
 				<div className="flex items-center gap-1">
-					<Button
-						variant="subtle"
-						size="icon"
-						onClick={onNewChat}
-						className="size-7 text-content-secondary hover:text-content-primary"
-						aria-label="New chat"
-					>
-						<PlusIcon className="size-4" />
-					</Button>
-					{chatId && (
-						<Button
-							asChild
-							variant="subtle"
-							size="icon"
-							className="size-7 text-content-secondary hover:text-content-primary"
-						>
-							<Link
-								to={buildAgentChatPath({ chatId })}
-								aria-label="Open in Agents"
-								onClick={onClose}
-							>
-								<ExternalLinkIcon className="size-4" />
-							</Link>
-						</Button>
-					)}
 					<Button
 						variant="subtle"
 						size="icon"
@@ -228,6 +238,24 @@ export const CoderAgentPanel: FC<CoderAgentPanelProps> = ({
 											workspaces, templates, or development environment.
 										</p>
 									</div>
+									<div className="flex flex-wrap justify-center gap-2">
+										{SUGGESTED_PROMPTS.map((prompt) => (
+											<button
+												key={prompt}
+												type="button"
+												disabled={!hasModelOptions}
+												onClick={() => onSendMessage(prompt)}
+												className={cn(
+													"cursor-pointer rounded-full border border-solid border-border",
+													"bg-surface-secondary px-3 py-1.5 text-xs text-content-secondary",
+													"hover:bg-surface-tertiary hover:text-content-primary",
+													"disabled:cursor-not-allowed disabled:opacity-50",
+												)}
+											>
+												{prompt}
+											</button>
+										))}
+									</div>
 								</>
 							)}
 							{persistedError && (
@@ -249,6 +277,9 @@ export const CoderAgentPanel: FC<CoderAgentPanelProps> = ({
 					placeholder="Type a message..."
 					isDisabled={!hasModelOptions}
 					isLoading={isSendPending}
+					isStreaming={isStreaming}
+					onInterrupt={onInterrupt}
+					isInterruptPending={isInterruptPending}
 					selectedModel={selectedModel}
 					onModelChange={onModelChange}
 					modelOptions={modelOptions}

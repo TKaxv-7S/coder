@@ -20,6 +20,7 @@ import {
 	chatModels,
 	createChat,
 	createChatMessage,
+	interruptChat,
 	userChatProviderConfigs,
 } from "#/api/queries/chats";
 import type * as TypesGen from "#/api/typesGenerated";
@@ -27,6 +28,7 @@ import { useAuthenticated } from "#/hooks/useAuthenticated";
 import {
 	type ChatStore,
 	selectChatStatus,
+	selectHasStreamState,
 	useChatSelector,
 } from "#/pages/AgentsPage/components/ChatConversation/chatStore";
 import { useChatStore } from "#/pages/AgentsPage/components/ChatConversation/useChatStore";
@@ -43,6 +45,8 @@ interface CoderAgentContextValue {
 	open: boolean;
 	toggle: () => void;
 	close: () => void;
+	// Disables the assistant immediately and persists the choice.
+	disable: () => void;
 	chatId: string | null;
 	chatTitle: string | undefined;
 	store: ChatStore;
@@ -52,6 +56,11 @@ interface CoderAgentContextValue {
 	isThinking: boolean;
 	// True while a create-chat or send-message request is in flight.
 	isSendPending: boolean;
+	// True while the assistant is streaming a response, mirroring the
+	// derivation in ChatPageContent.
+	isStreaming: boolean;
+	interrupt: () => void;
+	isInterruptPending: boolean;
 	// Model selector state, mirroring the agents chat page wiring.
 	modelOptions: readonly ModelSelectorOption[];
 	selectedModel: string;
@@ -96,7 +105,7 @@ function writeLocalStorage(key: string, value: string | null): void {
 export const CoderAgentProvider: FC<
 	PropsWithChildren<{ forceEnabled?: boolean }>
 > = ({ children, forceEnabled }) => {
-	const [enabled] = useState(
+	const [enabled, setEnabled] = useState(
 		() =>
 			forceEnabled ||
 			readLocalStorage("coder_agent_enabled", "false") === "true",
@@ -199,6 +208,8 @@ export const CoderAgentProvider: FC<
 		useMutation(createChat(queryClient));
 	const { isPending: isSendPending, mutateAsync: createMessageAsync } =
 		useMutation(createChatMessage(queryClient, chatId ?? ""));
+	const { isPending: isInterruptPending, mutateAsync: interruptAsync } =
+		useMutation(interruptChat(queryClient, chatId ?? ""));
 
 	// Model selector, wired the same way as the agents chat page.
 	const chatModelsQuery = useQuery(chatModels());
@@ -248,11 +259,15 @@ export const CoderAgentProvider: FC<
 	// WebSocket, so it is the authoritative source for the thinking
 	// indicator.
 	const chatStatus = useChatSelector(store, selectChatStatus);
+	const hasStreamState = useChatSelector(store, selectHasStreamState);
 	const isThinking =
 		isCreatePending ||
 		isSendPending ||
 		chatStatus === "running" ||
 		chatStatus === "pending";
+	// Same derivation ChatPageContent uses for the stop button.
+	const isStreaming =
+		hasStreamState || chatStatus === "running" || chatStatus === "pending";
 
 	const toggle = useCallback(() => {
 		setOpen((prev) => !prev);
@@ -261,6 +276,19 @@ export const CoderAgentProvider: FC<
 	const close = useCallback(() => {
 		setOpen(false);
 	}, []);
+
+	const disable = useCallback(() => {
+		writeLocalStorage("coder_agent_enabled", "false");
+		setEnabled(false);
+		setOpen(false);
+	}, []);
+
+	const interrupt = useCallback(() => {
+		if (!chatId || isInterruptPending) {
+			return;
+		}
+		void interruptAsync();
+	}, [chatId, isInterruptPending, interruptAsync]);
 
 	const sendMessage = useCallback(
 		(text: string) => {
@@ -323,6 +351,7 @@ export const CoderAgentProvider: FC<
 				open,
 				toggle,
 				close,
+				disable,
 				chatId,
 				chatTitle: chatQuery.data?.title,
 				store,
@@ -331,6 +360,9 @@ export const CoderAgentProvider: FC<
 				startNewChat,
 				isThinking,
 				isSendPending: isCreatePending || isSendPending,
+				isStreaming,
+				interrupt,
+				isInterruptPending,
 				modelOptions,
 				selectedModel: effectiveSelectedModel,
 				setSelectedModel,

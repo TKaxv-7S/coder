@@ -1,4 +1,4 @@
-import { type FC, useRef } from "react";
+import { type FC, useId, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "react-query";
 import {
 	appearanceSettings,
@@ -6,8 +6,11 @@ import {
 } from "#/api/queries/users";
 import type { UpdateUserAppearanceSettingsRequest } from "#/api/typesGenerated";
 import { ErrorAlert } from "#/components/Alert/ErrorAlert";
+import { Label } from "#/components/Label/Label";
 import { Loader } from "#/components/Loader/Loader";
+import { Switch } from "#/components/Switch/Switch";
 import { useEmbeddedMetadata } from "#/hooks/useEmbeddedMetadata";
+import { Section } from "#/pages/UserSettingsPage/Section";
 import { usePreferredColorScheme } from "#/theme/usePreferredColorScheme";
 import { AppearanceForm } from "./AppearanceForm";
 
@@ -47,6 +50,52 @@ export const useQueuedAppearanceSubmit = (mutate: MutateAppearanceSettings) => {
 	};
 };
 
+const CODER_AGENT_ENABLED_KEY = "coder_agent_enabled";
+
+// The Coder Assistant is a per-browser preference stored in
+// localStorage. The provider reads it once at mount, so changes take
+// effect after a page reload.
+const CoderAssistantSection: FC = () => {
+	const switchId = useId();
+	const [assistantEnabled, setAssistantEnabled] = useState(() => {
+		try {
+			return localStorage.getItem(CODER_AGENT_ENABLED_KEY) === "true";
+		} catch {
+			return false;
+		}
+	});
+
+	const handleToggle = (checked: boolean) => {
+		setAssistantEnabled(checked);
+		try {
+			localStorage.setItem(CODER_AGENT_ENABLED_KEY, String(checked));
+		} catch {
+			// Storage may be unavailable in some contexts.
+		}
+	};
+
+	return (
+		<Section title="Coder Assistant" layout="fluid" className="mt-12">
+			<div className="flex items-center gap-3">
+				<Switch
+					id={switchId}
+					checked={assistantEnabled}
+					onCheckedChange={handleToggle}
+				/>
+				<div className="flex flex-col">
+					<Label htmlFor={switchId} className="cursor-pointer font-normal">
+						Show the Coder Assistant
+					</Label>
+					<span className="text-xs text-content-secondary">
+						Display the floating assistant button in the dashboard. Takes effect
+						after a page reload.
+					</span>
+				</div>
+			</div>
+		</Section>
+	);
+};
+
 const AppearancePage: FC = () => {
 	const queryClient = useQueryClient();
 	const updateAppearanceSettingsMutation = useMutation(
@@ -75,13 +124,16 @@ const AppearancePage: FC = () => {
 	}
 
 	return (
-		<AppearanceForm
-			isUpdating={updateAppearanceSettingsMutation.isPending}
-			error={updateAppearanceSettingsMutation.error}
-			initialValues={appearanceSettingsQuery.data}
-			activeScheme={osColorScheme}
-			onSubmit={submitAppearanceSettings}
-		/>
+		<>
+			<AppearanceForm
+				isUpdating={updateAppearanceSettingsMutation.isPending}
+				error={updateAppearanceSettingsMutation.error}
+				initialValues={appearanceSettingsQuery.data}
+				activeScheme={osColorScheme}
+				onSubmit={submitAppearanceSettings}
+			/>
+			<CoderAssistantSection />
+		</>
 	);
 };
 

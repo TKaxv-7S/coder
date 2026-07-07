@@ -13,6 +13,7 @@ export const CoderAgent: FC = () => {
 		open,
 		toggle,
 		close,
+		disable,
 		chatId,
 		store,
 		persistedError,
@@ -20,6 +21,9 @@ export const CoderAgent: FC = () => {
 		startNewChat,
 		isThinking,
 		isSendPending,
+		isStreaming,
+		interrupt,
+		isInterruptPending,
 		modelOptions,
 		selectedModel,
 		setSelectedModel,
@@ -51,9 +55,13 @@ export const CoderAgent: FC = () => {
 				open={open}
 				onClose={close}
 				onNewChat={startNewChat}
+				onDisable={disable}
 				onSendMessage={sendMessage}
 				isThinking={isThinking}
 				isSendPending={isSendPending}
+				isStreaming={isStreaming}
+				onInterrupt={interrupt}
+				isInterruptPending={isInterruptPending}
 				chatId={chatId}
 				store={store}
 				persistedError={persistedError}
