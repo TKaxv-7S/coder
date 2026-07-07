@@ -239,7 +239,6 @@ export const TemplateBuilderPageView: FC<TemplateBuilderPageViewProps> = ({
 								? state.selectedModules
 								: undefined
 						}
-						onDeselectModule={handleDeselectModule}
 						onNavigateStep={navigateToStep}
 						onNavigateModule={navigateToModule}
 					/>

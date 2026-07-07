@@ -1,8 +1,6 @@
 import { cva } from "class-variance-authority";
-import { XIcon } from "lucide-react";
 import { createContext, type PropsWithChildren, useContext } from "react";
 import { Avatar } from "#/components/Avatar/Avatar";
-import { Button } from "#/components/Button/Button";
 import { cn } from "#/utils/cn";
 import type { StepId } from "./steps";
 
@@ -32,7 +30,6 @@ type SelectionSummaryProps = {
 	maxReachedStep: number;
 	selectedTemplate?: SelectedTemplate;
 	selectedModules?: SelectedModule[];
-	onDeselectModule: (moduleId: string) => void;
 	/**
 	 * Jump to a wizard step. `SelectionSummary` calls this from the
 	 * numbered step labels and from the selected-template row.
@@ -51,7 +48,6 @@ export const SelectionSummary: React.FC<SelectionSummaryProps> = ({
 	maxReachedStep,
 	selectedTemplate,
 	selectedModules,
-	onDeselectModule,
 	onNavigateStep,
 	onNavigateModule,
 }) => {
@@ -103,7 +99,6 @@ export const SelectionSummary: React.FC<SelectionSummaryProps> = ({
 					{selectedModules ? (
 						<ModuleSelection
 							modules={selectedModules}
-							onDeselectModule={onDeselectModule}
 							onSelectModule={reachable(2) ? onNavigateModule : undefined}
 						/>
 					) : (
@@ -171,7 +166,7 @@ const StepIndicator: React.FC<StepIndicatorProps> = ({
 				aria-label={`Go to ${label}`}
 				className={cn(
 					"flex items-center gap-2 w-full text-left p-0 bg-transparent border-0 cursor-pointer rounded-sm",
-					"hover:bg-surface-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-primary",
+					"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-primary",
 				)}
 			>
 				<div className={stepCircleVariants({ variant })}>{step}</div>
@@ -262,65 +257,45 @@ const BaseTemplateSelection: React.FC<BaseTemplateSelectionProps> = ({
 
 type ModuleSelectionProps = {
 	modules: SelectedModule[];
-	onDeselectModule: (moduleId: string) => void;
 	onSelectModule?: (moduleId: string) => void;
 };
 
 const ModuleSelection: React.FC<ModuleSelectionProps> = ({
 	modules,
-	onDeselectModule,
 	onSelectModule,
 }) => {
 	return (
 		<StepDivider className="max-h-72 overflow-y-auto">
-			{modules.map((module) => (
-				<div
-					key={module.id}
-					className={cn(
-						"group flex items-start justify-between rounded-sm mb-1",
-						"hover:bg-surface-secondary",
-					)}
-				>
-					{onSelectModule ? (
-						<button
-							type="button"
-							onClick={() => onSelectModule(module.id)}
-							aria-label={`Configure ${module.name}`}
-							className={cn(
-								"flex flex-1 items-start min-w-0 p-1 text-left bg-transparent border-0 cursor-pointer rounded-sm",
-								"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-primary",
-							)}
-						>
-							<div className="h-[1lh] content-center">
-								<Avatar src={module.iconUrl} size="sm" variant="icon" />
-							</div>
-							<span className="flex-1 ml-2 text-content-secondary">
-								{module.name}
-							</span>
-						</button>
-					) : (
-						<div className="flex flex-1 items-start min-w-0 p-1">
-							<div className="h-[1lh] content-center">
-								<Avatar src={module.iconUrl} size="sm" variant="icon" />
-							</div>
-							<span className="flex-1 ml-2 text-content-secondary">
-								{module.name}
-							</span>
+			{modules.map((module) =>
+				onSelectModule ? (
+					<button
+						key={module.id}
+						type="button"
+						onClick={() => onSelectModule(module.id)}
+						aria-label={`Configure ${module.name}`}
+						className={cn(
+							"flex items-start w-full text-left p-2 rounded-sm bg-transparent border-0 cursor-pointer",
+							"text-content-secondary hover:text-content-primary hover:bg-surface-secondary",
+							"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-primary",
+						)}
+					>
+						<div className="h-[1lh] content-center">
+							<Avatar src={module.iconUrl} size="sm" variant="icon" />
 						</div>
-					)}
-					<div className="h-[1lh] content-center p-1">
-						<Button
-							size="xs"
-							variant="subtle"
-							className="flex opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-							onClick={() => onDeselectModule(module.id)}
-							aria-label="Deselect module"
-						>
-							<XIcon className="w-4 h-4" />
-						</Button>
+						<span className="flex-1 ml-2">{module.name}</span>
+					</button>
+				) : (
+					<div
+						key={module.id}
+						className="flex items-start p-2 text-content-secondary"
+					>
+						<div className="h-[1lh] content-center">
+							<Avatar src={module.iconUrl} size="sm" variant="icon" />
+						</div>
+						<span className="flex-1 ml-2">{module.name}</span>
 					</div>
-				</div>
-			))}
+				),
+			)}
 		</StepDivider>
 	);
 };

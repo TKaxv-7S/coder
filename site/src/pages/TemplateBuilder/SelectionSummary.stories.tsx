@@ -7,7 +7,6 @@ const meta: Meta<typeof SelectionSummary> = {
 	component: SelectionSummary,
 	args: {
 		maxReachedStep: 3,
-		onDeselectModule: fn(),
 		onNavigateStep: fn(),
 		onNavigateModule: fn(),
 	},
@@ -122,11 +121,12 @@ export const WithLongNameModule: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 
-		const deselectModuleButton = await canvas.findByRole("button", {
-			name: "Deselect module",
+		// Long module names must not be truncated and must remain visible in
+		// the sidebar. The row is a single navigation button.
+		const moduleBtn = await canvas.findByRole("button", {
+			name: /^Configure A module/i,
 		});
-		deselectModuleButton.focus();
-		await expect(deselectModuleButton).toBeVisible();
+		await expect(moduleBtn).toBeVisible();
 	},
 };
 
