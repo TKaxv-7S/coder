@@ -1020,6 +1020,7 @@
   "created_at": "2019-08-24T14:15:22Z",
   "display_name": "string",
   "enabled": true,
+  "icon": "string",
   "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
   "name": "string",
   "settings": {},
@@ -1037,6 +1038,7 @@
 | `created_at`   | string                                                     | false    |              |             |
 | `display_name` | string                                                     | false    |              |             |
 | `enabled`      | boolean                                                    | false    |              |             |
+| `icon`         | string                                                     | false    |              |             |
 | `id`           | string                                                     | false    |              |             |
 | `name`         | string                                                     | false    |              |             |
 | `settings`     | [codersdk.AIProviderSettings](#codersdkaiprovidersettings) | false    |              |             |
@@ -4331,6 +4333,7 @@ AuthorizationObject can represent a "set" of objects, such as: all workspaces in
   "base_url": "string",
   "display_name": "string",
   "enabled": true,
+  "icon": "string",
   "name": "string",
   "settings": {},
   "type": "openai"
@@ -4345,6 +4348,7 @@ AuthorizationObject can represent a "set" of objects, such as: all workspaces in
 | `base_url`     | string                                                     | false    |              |             |
 | `display_name` | string                                                     | false    |              |             |
 | `enabled`      | boolean                                                    | false    |              |             |
+| `icon`         | string                                                     | false    |              |             |
 | `name`         | string                                                     | false    |              |             |
 | `settings`     | [codersdk.AIProviderSettings](#codersdkaiprovidersettings) | false    |              |             |
 | `type`         | [codersdk.AIProviderType](#codersdkaiprovidertype)         | false    |              |             |
@@ -13094,6 +13098,7 @@ Restarts will only happen on weekdays in this list on weeks which line up with W
   "base_url": "string",
   "display_name": "string",
   "enabled": true,
+  "icon": "string",
   "settings": {}
 }
 ```
@@ -13106,6 +13111,7 @@ Restarts will only happen on weekdays in this list on weeks which line up with W
 | `base_url`     | string                                                                    | false    |              |             |
 | `display_name` | string                                                                    | false    |              |             |
 | `enabled`      | boolean                                                                   | false    |              |             |
+| `icon`         | string                                                                    | false    |              |             |
 | `settings`     | [codersdk.AIProviderSettings](#codersdkaiprovidersettings)                | false    |              |             |
 
 ## codersdk.UpdateActiveTemplateVersion

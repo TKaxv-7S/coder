@@ -822,6 +822,7 @@ const meta: Meta<typeof AgentChatPageLayout> = {
 					type: "openai",
 					name: "openai",
 					display_name: "OpenAI",
+					icon: "",
 					enabled: true,
 					deleted: false,
 				},
