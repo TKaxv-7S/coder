@@ -1,7 +1,19 @@
-import { ExternalLinkIcon, PlusIcon, SparklesIcon, XIcon } from "lucide-react";
+import {
+	EllipsisVerticalIcon,
+	ExternalLinkIcon,
+	PlusIcon,
+	SparklesIcon,
+	XIcon,
+} from "lucide-react";
 import { type FC, useEffect, useRef } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { Button } from "#/components/Button/Button";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "#/components/DropdownMenu/DropdownMenu";
 import {
 	AgentChatInput,
 	type ChatMessageInputRef,
@@ -25,7 +37,6 @@ interface CoderAgentPanelProps {
 	isThinking: boolean;
 	isSendPending: boolean;
 	chatId: string | null;
-	chatTitle: string | undefined;
 	store: ChatStore;
 	persistedError: ChatDetailError | undefined;
 	// Model selector state, provided by CoderAgentProvider.
@@ -45,7 +56,6 @@ export const CoderAgentPanel: FC<CoderAgentPanelProps> = ({
 	isThinking,
 	isSendPending,
 	chatId,
-	chatTitle,
 	store,
 	persistedError,
 	modelOptions,
@@ -57,6 +67,7 @@ export const CoderAgentPanel: FC<CoderAgentPanelProps> = ({
 }) => {
 	const messagesEndRef = useRef<HTMLDivElement>(null);
 	const inputRef = useRef<ChatMessageInputRef>(null);
+	const navigate = useNavigate();
 
 	const orderedMessageIDs = useChatSelector(store, selectOrderedMessageIDs);
 	const messageCount = orderedMessageIDs.length;
@@ -95,10 +106,47 @@ export const CoderAgentPanel: FC<CoderAgentPanelProps> = ({
 		>
 			{/* Header. Mirrors the agents chat top bar (ChatTopBar). */}
 			<div className="flex shrink-0 items-center gap-2 px-4 py-1.5">
-				<div className="flex min-w-0 flex-1 items-center gap-1.5">
-					<span className="truncate text-sm text-content-primary">
-						{chatTitle || "Coder Agent"}
+				<div className="flex min-w-0 flex-1 items-center gap-1">
+					<span className="truncate text-sm font-medium text-content-primary">
+						Coder Assistant
 					</span>
+					<DropdownMenu>
+						<DropdownMenuTrigger asChild>
+							<Button
+								variant="subtle"
+								size="icon"
+								className="size-7 text-content-secondary hover:text-content-primary"
+								aria-label="Assistant settings"
+							>
+								<EllipsisVerticalIcon className="size-4" />
+							</Button>
+						</DropdownMenuTrigger>
+						<DropdownMenuContent align="start">
+							<DropdownMenuItem onClick={onNewChat}>
+								<PlusIcon className="size-4" />
+								New chat
+							</DropdownMenuItem>
+							{chatId && (
+								<DropdownMenuItem
+									onClick={() => {
+										onClose();
+										void navigate(buildAgentChatPath({ chatId }));
+									}}
+								>
+									<ExternalLinkIcon className="size-4" />
+									Open in Agents
+								</DropdownMenuItem>
+							)}
+							<DropdownMenuItem
+								onClick={() => {
+									onClose();
+									void navigate("/ai/settings/providers");
+								}}
+							>
+								AI settings
+							</DropdownMenuItem>
+						</DropdownMenuContent>
+					</DropdownMenu>
 				</div>
 				<div className="flex items-center gap-1">
 					<Button

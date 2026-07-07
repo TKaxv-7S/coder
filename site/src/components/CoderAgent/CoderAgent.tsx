@@ -14,7 +14,6 @@ export const CoderAgent: FC = () => {
 		toggle,
 		close,
 		chatId,
-		chatTitle,
 		store,
 		persistedError,
 		sendMessage,
@@ -56,7 +55,6 @@ export const CoderAgent: FC = () => {
 				isThinking={isThinking}
 				isSendPending={isSendPending}
 				chatId={chatId}
-				chatTitle={chatTitle}
 				store={store}
 				persistedError={persistedError}
 				modelOptions={modelOptions}
