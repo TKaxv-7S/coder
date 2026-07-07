@@ -83,12 +83,15 @@ export const WorkspaceTimings: FC<WorkspaceTimingsProps> = ({
 
 	const stages = [
 		...provisioningStages,
-		...agents.flatMap((agent) =>
-			agentStages(
+		...agents.flatMap((agent) => {
+			const hasScripts = uniqScriptTimings.some(
+				(t) => t.workspace_agent_id === agent.workspace_agent_id,
+			);
+			return agentStages(
 				`agent (${agent.workspace_agent_name})`,
 				agent.workspace_agent_id,
-			),
-		),
+			).filter((stage) => hasScripts || stage.name !== "start");
+		}),
 	];
 
 	const displayProvisioningTime = () => {

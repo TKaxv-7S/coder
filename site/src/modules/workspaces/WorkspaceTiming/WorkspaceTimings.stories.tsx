@@ -409,6 +409,11 @@ export const MultipleAgents: Story = {
 
 // A template with no agent scripts.
 export const NoAgentScripts: Story = {
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await canvas.findByText("agent (main)");
+		expect(canvas.queryByText("run startup scripts")).not.toBeInTheDocument();
+	},
 	args: {
 		provisionerTimings: [
 			{
