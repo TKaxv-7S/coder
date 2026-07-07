@@ -665,6 +665,7 @@ func TestStopAfterBehaviorTools(t *testing.T) {
 		t.Parallel()
 		require.Equal(t, map[string]struct{}{
 			chattool.CompleteGoalToolName: {},
+			chattool.BlockGoalToolName:    {},
 		}, stopAfterBehaviorTools(
 			database.NullChatPlanMode{},
 			database.NullChatMode{},
@@ -696,6 +697,7 @@ func TestStopAfterBehaviorTools(t *testing.T) {
 			require.Contains(t, result, tool)
 		}
 		require.Contains(t, result, chattool.CompleteGoalToolName)
+		require.Contains(t, result, chattool.BlockGoalToolName)
 	})
 
 	t.Run("ExploreModeReturnsNil", func(t *testing.T) {

@@ -19,6 +19,7 @@ import (
 const (
 	GetGoalToolName      = "get_goal"
 	CompleteGoalToolName = "complete_goal"
+	BlockGoalToolName    = "block_goal"
 )
 
 // GoalToolOptions configures the goal tools.
@@ -70,6 +71,11 @@ type completeGoalArgs struct {
 	Summary string `json:"summary" description:"A concise non-empty summary of how the goal was completed."`
 }
 
+type blockGoalArgs struct {
+	GoalID string `json:"goal_id" description:"The expected current goal ID as a UUIDv4 string. The tool fails if the current goal changed."`
+	Reason string `json:"reason" description:"A concise non-empty explanation of what blocks progress and what is needed from the user."`
+}
+
 type goalResult struct {
 	Goal *codersdk.ChatGoal `json:"goal"`
 }
@@ -78,6 +84,12 @@ type completeGoalResult struct {
 	Goal      *codersdk.ChatGoal `json:"goal"`
 	Completed bool               `json:"completed"`
 	Summary   string             `json:"summary"`
+}
+
+type blockGoalResult struct {
+	Goal    *codersdk.ChatGoal `json:"goal"`
+	Blocked bool               `json:"blocked"`
+	Reason  string             `json:"reason"`
 }
 
 // CurrentChatGoalByRootChatID returns the current goal for rootChatID, or
@@ -206,6 +218,100 @@ func CompleteGoal(db database.Store, options GoalToolOptions) fantasy.AgentTool 
 				Goal:      &sdkGoal,
 				Completed: true,
 				Summary:   summary,
+			}), nil
+		},
+	)
+}
+
+// BlockGoal returns a root-only tool that marks the active goal blocked
+// on user input. It is the model's escape hatch from the goal
+// continuation loop: a blocked goal stops auto-continuation until the
+// user resumes it.
+func BlockGoal(db database.Store, options GoalToolOptions) fantasy.AgentTool {
+	return fantasy.NewAgentTool(
+		BlockGoalToolName,
+		"Mark the active chat goal blocked when you cannot proceed without the user, or you are stuck on the same obstacle repeatedly. Requires the current goal_id and a concise reason. Automatic goal continuation stops until the user resumes the goal.",
+		func(ctx context.Context, args blockGoalArgs, _ fantasy.ToolCall) (fantasy.ToolResponse, error) {
+			if !options.IsRootChat {
+				return fantasy.NewTextErrorResponse("block_goal can only be used from the root chat"), nil
+			}
+			goalIDStr := strings.TrimSpace(args.GoalID)
+			if goalIDStr == "" {
+				return fantasy.NewTextErrorResponse("goal_id is required"), nil
+			}
+			goalID, err := uuid.Parse(goalIDStr)
+			if err != nil {
+				return fantasy.NewTextErrorResponse("goal_id is required"), nil
+			}
+			reason := strings.TrimSpace(args.Reason)
+			if reason == "" {
+				return fantasy.NewTextErrorResponse("reason is required"), nil
+			}
+			if len(reason) > codersdk.MaxChatGoalBlockedReasonBytes {
+				return fantasy.NewTextErrorResponse(fmt.Sprintf(
+					"reason must be at most %d bytes",
+					codersdk.MaxChatGoalBlockedReasonBytes,
+				)), nil
+			}
+
+			var blocked database.ChatGoal
+			var chat database.Chat
+			if err := db.InTx(func(tx database.Store) error {
+				// Lock the chat row first (matching the API mutation
+				// paths) so the fence check and goal update are atomic
+				// with respect to interrupts and worker takeovers.
+				if err := verifyGoalToolFence(ctx, tx, options.ChatID, options.Fence); err != nil {
+					return err
+				}
+				current, err := CurrentChatGoalByRootChatID(ctx, tx, options.RootChatID)
+				if err != nil {
+					return err
+				}
+				if current.ID != goalID {
+					return sql.ErrNoRows
+				}
+				if current.Status != database.ChatGoalStatusActive {
+					return errGoalNotActive
+				}
+				if len(current.Objective)+len(reason) > codersdk.MaxChatGoalTextPayloadBytes {
+					return errGoalTextPayloadTooLong
+				}
+				blocked, err = tx.BlockChatGoalByID(ctx, database.BlockChatGoalByIDParams{
+					RootChatID:    options.RootChatID,
+					ID:            goalID,
+					BlockedReason: reason,
+				})
+				if err != nil {
+					return err
+				}
+				chat, err = tx.GetChatByID(ctx, options.ChatID)
+				return err
+			}, nil); err != nil {
+				switch {
+				case errors.Is(err, sql.ErrNoRows):
+					return fantasy.NewTextErrorResponse("current active goal does not match goal_id"), nil
+				case errors.Is(err, errGoalTextPayloadTooLong):
+					return fantasy.NewTextErrorResponse(fmt.Sprintf(
+						"goal objective and reason must be at most %d bytes combined",
+						codersdk.MaxChatGoalTextPayloadBytes,
+					)), nil
+				case errors.Is(err, errGoalNotActive):
+					return fantasy.NewTextErrorResponse("current goal is not active"), nil
+				case errors.Is(err, errGoalFenceMismatch):
+					return fantasy.NewTextErrorResponse("the chat turn changed before the goal could be blocked; the goal was not modified"), nil
+				default:
+					return fantasy.NewTextErrorResponse("block goal: " + err.Error()), nil
+				}
+			}
+
+			if options.OnGoalUpdated != nil {
+				options.OnGoalUpdated(ctx, chat, blocked)
+			}
+			sdkGoal := chatgoal.ToSDK(blocked)
+			return marshalToolResponse(blockGoalResult{
+				Goal:    &sdkGoal,
+				Blocked: true,
+				Reason:  reason,
 			}), nil
 		},
 	)

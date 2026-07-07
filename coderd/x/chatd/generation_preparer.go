@@ -356,10 +356,6 @@ func (server *Server) prepareGeneration(
 	}
 	goalBehaviorTurn := chatGoalsEnabled && isRootChat && !isPlanModeTurn && !isExploreSubagent
 	canCompleteGoal := goalBehaviorTurn && activeGoal != nil
-	var goalReminder *generationGoalReminder
-	if canCompleteGoal {
-		goalReminder = &generationGoalReminder{GoalID: activeGoal.ID}
-	}
 
 	prompt = buildSystemPrompt(
 		prompt,
@@ -420,7 +416,7 @@ func (server *Server) prepareGeneration(
 					HistoryVersion: chat.HistoryVersion,
 				}
 			}
-			tools = append(tools, chattool.CompleteGoal(server.db, chattool.GoalToolOptions{
+			goalToolOptions := chattool.GoalToolOptions{
 				ChatID:     chat.ID,
 				RootChatID: rootChatID,
 				IsRootChat: true,
@@ -428,7 +424,11 @@ func (server *Server) prepareGeneration(
 				OnGoalUpdated: func(_ context.Context, updatedChat database.Chat, goal database.ChatGoal) {
 					server.publishChatGoalChange(updatedChat, &goal)
 				},
-			}))
+			}
+			tools = append(tools,
+				chattool.CompleteGoal(server.db, goalToolOptions),
+				chattool.BlockGoal(server.db, goalToolOptions),
+			)
 		}
 	}
 	if isPlanModeTurn && isRootChat {
@@ -673,7 +673,6 @@ func (server *Server) prepareGeneration(
 		StopAfterTools: stopAfterBehaviorTools(currentPlanMode, chat.Mode, chat.ParentChatID, stopAfterBehaviorToolOptions{
 			stopAfterCompleteGoal: goalBehaviorTurn,
 		}),
-		GoalReminder:       goalReminder,
 		ExclusiveToolNames: exclusiveToolNames,
 		BuiltinToolNames:   builtinToolNames,
 		ToolNameToConfigID: toolNameToConfigID,
