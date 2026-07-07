@@ -9012,6 +9012,14 @@ export interface UpdateChatRequest {
 	 * nil: no change, ptr to "plan": enable, ptr to "": clear.
 	 */
 	readonly plan_mode?: ChatPlanMode;
+	/**
+	 * MCPServerIDs replaces the chat's selected MCP servers.
+	 * nil: no change, empty slice: clear the selection. Servers
+	 * with force_on availability remain active regardless of this
+	 * list. Changes apply from the next generation step, including
+	 * mid-turn while the chat waits on tool results.
+	 */
+	readonly mcp_server_ids?: string[];
 }
 
 // From codersdk/chats.go

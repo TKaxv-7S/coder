@@ -582,6 +582,12 @@ type UpdateChatRequest struct {
 	// PlanMode switches the chat's persistent plan mode.
 	// nil: no change, ptr to "plan": enable, ptr to "": clear.
 	PlanMode *ChatPlanMode `json:"plan_mode,omitempty"`
+	// MCPServerIDs replaces the chat's selected MCP servers.
+	// nil: no change, empty slice: clear the selection. Servers
+	// with force_on availability remain active regardless of this
+	// list. Changes apply from the next generation step, including
+	// mid-turn while the chat waits on tool results.
+	MCPServerIDs *[]uuid.UUID `json:"mcp_server_ids,omitempty" format:"uuid"`
 }
 
 // ChatBusyBehavior controls what happens when a user sends a message

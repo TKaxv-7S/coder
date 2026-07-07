@@ -1132,34 +1132,8 @@ func (api *API) postChats(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate MCP server IDs exist.
-	if len(req.MCPServerIDs) > 0 {
-		//nolint:gocritic // Need to validate MCP server IDs exist.
-		existingConfigs, err := api.Database.GetMCPServerConfigsByIDs(dbauthz.AsSystemRestricted(ctx), req.MCPServerIDs)
-		if err != nil {
-			httpapi.Write(ctx, rw, http.StatusInternalServerError, codersdk.Response{
-				Message: "Failed to validate MCP server IDs.",
-				Detail:  err.Error(),
-			})
-			return
-		}
-		if len(existingConfigs) != len(req.MCPServerIDs) {
-			found := make(map[uuid.UUID]struct{}, len(existingConfigs))
-			for _, c := range existingConfigs {
-				found[c.ID] = struct{}{}
-			}
-			var missing []string
-			for _, id := range req.MCPServerIDs {
-				if _, ok := found[id]; !ok {
-					missing = append(missing, id.String())
-				}
-			}
-			httpapi.Write(ctx, rw, http.StatusBadRequest, codersdk.Response{
-				Message: "One or more MCP server IDs are invalid.",
-				Detail:  fmt.Sprintf("Invalid IDs: %s", strings.Join(missing, ", ")),
-			})
-			return
-		}
+	if !api.validateMCPServerIDs(ctx, rw, req.MCPServerIDs) {
+		return
 	}
 
 	mcpServerIDs := req.MCPServerIDs
@@ -2963,6 +2937,32 @@ func (api *API) patchChat(rw http.ResponseWriter, r *http.Request) {
 		chat = updatedChat
 	}
 
+	if req.MCPServerIDs != nil {
+		if !api.validateMCPServerIDs(ctx, rw, *req.MCPServerIDs) {
+			return
+		}
+		mcpServerIDs := *req.MCPServerIDs
+		if mcpServerIDs == nil {
+			mcpServerIDs = []uuid.UUID{}
+		}
+		updatedChat, err := api.Database.UpdateChatMCPServerIDs(ctx, database.UpdateChatMCPServerIDsParams{
+			ID:           chat.ID,
+			MCPServerIDs: mcpServerIDs,
+		})
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				httpapi.ResourceNotFound(rw)
+				return
+			}
+			httpapi.Write(ctx, rw, http.StatusInternalServerError, codersdk.Response{
+				Message: "Failed to update chat MCP servers.",
+				Detail:  err.Error(),
+			})
+			return
+		}
+		chat = updatedChat
+	}
+
 	if planModeUpdate != nil {
 		updatedChat, err := api.Database.UpdateChatPlanModeByID(ctx, database.UpdateChatPlanModeByIDParams{
 			PlanMode: *planModeUpdate,
@@ -2990,6 +2990,42 @@ func (api *API) patchChat(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	rw.WriteHeader(http.StatusNoContent)
+}
+
+// validateMCPServerIDs verifies every MCP server config ID exists,
+// writing a 400 or 500 response when validation fails. Returns true
+// when all IDs are valid and no response has been written.
+func (api *API) validateMCPServerIDs(ctx context.Context, rw http.ResponseWriter, ids []uuid.UUID) bool {
+	if len(ids) == 0 {
+		return true
+	}
+	//nolint:gocritic // Need to validate MCP server IDs exist.
+	existingConfigs, err := api.Database.GetMCPServerConfigsByIDs(dbauthz.AsSystemRestricted(ctx), ids)
+	if err != nil {
+		httpapi.Write(ctx, rw, http.StatusInternalServerError, codersdk.Response{
+			Message: "Failed to validate MCP server IDs.",
+			Detail:  err.Error(),
+		})
+		return false
+	}
+	if len(existingConfigs) != len(ids) {
+		found := make(map[uuid.UUID]struct{}, len(existingConfigs))
+		for _, c := range existingConfigs {
+			found[c.ID] = struct{}{}
+		}
+		var missing []string
+		for _, id := range ids {
+			if _, ok := found[id]; !ok {
+				missing = append(missing, id.String())
+			}
+		}
+		httpapi.Write(ctx, rw, http.StatusBadRequest, codersdk.Response{
+			Message: "One or more MCP server IDs are invalid.",
+			Detail:  fmt.Sprintf("Invalid IDs: %s", strings.Join(missing, ", ")),
+		})
+		return false
+	}
+	return true
 }
 
 // writeChatInvalidState writes the shared invalid-state response for
@@ -3090,34 +3126,8 @@ func (api *API) postChatMessages(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate MCP server IDs exist.
-	if req.MCPServerIDs != nil && len(*req.MCPServerIDs) > 0 {
-		//nolint:gocritic // Need to validate MCP server IDs exist.
-		existingConfigs, err := api.Database.GetMCPServerConfigsByIDs(dbauthz.AsSystemRestricted(ctx), *req.MCPServerIDs)
-		if err != nil {
-			httpapi.Write(ctx, rw, http.StatusInternalServerError, codersdk.Response{
-				Message: "Failed to validate MCP server IDs.",
-				Detail:  err.Error(),
-			})
-			return
-		}
-		if len(existingConfigs) != len(*req.MCPServerIDs) {
-			found := make(map[uuid.UUID]struct{}, len(existingConfigs))
-			for _, c := range existingConfigs {
-				found[c.ID] = struct{}{}
-			}
-			var missing []string
-			for _, id := range *req.MCPServerIDs {
-				if _, ok := found[id]; !ok {
-					missing = append(missing, id.String())
-				}
-			}
-			httpapi.Write(ctx, rw, http.StatusBadRequest, codersdk.Response{
-				Message: "One or more MCP server IDs are invalid.",
-				Detail:  fmt.Sprintf("Invalid IDs: %s", strings.Join(missing, ", ")),
-			})
-			return
-		}
+	if req.MCPServerIDs != nil && !api.validateMCPServerIDs(ctx, rw, *req.MCPServerIDs) {
+		return
 	}
 
 	if req.PlanMode != nil {

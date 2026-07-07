@@ -24922,6 +24922,14 @@ const docTemplate = `{
                         "type": "string"
                     }
                 },
+                "mcp_server_ids": {
+                    "description": "MCPServerIDs replaces the chat's selected MCP servers.\nnil: no change, empty slice: clear the selection. Servers\nwith force_on availability remain active regardless of this\nlist. Changes apply from the next generation step, including\nmid-turn while the chat waits on tool results.",
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "format": "uuid"
+                    }
+                },
                 "pin_order": {
                     "description": "PinOrder controls the chat's pinned state and position.\n- nil: no change to pin state.\n- 0: unpin the chat.\n- \u003e0 (chat is unpinned): pin the chat, appending it to\n  the end of the pinned list. The specific value is\n  ignored; the server assigns the next available position.\n- \u003e0 (chat is already pinned): move the chat to the\n  requested position, shifting neighbors as needed. The\n  value is clamped to [1, pinned_count].",
                     "type": "integer"

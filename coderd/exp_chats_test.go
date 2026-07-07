@@ -5725,6 +5725,85 @@ func TestPatchChat(t *testing.T) {
 			t.Fatalf("did not observe title_change event for chat %s", chat.ID)
 		})
 	})
+
+	t.Run("MCPServerIDs", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("SetAndClear", func(t *testing.T) {
+			t.Parallel()
+
+			ctx := testutil.Context(t, testutil.WaitLong)
+			client := newChatClient(t)
+			firstUser := coderdtest.CreateFirstUser(t, client.Client)
+			_ = createChatModelConfig(t, client)
+			config := createMCPServerConfig(t, client.Client, "patch-chat-mcp", true)
+
+			chat := createChat(ctx, t, client, firstUser.OrganizationID, "set mcp servers")
+			require.Empty(t, chat.MCPServerIDs)
+
+			err := client.UpdateChat(ctx, chat.ID, codersdk.UpdateChatRequest{
+				MCPServerIDs: ptr.Ref([]uuid.UUID{config.ID}),
+			})
+			require.NoError(t, err)
+
+			updated := getChat(ctx, t, client, chat.ID)
+			require.Equal(t, []uuid.UUID{config.ID}, updated.MCPServerIDs)
+
+			// An empty slice clears the selection.
+			err = client.UpdateChat(ctx, chat.ID, codersdk.UpdateChatRequest{
+				MCPServerIDs: ptr.Ref([]uuid.UUID{}),
+			})
+			require.NoError(t, err)
+
+			updated = getChat(ctx, t, client, chat.ID)
+			require.Empty(t, updated.MCPServerIDs)
+		})
+
+		t.Run("NilLeavesUnchanged", func(t *testing.T) {
+			t.Parallel()
+
+			ctx := testutil.Context(t, testutil.WaitLong)
+			client := newChatClient(t)
+			firstUser := coderdtest.CreateFirstUser(t, client.Client)
+			_ = createChatModelConfig(t, client)
+			config := createMCPServerConfig(t, client.Client, "patch-chat-mcp-nil", true)
+
+			chat := createChat(ctx, t, client, firstUser.OrganizationID, "nil mcp servers")
+			err := client.UpdateChat(ctx, chat.ID, codersdk.UpdateChatRequest{
+				MCPServerIDs: ptr.Ref([]uuid.UUID{config.ID}),
+			})
+			require.NoError(t, err)
+
+			// A patch without mcp_server_ids leaves the selection alone.
+			err = client.UpdateChat(ctx, chat.ID, codersdk.UpdateChatRequest{
+				Title: ptr.Ref("renamed without touching mcp"),
+			})
+			require.NoError(t, err)
+
+			updated := getChat(ctx, t, client, chat.ID)
+			require.Equal(t, []uuid.UUID{config.ID}, updated.MCPServerIDs)
+		})
+
+		t.Run("InvalidID", func(t *testing.T) {
+			t.Parallel()
+
+			ctx := testutil.Context(t, testutil.WaitLong)
+			client := newChatClient(t)
+			firstUser := coderdtest.CreateFirstUser(t, client.Client)
+			_ = createChatModelConfig(t, client)
+
+			chat := createChat(ctx, t, client, firstUser.OrganizationID, "invalid mcp server")
+			err := client.UpdateChat(ctx, chat.ID, codersdk.UpdateChatRequest{
+				MCPServerIDs: ptr.Ref([]uuid.UUID{uuid.New()}),
+			})
+			var sdkErr *codersdk.Error
+			require.ErrorAs(t, err, &sdkErr)
+			require.Equal(t, http.StatusBadRequest, sdkErr.StatusCode())
+
+			updated := getChat(ctx, t, client, chat.ID)
+			require.Empty(t, updated.MCPServerIDs)
+		})
+	})
 }
 
 func TestArchiveChat(t *testing.T) {

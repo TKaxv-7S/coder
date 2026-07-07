@@ -1013,6 +1013,9 @@ Experimental: this endpoint is subject to change.
     "property1": "string",
     "property2": "string"
   },
+  "mcp_server_ids": [
+    "497f6eca-6276-4993-bfeb-53cbbbba6f08"
+  ],
   "pin_order": 0,
   "plan_mode": "plan",
   "title": "string",
