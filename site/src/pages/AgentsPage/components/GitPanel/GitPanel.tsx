@@ -671,15 +671,15 @@ function prStateLabel(state: string | undefined, draft: boolean | undefined) {
 /** Tailwind classes for the state pill on the view-switcher trigger. */
 function prStateClasses(state: string | undefined, draft: boolean | undefined) {
 	if (state === "merged") {
-		return "text-git-merged-bright bg-surface-git-merged";
+		return "text-git-merged-bright";
 	}
 	if (state === "closed") {
-		return "text-git-deleted-bright bg-surface-git-deleted";
+		return "text-git-deleted-bright";
 	}
 	if (draft) {
-		return "text-content-secondary bg-surface-secondary";
+		return "text-content-secondary";
 	}
-	return "text-git-added-bright bg-surface-git-added";
+	return "text-git-added-bright";
 }
 
 // ---------------------------------------------------------------
