@@ -75,7 +75,7 @@ export const CoderAgentPanel: FC<CoderAgentPanelProps> = ({
 	return (
 		<div
 			className={cn(
-				"fixed bottom-20 right-6 z-50",
+				"fixed bottom-[7rem] right-6 z-50",
 				"w-[420px] h-[640px] max-h-[80vh]",
 				"flex flex-col",
 				"rounded-xl shadow-2xl",

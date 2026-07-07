@@ -22,10 +22,11 @@ export const CoderAgentButton: FC<CoderAgentButtonProps> = ({
 			aria-label={open ? "Close Coder Agent" : "Open Coder Agent"}
 			aria-expanded={open}
 			className={cn(
-				"fixed bottom-6 right-6 z-50",
+				"fixed bottom-12 right-6 z-50",
 				"flex items-center justify-center",
 				"w-12 h-12 rounded-full",
-				"bg-surface-invert-primary text-surface-primary",
+				"bg-surface-secondary text-content-primary",
+				"border border-solid border-border hover:border-border-secondary",
 				"shadow-lg hover:scale-105 transition-transform",
 				"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-content-link",
 			)}
