@@ -84,86 +84,93 @@ export const TemplateCustomizationsStep: FC<
 				{/* Base template card */}
 				{state.selectedBase && <BaseTemplateCard base={state.selectedBase} />}
 
-				{/* Two-column form grid */}
-				<div className="grid grid-cols-2 gap-x-6 gap-y-6 content-start">
+				{/* Two independent columns so the left stack (Display name,
+				Organization, Icon) is not stretched by the taller right stack
+				(Description, ID). */}
+				<div className="flex gap-6">
 					{/* Left column */}
-					<div className="flex flex-col gap-2">
-						<Label htmlFor="template-display-name">Display name</Label>
-						<Input
-							id="template-display-name"
-							value={state.displayName}
-							onChange={(e) => onChangeField("displayName", e.target.value)}
-							placeholder="My Template"
-						/>
+					<div className="flex-1 flex flex-col gap-6">
+						<div className="flex flex-col gap-2">
+							<Label htmlFor="template-display-name">Display name</Label>
+							<Input
+								id="template-display-name"
+								value={state.displayName}
+								onChange={(e) => onChangeField("displayName", e.target.value)}
+								placeholder="My Template"
+							/>
+						</div>
+
+						{orgOptions.length > 0 && (
+							<div className="flex flex-col gap-2">
+								<Label htmlFor="organization">
+									Organization
+									<span className="text-xs font-bold text-content-destructive ml-1">
+										*
+									</span>
+								</Label>
+								<OrganizationAutocomplete
+									id="organization"
+									required
+									value={selectedOrg}
+									onChange={handleOrgChange}
+									options={orgOptions}
+								/>
+							</div>
+						)}
+
+						<div className="flex flex-col gap-2">
+							<Label htmlFor="template-icon">Icon</Label>
+							<IconField
+								id="template-icon"
+								label=""
+								value={state.icon}
+								onChange={(e) => {
+									const target = e.target as HTMLInputElement;
+									onChangeField("icon", target.value);
+								}}
+								onPickEmoji={(value) => onChangeField("icon", value)}
+							/>
+						</div>
 					</div>
 
 					{/* Right column */}
-					{orgOptions.length > 0 && (
+					<div className="flex-1 flex flex-col gap-6">
 						<div className="flex flex-col gap-2">
-							<Label htmlFor="organization">
-								Organization
+							<Label htmlFor="template-description">Description</Label>
+							<div>
+								<Textarea
+									id="template-description"
+									value={state.description}
+									onChange={(e) => onChangeField("description", e.target.value)}
+									placeholder="Describe what this template is for"
+									rows={3}
+								/>
+								<p className="text-xs text-content-secondary mt-1">
+									Used by both humans and Agents to identify templates.
+								</p>
+							</div>
+						</div>
+
+						<div className="flex flex-col gap-2">
+							<Label htmlFor="template-name">
+								ID
 								<span className="text-xs font-bold text-content-destructive ml-1">
 									*
 								</span>
 							</Label>
-							<OrganizationAutocomplete
-								id="organization"
-								required
-								value={selectedOrg}
-								onChange={handleOrgChange}
-								options={orgOptions}
-							/>
+							<div>
+								<Input
+									id="template-name"
+									value={state.name}
+									onChange={(e) => onChangeField("name", e.target.value)}
+									placeholder="my-template"
+									aria-required
+								/>
+								<p className="text-xs text-content-secondary mt-1">
+									Used to identify the template in URLs and the API.
+								</p>
+							</div>
 						</div>
-					)}
-
-					{/* Left column */}
-					<div className="flex flex-col gap-2">
-						<Label htmlFor="template-description">Description</Label>
-						<Textarea
-							id="template-description"
-							value={state.description}
-							onChange={(e) => onChangeField("description", e.target.value)}
-							placeholder="Describe what this template is for"
-							rows={3}
-						/>
-						<p className="text-xs text-content-secondary">
-							Used by both humans and Agents to identify templates.
-						</p>
-					</div>
-
-					{/* Left column */}
-					<div className="flex flex-col gap-2">
-						<Label htmlFor="template-icon">Icon</Label>
-						<IconField
-							id="template-icon"
-							label=""
-							value={state.icon}
-							onChange={(e) => {
-								const target = e.target as HTMLInputElement;
-								onChangeField("icon", target.value);
-							}}
-							onPickEmoji={(value) => onChangeField("icon", value)}
-						/>
-					</div>
-
-					{/* Right column */}
-					<div className="flex flex-col gap-2">
-						<Label htmlFor="template-name">
-							ID
-							<span className="text-xs font-bold text-content-destructive ml-1">
-								*
-							</span>
-						</Label>
-						<Input
-							id="template-name"
-							value={state.name}
-							onChange={(e) => onChangeField("name", e.target.value)}
-							placeholder="my-template"
-							aria-required
-						/>
-						<p className="text-xs text-content-secondary">
-							Used to identify the template in URLs and the API.
-						</p>
 					</div>
 				</div>
 			</div>
