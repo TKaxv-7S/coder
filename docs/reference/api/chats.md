@@ -261,7 +261,12 @@ Experimental: this endpoint is subject to change.
       "file_name": "string",
       "start_line": 0,
       "text": "string",
-      "type": "text"
+      "type": "text",
+      "workspace_file_media_type": "string",
+      "workspace_file_name": "string",
+      "workspace_file_path": "string",
+      "workspace_file_size": 0,
+      "workspace_file_workspace_id": "74c05446-1c56-4543-82a9-03f2bf73b2ab"
     }
   ],
   "labels": {
@@ -1632,7 +1637,12 @@ Experimental: this endpoint is subject to change.
           "tool_call_id": "string",
           "tool_name": "string",
           "type": "text",
-          "url": "string"
+          "url": "string",
+          "workspace_file_media_type": "string",
+          "workspace_file_name": "string",
+          "workspace_file_path": "string",
+          "workspace_file_size": 0,
+          "workspace_file_workspace_id": "74c05446-1c56-4543-82a9-03f2bf73b2ab"
         }
       ],
       "created_at": "2019-08-24T14:15:22Z",
@@ -1715,7 +1725,12 @@ Experimental: this endpoint is subject to change.
           "tool_call_id": "string",
           "tool_name": "string",
           "type": "text",
-          "url": "string"
+          "url": "string",
+          "workspace_file_media_type": "string",
+          "workspace_file_name": "string",
+          "workspace_file_path": "string",
+          "workspace_file_size": 0,
+          "workspace_file_workspace_id": "74c05446-1c56-4543-82a9-03f2bf73b2ab"
         }
       ],
       "created_at": "2019-08-24T14:15:22Z",
@@ -1763,7 +1778,12 @@ Experimental: this endpoint is subject to change.
       "file_name": "string",
       "start_line": 0,
       "text": "string",
-      "type": "text"
+      "type": "text",
+      "workspace_file_media_type": "string",
+      "workspace_file_name": "string",
+      "workspace_file_path": "string",
+      "workspace_file_size": 0,
+      "workspace_file_workspace_id": "74c05446-1c56-4543-82a9-03f2bf73b2ab"
     }
   ],
   "mcp_server_ids": [
@@ -1850,7 +1870,12 @@ Experimental: this endpoint is subject to change.
         "tool_call_id": "string",
         "tool_name": "string",
         "type": "text",
-        "url": "string"
+        "url": "string",
+        "workspace_file_media_type": "string",
+        "workspace_file_name": "string",
+        "workspace_file_path": "string",
+        "workspace_file_size": 0,
+        "workspace_file_workspace_id": "74c05446-1c56-4543-82a9-03f2bf73b2ab"
       }
     ],
     "created_at": "2019-08-24T14:15:22Z",
@@ -1932,7 +1957,12 @@ Experimental: this endpoint is subject to change.
         "tool_call_id": "string",
         "tool_name": "string",
         "type": "text",
-        "url": "string"
+        "url": "string",
+        "workspace_file_media_type": "string",
+        "workspace_file_name": "string",
+        "workspace_file_path": "string",
+        "workspace_file_size": 0,
+        "workspace_file_workspace_id": "74c05446-1c56-4543-82a9-03f2bf73b2ab"
       }
     ],
     "created_at": "2019-08-24T14:15:22Z",
@@ -1981,7 +2011,12 @@ Experimental: this endpoint is subject to change.
       "file_name": "string",
       "start_line": 0,
       "text": "string",
-      "type": "text"
+      "type": "text",
+      "workspace_file_media_type": "string",
+      "workspace_file_name": "string",
+      "workspace_file_path": "string",
+      "workspace_file_size": 0,
+      "workspace_file_workspace_id": "74c05446-1c56-4543-82a9-03f2bf73b2ab"
     }
   ],
   "model_config_id": "f5fb4d91-62ca-4377-9ee6-5d43ba00d205"
@@ -2065,7 +2100,12 @@ Experimental: this endpoint is subject to change.
         "tool_call_id": "string",
         "tool_name": "string",
         "type": "text",
-        "url": "string"
+        "url": "string",
+        "workspace_file_media_type": "string",
+        "workspace_file_name": "string",
+        "workspace_file_path": "string",
+        "workspace_file_size": 0,
+        "workspace_file_workspace_id": "74c05446-1c56-4543-82a9-03f2bf73b2ab"
       }
     ],
     "created_at": "2019-08-24T14:15:22Z",
@@ -2485,7 +2525,12 @@ Experimental: this endpoint is subject to change.
         "tool_call_id": "string",
         "tool_name": "string",
         "type": "text",
-        "url": "string"
+        "url": "string",
+        "workspace_file_media_type": "string",
+        "workspace_file_name": "string",
+        "workspace_file_path": "string",
+        "workspace_file_size": 0,
+        "workspace_file_workspace_id": "74c05446-1c56-4543-82a9-03f2bf73b2ab"
       }
     ],
     "created_at": "2019-08-24T14:15:22Z",
@@ -2566,7 +2611,12 @@ Experimental: this endpoint is subject to change.
       "tool_call_id": "string",
       "tool_name": "string",
       "type": "text",
-      "url": "string"
+      "url": "string",
+      "workspace_file_media_type": "string",
+      "workspace_file_name": "string",
+      "workspace_file_path": "string",
+      "workspace_file_size": 0,
+      "workspace_file_workspace_id": "74c05446-1c56-4543-82a9-03f2bf73b2ab"
     },
     "role": "system",
     "seq": 0
@@ -2635,7 +2685,12 @@ Experimental: this endpoint is subject to change.
           "tool_call_id": "string",
           "tool_name": "string",
           "type": "text",
-          "url": "string"
+          "url": "string",
+          "workspace_file_media_type": "string",
+          "workspace_file_name": "string",
+          "workspace_file_path": "string",
+          "workspace_file_size": 0,
+          "workspace_file_workspace_id": "74c05446-1c56-4543-82a9-03f2bf73b2ab"
         }
       ],
       "created_at": "2019-08-24T14:15:22Z",
@@ -2972,5 +3027,61 @@ Experimental: this endpoint is subject to change.
 | Status | Meaning                                                 | Description | Schema                                   |
 |--------|---------------------------------------------------------|-------------|------------------------------------------|
 | 200    | [OK](https://tools.ietf.org/html/rfc7231#section-6.3.1) | OK          | [codersdk.Chat](schemas.md#codersdkchat) |
+
+To perform this operation, you must be authenticated. [Learn more](authentication.md).
+
+## Upload a file to a chat's workspace
+
+### Code samples
+
+```shell
+# Example request using curl
+curl -X POST http://coder-server:8080/api/experimental/chats/{chat}/workspace-files \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: string' \
+  -H 'Content-Disposition: string' \
+  -H 'Coder-Session-Token: API_KEY'
+```
+
+`POST /api/experimental/chats/{chat}/workspace-files`
+
+Experimental: this endpoint is subject to change.
+Streams the request body into the chat workspace's
+upload directory. There is no server-imposed size cap;
+client cancellation aborts the stream and the agent
+leaves no partial target file behind.
+
+### Parameters
+
+| Name                  | In     | Type         | Required | Description                                     |
+|-----------------------|--------|--------------|----------|-------------------------------------------------|
+| `chat`                | path   | string(uuid) | true     | Chat ID                                         |
+| `Content-Type`        | header | string       | false    | Content type of the file                        |
+| `Content-Disposition` | header | string       | true     | Filename of the file (attachment; filename=...) |
+
+### Example responses
+
+> 201 Response
+
+```json
+{
+  "media_type": "string",
+  "name": "string",
+  "path": "string",
+  "size": 0,
+  "workspace_id": "0967198e-ec7b-4c6b-b4d3-f71244cadbe9"
+}
+```
+
+### Responses
+
+| Status | Meaning                                                                    | Description           | Schema                                                                                         |
+|--------|----------------------------------------------------------------------------|-----------------------|------------------------------------------------------------------------------------------------|
+| 201    | [Created](https://tools.ietf.org/html/rfc7231#section-6.3.2)               | Created               | [codersdk.UploadChatWorkspaceFileResponse](schemas.md#codersdkuploadchatworkspacefileresponse) |
+| 400    | [Bad Request](https://tools.ietf.org/html/rfc7231#section-6.5.1)           | Bad Request           | [codersdk.Response](schemas.md#codersdkresponse)                                               |
+| 403    | [Forbidden](https://tools.ietf.org/html/rfc7231#section-6.5.3)             | Forbidden             | [codersdk.Response](schemas.md#codersdkresponse)                                               |
+| 409    | [Conflict](https://tools.ietf.org/html/rfc7231#section-6.5.8)              | Conflict              | [codersdk.Response](schemas.md#codersdkresponse)                                               |
+| 500    | [Internal Server Error](https://tools.ietf.org/html/rfc7231#section-6.6.1) | Internal Server Error | [codersdk.Response](schemas.md#codersdkresponse)                                               |
+| 502    | [Bad Gateway](https://tools.ietf.org/html/rfc7231#section-6.6.3)           | Bad Gateway           | [codersdk.Response](schemas.md#codersdkresponse)                                               |
 
 To perform this operation, you must be authenticated. [Learn more](authentication.md).

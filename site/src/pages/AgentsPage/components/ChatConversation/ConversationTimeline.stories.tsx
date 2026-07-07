@@ -2888,3 +2888,37 @@ export const ThinkingBlockPreviewMode: Story = {
 		});
 	},
 };
+
+export const UserMessageWithWorkspaceFileReference: Story = {
+	args: {
+		...defaultArgs,
+		parsedMessages: buildMessages([
+			{
+				...baseMessage,
+				id: 1,
+				role: "user",
+				content: [
+					{ type: "text", text: "Unzip this in my workspace" },
+					{
+						type: "workspace-file-reference",
+						workspace_file_path:
+							"/home/coder/.coder/chats/story-chat/files/dataset.zip",
+						workspace_file_name: "dataset.zip",
+						workspace_file_size: 4096,
+						workspace_file_media_type: "application/zip",
+						workspace_file_workspace_id: "ws-1",
+					},
+				],
+			},
+		]),
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		expect(canvas.getByText("Unzip this in my workspace")).toBeVisible();
+		expect(
+			canvas.getByText(
+				"Workspace file attached. Display support is coming soon.",
+			),
+		).toBeVisible();
+	},
+};

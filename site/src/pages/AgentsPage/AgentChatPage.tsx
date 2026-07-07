@@ -660,6 +660,9 @@ type _UncoveredAgentFields = Omit<
 	// Fields below are intentionally not compared. They change
 	// frequently (stats, metadata) or are objects/arrays that would
 	// require deep comparison, and the UI does not read them.
+	// display_order is read only by unbound-agent selection, whose
+	// outcome the comparison already covers via the selected agent id.
+	| "display_order"
 	| "parent_id"
 	| "created_at"
 	| "updated_at"

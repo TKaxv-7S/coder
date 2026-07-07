@@ -293,6 +293,10 @@ export const parseMessageContent = (
 				// they are not rendered in the conversation timeline.
 				break;
 			}
+			case "workspace-file-reference": {
+				parsed.blocks.push(part);
+				break;
+			}
 			default: {
 				const _exhaustive: never = part;
 				break;
@@ -301,6 +305,13 @@ export const parseMessageContent = (
 	}
 	return parsed;
 };
+
+const messageHasWorkspaceFileReferences = (
+	message: TypesGen.ChatMessage,
+): boolean =>
+	(message.content ?? []).some(
+		(part) => part.type === "workspace-file-reference",
+	);
 
 const isEditableAttachmentMediaType = (mediaType: string): boolean =>
 	mediaType.startsWith("image/") ||
@@ -317,10 +328,20 @@ const isEditableUserMessageFileBlock = (
 
 export const getEditableUserMessagePayload = (
 	message: TypesGen.ChatMessage,
-): {
-	text: string;
-	fileBlocks: readonly TypesGen.ChatMessagePart[] | undefined;
-} => {
+):
+	| {
+			text: string;
+			fileBlocks: readonly TypesGen.ChatMessagePart[] | undefined;
+	  }
+	| undefined => {
+	// Editing rebuilds the message from text + editable attachment
+	// blocks, which would silently drop workspace file references.
+	// Until the edit flow preserves them, such messages are not
+	// editable.
+	if (messageHasWorkspaceFileReferences(message)) {
+		return undefined;
+	}
+
 	// Concatenate text parts verbatim to match the server-side string_agg in
 	// GetChatUserPromptsByChatID; parseMessageContent/appendText is for streaming and drops whitespace-only chunks.
 	const text = (message.content ?? [])

@@ -260,7 +260,7 @@ func (server *Server) prepareGeneration(
 			return chatprovider.AcceptsFilePartMediaType(model.Provider(), model.Model(), mediaType)
 		}
 		providerType := string(modelRoute.Provider.Type)
-		prompt, err = chatprompt.ConvertMessagesWithFiles(ctx, promptRows, server.chatFileResolver(providerType), logger, acceptsFilePart)
+		prompt, err = chatprompt.ConvertMessagesWithFiles(ctx, promptRows, server.chatFileResolver(providerType), logger, acceptsFilePart, chat.WorkspaceID)
 		if err != nil {
 			return xerrors.Errorf("build chat prompt: %w", err)
 		}

@@ -1393,6 +1393,10 @@ func New(options *Options) *API {
 				r.Post("/title/regenerate", api.regenerateChatTitle)
 				r.Post("/title/propose", api.proposeChatTitle)
 				r.Get("/diff", api.getChatDiffContents)
+				r.With(
+					httpmw.RateLimit(options.FilesRateLimit, time.Minute),
+					api.chatWorkspaceUploadMiddleware,
+				).Post("/workspace-files", api.postChatWorkspaceFile)
 				r.Put("/context", api.refreshChatContext)
 				r.Route("/queue/{queuedMessage}", func(r chi.Router) {
 					r.Delete("/", api.deleteChatQueuedMessage)

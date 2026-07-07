@@ -2304,15 +2304,34 @@ export interface ChatInputPart {
 	 * The code content from the diff that was commented on.
 	 */
 	readonly content?: string;
+	/**
+	 * The following fields are only set when Type is
+	 * ChatInputPartTypeWorkspaceFileReference.
+	 */
+	readonly workspace_file_path?: string;
+	readonly workspace_file_name?: string;
+	readonly workspace_file_size?: number;
+	readonly workspace_file_media_type?: string;
+	/**
+	 * WorkspaceFileWorkspaceID is the workspace the file was uploaded
+	 * to, as returned by the upload endpoint. It must match the chat's
+	 * currently bound workspace.
+	 */
+	readonly workspace_file_workspace_id?: string;
 }
 
 // From codersdk/chats.go
-export type ChatInputPartType = "file" | "file-reference" | "text";
+export type ChatInputPartType =
+	| "file"
+	| "file-reference"
+	| "text"
+	| "workspace-file-reference";
 
 export const ChatInputPartTypes: ChatInputPartType[] = [
 	"file",
 	"file-reference",
 	"text",
+	"workspace-file-reference",
 ];
 
 // From codersdk/chats.go
@@ -2373,7 +2392,8 @@ export type ChatMessagePart =
 	| ChatFilePart
 	| ChatFileReferencePart
 	| ChatContextFilePart
-	| ChatSkillPart;
+	| ChatSkillPart
+	| ChatWorkspaceFileReferencePart;
 
 // From codersdk/chats.go
 export type ChatMessagePartType =
@@ -2385,7 +2405,8 @@ export type ChatMessagePartType =
 	| "source"
 	| "text"
 	| "tool-call"
-	| "tool-result";
+	| "tool-result"
+	| "workspace-file-reference";
 
 export const ChatMessagePartTypes: ChatMessagePartType[] = [
 	"context-file",
@@ -2397,6 +2418,7 @@ export const ChatMessagePartTypes: ChatMessagePartType[] = [
 	"text",
 	"tool-call",
 	"tool-result",
+	"workspace-file-reference",
 ];
 
 // From codersdk/chats.go
@@ -3302,6 +3324,35 @@ export const ChatWatchEventKinds: ChatWatchEventKind[] = [
 	"summary_change",
 	"title_change",
 ];
+
+// From codersdk/chats.go
+export interface ChatWorkspaceFileReferencePart {
+	readonly type: "workspace-file-reference";
+	/**
+	 * WorkspaceFilePath is the absolute path of a workspace upload.
+	 * The bytes live on the workspace filesystem; only metadata is
+	 * persisted on the message.
+	 */
+	readonly workspace_file_path: string;
+	/**
+	 * WorkspaceFileName is the sanitized basename of a workspace upload.
+	 */
+	readonly workspace_file_name: string;
+	/**
+	 * WorkspaceFileSize is the byte size of a workspace upload.
+	 */
+	readonly workspace_file_size: number;
+	/**
+	 * WorkspaceFileWorkspaceID identifies the workspace whose
+	 * filesystem holds the uploaded bytes. References are only
+	 * readable while the chat stays bound to that workspace.
+	 */
+	readonly workspace_file_workspace_id: string;
+	/**
+	 * WorkspaceFileMediaType is the best-effort declared MIME type.
+	 */
+	readonly workspace_file_media_type?: string;
+}
 
 // From codersdk/chats.go
 /**
@@ -9553,6 +9604,35 @@ export interface UploadChatFileResponse {
 	readonly id: string;
 }
 
+// From codersdk/chats.go
+/**
+ * UploadChatWorkspaceFileResponse describes a file uploaded to a
+ * chat's workspace filesystem.
+ */
+export interface UploadChatWorkspaceFileResponse {
+	/**
+	 * Path is the absolute path of the file on the workspace.
+	 */
+	readonly path: string;
+	/**
+	 * Name is the final basename of the uploaded file.
+	 */
+	readonly name: string;
+	/**
+	 * Size is the number of bytes written to the workspace.
+	 */
+	readonly size: number;
+	/**
+	 * MediaType is the client-declared content type for display.
+	 */
+	readonly media_type: string;
+	/**
+	 * WorkspaceID is the workspace whose filesystem received the
+	 * bytes. Message parts referencing this upload must carry it.
+	 */
+	readonly workspace_id: string;
+}
+
 // From codersdk/files.go
 /**
  * UploadResponse contains the hash to reference the uploaded file.
@@ -10097,6 +10177,14 @@ export interface WorkspaceAgent {
 	readonly status: WorkspaceAgentStatus;
 	readonly lifecycle_state: WorkspaceAgentLifecycle;
 	readonly name: string;
+	/**
+	 * DisplayOrder distinguishes agents the template author ranked
+	 * explicitly. Agents in API responses are already sorted, but the
+	 * sort is scoped per resource; clients replicating server-side
+	 * agent selection (which orders all agents globally) need the
+	 * underlying key.
+	 */
+	readonly display_order: number;
 	readonly resource_id: string;
 	readonly instance_id?: string;
 	readonly architecture: string;

@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"charm.land/fantasy"
+	"github.com/dustin/go-humanize"
 	"github.com/google/uuid"
 	"github.com/sqlc-dev/pqtype"
 	"golang.org/x/xerrors"
@@ -107,6 +108,7 @@ func ConvertMessagesWithFiles(
 	resolver FileResolver,
 	logger slog.Logger,
 	acceptsFilePart func(mediaType string) bool,
+	chatWorkspaceID uuid.NullUUID,
 ) ([]fantasy.Message, error) {
 	// Phase 1: Parse all messages via ParseContent (→ SDK parts)
 	// and collect file_id references from user messages for batch
@@ -189,6 +191,7 @@ func ConvertMessagesWithFiles(
 				resolved,
 				userMissingFilePolicy,
 				acceptsFilePart,
+				chatWorkspaceID,
 			)
 			if len(userParts) == 0 {
 				continue
@@ -199,7 +202,7 @@ func ConvertMessagesWithFiles(
 			})
 		case codersdk.ChatMessageRoleAssistant:
 			fantasyParts := normalizeAssistantToolCallInputs(
-				partsToMessageParts(ctx, logger, pm.parts, nil, dropMissingFiles, nil),
+				partsToMessageParts(ctx, logger, pm.parts, nil, dropMissingFiles, nil, chatWorkspaceID),
 			)
 			for _, toolCall := range ExtractToolCalls(fantasyParts) {
 				if toolCall.ToolCallID == "" || strings.TrimSpace(toolCall.ToolName) == "" {
@@ -223,7 +226,7 @@ func ConvertMessagesWithFiles(
 					}
 				}
 			}
-			toolParts := partsToMessageParts(ctx, logger, pm.parts, nil, dropMissingFiles, nil)
+			toolParts := partsToMessageParts(ctx, logger, pm.parts, nil, dropMissingFiles, nil, chatWorkspaceID)
 			if len(toolParts) == 0 {
 				continue
 			}
@@ -1357,6 +1360,32 @@ func fileReferencePartToText(part codersdk.ChatMessagePart) string {
 	return sb.String()
 }
 
+// workspaceFilePartToText formats a workspace-file-reference SDK
+// part as plain text for LLM consumption. The uploaded bytes stay on
+// the workspace filesystem; only the metadata reference reaches the
+// model, which can read the file with its workspace tools.
+//
+// References carry the workspace they were uploaded to. When the chat
+// has since been rebound (or unbound), the path no longer exists for
+// the current agent, so the reference renders as unavailable instead
+// of steering the model toward a dead path.
+func workspaceFilePartToText(part codersdk.ChatMessagePart, chatWorkspaceID uuid.NullUUID) string {
+	var sb strings.Builder
+	_, _ = sb.WriteString("[workspace file: ")
+	_, _ = sb.WriteString(part.WorkspaceFileName)
+	if part.WorkspaceFileSize > 0 {
+		_, _ = fmt.Fprintf(&sb, " (%s)", humanize.IBytes(uint64(part.WorkspaceFileSize)))
+	}
+	if !chatWorkspaceID.Valid || part.WorkspaceFileWorkspaceID != chatWorkspaceID.UUID {
+		_, _ = sb.WriteString(", uploaded to a previously attached workspace and no longer accessible]")
+		return sb.String()
+	}
+	_, _ = sb.WriteString(" at ")
+	_, _ = sb.WriteString(part.WorkspaceFilePath)
+	_, _ = sb.WriteString("]")
+	return sb.String()
+}
+
 // toolResultPartToMessagePart converts an SDK tool-result part
 // into a fantasy ToolResultPart for LLM dispatch.
 func toolResultPartToMessagePart(logger slog.Logger, part codersdk.ChatMessagePart) fantasy.ToolResultPart {
@@ -1497,6 +1526,7 @@ func partsToMessageParts(
 	resolved map[uuid.UUID]FileData,
 	policy missingFilePolicy,
 	acceptsFilePart func(mediaType string) bool,
+	chatWorkspaceID uuid.NullUUID,
 ) []fantasy.MessagePart {
 	result := make([]fantasy.MessagePart, 0, len(parts))
 	for _, part := range parts {
@@ -1612,6 +1642,10 @@ func partsToMessageParts(
 			// LLMs don't understand file-reference natively.
 			result = append(result, fantasy.TextPart{
 				Text: fileReferencePartToText(part),
+			})
+		case codersdk.ChatMessagePartTypeWorkspaceFileReference:
+			result = append(result, fantasy.TextPart{
+				Text: workspaceFilePartToText(part, chatWorkspaceID),
 			})
 		case codersdk.ChatMessagePartTypeContextFile:
 			if part.ContextFileContent == "" {
