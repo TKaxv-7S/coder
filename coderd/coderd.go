@@ -978,7 +978,7 @@ func New(options *Options) *API {
 		DeploymentValues:  options.DeploymentValues,
 		Experiments:       api.Experiments,
 		BuilderMetrics:    options.WorkspaceBuilderMetrics,
-		Clock:             api.Clock,
+		Clock:             quartz.NewReal(),
 	})
 	api.workspaceBuildOrchestrator.Start(api.ctx)
 
