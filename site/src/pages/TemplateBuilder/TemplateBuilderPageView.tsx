@@ -39,6 +39,7 @@ import { SelectionSummary } from "./SelectionSummary";
 import {
 	findNextVisibleIndex,
 	findPrevVisibleIndex,
+	furthestAllowedIndex,
 	nearestVisible,
 	type StepId,
 	WIZARD_STEPS,
@@ -81,7 +82,8 @@ export const TemplateBuilderPageView: FC<TemplateBuilderPageViewProps> = ({
 	const stepParam = searchParams.get("step") ?? WIZARD_STEPS[0].id;
 	const rawIndex = WIZARD_STEPS.findIndex((s) => s.id === stepParam);
 	const resolvedIndex = rawIndex >= 0 ? rawIndex : 0;
-	const currentIndex = nearestVisible(resolvedIndex, state);
+	const clampedIndex = Math.min(resolvedIndex, furthestAllowedIndex(state));
+	const currentIndex = nearestVisible(clampedIndex, state);
 	const currentStep = WIZARD_STEPS[currentIndex];
 
 	// Normalize the URL when the step param is invalid or refers to a skipped step.
