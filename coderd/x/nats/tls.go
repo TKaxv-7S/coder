@@ -42,9 +42,10 @@ type clusterTLS struct {
 	clock  quartz.Clock
 
 	mu sync.Mutex
-	// ca and ip are swapped together by setClusterCA: under the default noop
-	// cache no leaf can be minted (so no route forms), and the real cache plus
-	// this replica's relay IP are installed once cluster mTLS is enabled.
+	// ca is swapped by setCACache: the default noop cache mints no leaf (so no
+	// route forms) until the real cache is installed once cluster mTLS is
+	// enabled. ip is this replica's cluster host, fixed at construction and
+	// embedded as the leaf IP SAN.
 	ca cryptokeys.SigningKeycache
 	ip net.IP
 	// leaf is the cached leaf certificate. leafSeq is the active CA sequence it
@@ -85,17 +86,17 @@ func newClusterTLS(ctx context.Context, logger slog.Logger, clock quartz.Clock, 
 	}
 }
 
-// setClusterCA swaps the CA cache and this replica's leaf IP SAN. Because the
-// tls.Config callbacks read these on each handshake, the swap takes effect
-// without a server restart or route reload: installing the real cache lets
-// routes negotiate mTLS, and reverting to a noop cache makes leaf minting fail
-// so no new route can form. A swap clears the cached leaf so the next handshake
-// re-mints under the new CA/IP.
-func (t *clusterTLS) setClusterCA(ca cryptokeys.SigningKeycache, ip net.IP) {
+// setCACache swaps the CA cache. Because the tls.Config callbacks read it on
+// each handshake, the swap takes effect without a server restart or route
+// reload: installing the real cache lets routes negotiate mTLS, and reverting
+// to a noop cache makes leaf minting fail so no new route can form. The leaf IP
+// SAN is fixed at construction (this replica's cluster host does not change), so
+// it is not touched here. A swap clears the cached leaf so the next handshake
+// re-mints under the new CA.
+func (t *clusterTLS) setCACache(ca cryptokeys.SigningKeycache) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.ca = ca
-	t.ip = ip
 	t.leaf = nil
 	t.leafSeq = ""
 	// Verify pools follow the CA source: drop them so stale roots are not
@@ -200,7 +201,7 @@ func (t *clusterTLS) configForClient(chi *tls.ClientHelloInfo) (*tls.Config, err
 // signing CA (see mintLeaf), so re-minting is driven purely by CA rotation.
 //
 // The whole method holds t.mu so the CA cache, IP, and cached leaf are read as
-// a consistent set: a concurrent setClusterCA cannot swap the CA out from under
+// a consistent set: a concurrent setCACache cannot swap the CA out from under
 // the IP we mint with. The lock is therefore held across the SigningKey lookup
 // and the (rare) mint. Mints happen only at startup and on CA rotation, so the
 // keygen+sign cost on the lock is acceptable; the SigningKey lookup is normally

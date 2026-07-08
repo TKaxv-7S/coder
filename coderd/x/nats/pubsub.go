@@ -130,12 +130,10 @@ type Options struct {
 	// certificate from the active nats_ca CA and verifies peers against the
 	// CA fetched from this cache on each handshake. Nil keeps routes
 	// plaintext (token auth only). cryptokeys.SigningKeycache satisfies this.
+	//
+	// The leaf's IP SAN (and the accept-side source binding) is this replica's
+	// ClusterHost, so ClusterHost must be an IP for mTLS to activate.
 	ClusterCA cryptokeys.SigningKeycache
-
-	// ClusterTLSIP is this replica's relay IP, embedded as an IP SAN in the
-	// leaf certificate and matched against the dialed host when verifying a
-	// peer. Required when ClusterCA is set.
-	ClusterTLSIP net.IP
 
 	// clusterTLSClock overrides the cluster TLS clock, for tests.
 	clusterTLSClock quartz.Clock
@@ -333,12 +331,14 @@ func New(ctx context.Context, logger slog.Logger, opts Options) (pubSub *Pubsub,
 	// When ClusterCA is set, install the cluster TLS callbacks at boot so the
 	// route listener can negotiate mTLS. The callbacks read the CA cache on
 	// each handshake, so the default noop cache keeps routes inert (no leaf can
-	// be minted) until SetClusterCA swaps in a real cache. A real cache also
-	// requires ClusterTLSIP; leaf minting enforces that. ClusterCA == nil keeps
-	// routes plaintext (token auth only).
+	// be minted) until SetCACache swaps in a real cache. The leaf IP SAN is this
+	// replica's ClusterHost, fixed here at construction; leaf minting enforces
+	// that it is an IP. ClusterCA == nil keeps routes plaintext (token auth
+	// only).
 	var ct *clusterTLS
 	if !opts.disableCluster && opts.ClusterCA != nil {
-		ct = newClusterTLS(ctx, logger, opts.clusterTLSClock, opts.ClusterCA, opts.ClusterTLSIP)
+		selfIP := net.ParseIP(opts.ClusterHost)
+		ct = newClusterTLS(ctx, logger, opts.clusterTLSClock, opts.ClusterCA, selfIP)
 		sopts.Cluster.TLSConfig = ct.tlsConfig()
 		sopts.Cluster.TLSTimeout = clusterTLSTimeout.Seconds()
 	}

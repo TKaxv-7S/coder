@@ -77,22 +77,34 @@ func generateTestCA(t *testing.T, sequence int32) *cryptokeys.NATSCA {
 }
 
 // newTLSPubsub builds a clustered pubsub whose route listener requires mTLS,
-// using the supplied CA cache and leaf IP SAN. Peers dial each other on
-// 127.0.0.1 (clusterRouteAddress), so ip must be 127.0.0.1 for routes to form.
+// using the supplied CA cache. ip is this node's cluster host: the route
+// listener bind host and the leaf IP SAN. Peers dial each other on that host
+// (clusterRouteAddress), so ip must be 127.0.0.1 for routes to form.
 func newTLSPubsub(t *testing.T, ca cryptokeys.SigningKeycache, ip net.IP) *Pubsub {
 	t.Helper()
 	logger := slogtest.Make(t, nil)
 	ctx := testutil.Context(t, testutil.WaitLong)
 	ps, err := New(ctx, logger, Options{
-		ClusterHost:    "127.0.0.1",
+		ClusterHost:    ip.String(),
 		ClusterPort:    natsserver.RANDOM_PORT,
 		disableCluster: false,
 		ClusterCA:      ca,
-		ClusterTLSIP:   ip,
 	})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = ps.Close() })
 	return ps
+}
+
+// setLeafSAN overrides a node's leaf IP SAN after construction, for tests that
+// need the minted SAN to differ from the loopback address the node binds and
+// connects on (which are otherwise both the node's ClusterHost). Clearing the
+// cached leaf forces the next handshake to re-mint under the new SAN.
+func setLeafSAN(ps *Pubsub, ip net.IP) {
+	ps.clusterTLS.mu.Lock()
+	defer ps.clusterTLS.mu.Unlock()
+	ps.clusterTLS.ip = ip
+	ps.clusterTLS.leaf = nil
+	ps.clusterTLS.leafSeq = ""
 }
 
 func numRoutes(t *testing.T, ps *Pubsub) int {
@@ -196,14 +208,19 @@ func TestPubsub_ClusterTLS(t *testing.T) {
 		cache := func() *fakeCACache {
 			return &fakeCACache{active: ca, byID: map[string]*cryptokeys.NATSCA{"1": ca}}
 		}
-		// b mints its leaf for the wrong IP (not the loopback it actually
-		// connects from). When b dials a, a's accept-side source binding sees
-		// b's source IP (127.0.0.1) does not match b's leaf SAN (10.99.99.99)
-		// and rejects it, so no route forms even though both share a CA. Only b
-		// dials, so there is no other handshake direction.
+		// Both nodes bind and connect on loopback and know each other as peers,
+		// so the CA and source-membership checks pass. But both mint their leaf
+		// with a SAN that does not match the loopback address they connect from,
+		// so every handshake is rejected on the SAN binding alone and no route
+		// forms. This isolates the SAN check: a valid CA-signed leaf presented
+		// from a known replica is still rejected when the cert is not bound to
+		// the address it connects from (e.g. a stolen or mis-minted leaf).
 		a := newTLSPubsub(t, cache(), net.IPv4(127, 0, 0, 1))
-		b := newTLSPubsub(t, cache(), net.IPv4(10, 99, 99, 99))
+		b := newTLSPubsub(t, cache(), net.IPv4(127, 0, 0, 1))
+		setLeafSAN(a, net.IPv4(10, 99, 99, 99))
+		setLeafSAN(b, net.IPv4(10, 99, 99, 99))
 
+		require.NoError(t, a.setPeerAddresses([]string{clusterRouteAddress(t, b)}))
 		require.NoError(t, b.setPeerAddresses([]string{clusterRouteAddress(t, a)}))
 
 		require.Never(t, func() bool {
@@ -232,7 +249,7 @@ func TestPubsub_ClusterTLS(t *testing.T) {
 
 // TestPubsub_ClusterTLS_CacheSwap covers the Part C optional-mTLS model: a node
 // that boots with the noop CA cache forms no route, and swapping in a real cache
-// via SetClusterCA lets routes form over mTLS with no server restart.
+// via SetCACache lets routes form over mTLS with no server restart.
 func TestPubsub_ClusterTLS_CacheSwap(t *testing.T) {
 	t.Parallel()
 
@@ -242,7 +259,7 @@ func TestPubsub_ClusterTLS_CacheSwap(t *testing.T) {
 		ca := generateTestCA(t, 1)
 		// a boots with the noop cache (production default); b has a real cache.
 		// a cannot mint a leaf, so its route handshakes fail and no route forms.
-		a := newTLSPubsub(t, cryptokeys.NoopSigningKeycache{}, nil)
+		a := newTLSPubsub(t, cryptokeys.NoopSigningKeycache{}, net.IPv4(127, 0, 0, 1))
 		b := newTLSPubsub(t, &fakeCACache{active: ca, byID: map[string]*cryptokeys.NATSCA{"1": ca}}, net.IPv4(127, 0, 0, 1))
 
 		require.NoError(t, a.setPeerAddresses([]string{clusterRouteAddress(t, b)}))
@@ -262,15 +279,15 @@ func TestPubsub_ClusterTLS_CacheSwap(t *testing.T) {
 		}
 		// Both boot with the noop cache, then both get the real cache swapped in
 		// (mirroring the enterprise HA enable path) without a server restart.
-		a := newTLSPubsub(t, cryptokeys.NoopSigningKeycache{}, nil)
-		b := newTLSPubsub(t, cryptokeys.NoopSigningKeycache{}, nil)
+		a := newTLSPubsub(t, cryptokeys.NoopSigningKeycache{}, net.IPv4(127, 0, 0, 1))
+		b := newTLSPubsub(t, cryptokeys.NoopSigningKeycache{}, net.IPv4(127, 0, 0, 1))
 
 		// Drive peers through fetchers, as production does, rather than calling
-		// setPeerAddresses directly: SetClusterCA and SetPeerFetcher both trigger
+		// setPeerAddresses directly: SetCACache and SetPeerFetcher both trigger
 		// a peer refresh that reads the current fetcher, so routes converge on
 		// the fetcher's addresses without racing a manual call.
-		a.SetClusterCA(realCache(), net.IPv4(127, 0, 0, 1))
-		b.SetClusterCA(realCache(), net.IPv4(127, 0, 0, 1))
+		a.SetCACache(realCache())
+		b.SetCACache(realCache())
 
 		a.SetPeerFetcher(&testPeerFetcher{addresses: []string{clusterRouteAddress(t, b)}})
 		b.SetPeerFetcher(&testPeerFetcher{addresses: []string{clusterRouteAddress(t, a)}})

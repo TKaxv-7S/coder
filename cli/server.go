@@ -847,11 +847,15 @@ func (r *RootCmd) Server(newAPI func(context.Context, *coderd.Options) (*coderd.
 				token := fmt.Sprintf("%x", sha256.Sum256([]byte(dbURL)))
 				natsps, err := nats.New(ctx, logger.Named("nats_pubsub"), nats.Options{
 					ClusterAuthToken: token,
+					// ClusterHost is this replica's routable cluster address. It
+					// is the NATS route listener host and, when it is an IP, the
+					// leaf certificate's IP SAN for cluster mTLS.
+					ClusterHost: options.DeploymentValues.Cluster.Host.String(),
 					// Install the cluster TLS callbacks with a noop CA cache so a
 					// single node (or pre-license deployment) boots without a CA
 					// dependency and forms no routes. Enterprise HA swaps in the
-					// real nats_ca cache plus the relay IP via Pubsub.SetClusterCA
-					// once clustering is licensed.
+					// real nats_ca cache via Pubsub.SetCACache once clustering is
+					// licensed.
 					//
 					// TODO: the real CA cache cannot be built here because
 					// options.Database is not yet fully instantiated (it is

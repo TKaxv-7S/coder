@@ -883,25 +883,18 @@ func (api *API) Close() error {
 	return api.AGPL.Close()
 }
 
-// configureNATSClusterTLS swaps the real nats_ca CA cache and this replica's
-// relay IP into the NATS pubsub, enabling cluster mTLS. The relay URL host is
-// the IP SAN peers verify, so without an IP-based relay URL the cache is left
-// as the boot-time noop and routes stay plaintext (token auth only). The CA is
+// configureNATSClusterTLS swaps the real nats_ca CA cache into the NATS pubsub,
+// enabling cluster mTLS. The leaf IP SAN peers verify is this replica's cluster
+// host, fixed when the pubsub was constructed, so without an IP cluster host no
+// leaf can be minted and routes stay plaintext (token auth only). The CA is
 // read lazily by the TLS callbacks on each handshake, so nothing reads it here.
 func (api *API) configureNATSClusterTLS(natsPubsub *nats.Pubsub) {
-	relayURL := api.Options.DeploymentValues.DERP.Server.RelayURL.Value()
-	if relayURL == nil || relayURL.String() == "" {
-		api.Logger.Warn(api.ctx, "nats cluster mTLS disabled: no DERP relay URL configured; cluster routes use token auth only")
-		return
+	if net.ParseIP(api.Options.ClusterHost) == nil {
+		api.Logger.Warn(api.ctx, "nats cluster mTLS inactive: cluster host is not an IP; cluster routes use token auth only",
+			slog.F("cluster_host", api.Options.ClusterHost))
 	}
-	ip := net.ParseIP(relayURL.Hostname())
-	if ip == nil {
-		api.Logger.Warn(api.ctx, "nats cluster mTLS disabled: relay URL host is not an IP",
-			slog.F("relay_host", relayURL.Hostname()))
-		return
-	}
-	natsPubsub.SetClusterCA(api.AGPL.NATSCACache, ip)
-	api.Logger.Info(api.ctx, "nats cluster mTLS enabled", slog.F("leaf_ip", ip.String()))
+	natsPubsub.SetCACache(api.AGPL.NATSCACache)
+	api.Logger.Info(api.ctx, "nats cluster mTLS enabled")
 }
 
 func (api *API) updateEntitlements(ctx context.Context) error {
@@ -1068,7 +1061,7 @@ func (api *API) updateEntitlements(ctx context.Context) error {
 					natsPubsub.SetPeerFetcher(nats.NopPeerFetcher{})
 					// Revert to the noop CA cache: new route handshakes can no
 					// longer mint a leaf, so the cluster mesh stops forming.
-					natsPubsub.SetClusterCA(cryptokeys.NoopSigningKeycache{}, nil)
+					natsPubsub.SetCACache(cryptokeys.NoopSigningKeycache{})
 					api.Logger.Info(api.ctx, "nats cluster mTLS disabled")
 					api.replicaManager.SetCallback("nats", nil)
 				}
