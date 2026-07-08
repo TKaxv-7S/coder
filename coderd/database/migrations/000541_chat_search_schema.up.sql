@@ -17,8 +17,7 @@ CREATE INDEX idx_chat_messages_search_tsv ON chat_messages
 USING GIN (search_tsv)
 WHERE ((search_tsv IS NOT NULL) AND (deleted = false) AND (visibility = ANY (ARRAY['user'::chat_message_visibility, 'both'::chat_message_visibility])) AND (role = ANY (ARRAY['user'::chat_message_role, 'assistant'::chat_message_role])));
 
--- Lets the sweep find pending rows without a full table scan. Queries must
--- repeat the full predicate to use this index.
+-- Sweep uses this to find pending rows. Queries must repeat the full predicate.
 CREATE INDEX idx_chat_messages_search_tsv_pending ON chat_messages USING btree (id DESC)
 WHERE ((search_tsv IS NULL) AND (deleted = false) AND (visibility = ANY (ARRAY['user'::chat_message_visibility, 'both'::chat_message_visibility])) AND (role = ANY (ARRAY['user'::chat_message_role, 'assistant'::chat_message_role])));
 
@@ -27,3 +26,66 @@ CREATE INDEX idx_chats_title_fts ON chats
 
 CREATE INDEX idx_chat_diff_statuses_pr_title_fts ON chat_diff_statuses
     USING GIN (to_tsvector('simple', pull_request_title));
+
+-- search_tsv is system-maintained; the backfill must not perturb message
+-- revision, chat history_version, generation_attempt, or retry state.
+-- Both triggers therefore ignore changes confined to search_tsv.
+CREATE OR REPLACE FUNCTION set_chat_message_revision_before()
+RETURNS trigger AS $$
+DECLARE
+    chat_snapshot_version bigint;
+BEGIN
+    IF TG_OP = 'INSERT' AND NEW.revision IS NOT NULL THEN
+        RAISE EXCEPTION 'chat_messages.revision must be assigned by trigger';
+    END IF;
+
+    IF TG_OP = 'UPDATE' THEN
+        IF OLD.chat_id IS DISTINCT FROM NEW.chat_id THEN
+            RAISE EXCEPTION 'chat_messages.chat_id is immutable';
+        END IF;
+
+        IF OLD.revision IS DISTINCT FROM NEW.revision THEN
+            RAISE EXCEPTION 'chat_messages.revision must be assigned by trigger';
+        END IF;
+
+        IF OLD IS NOT DISTINCT FROM NEW THEN
+            RETURN NEW;
+        END IF;
+
+        IF to_jsonb(OLD) - 'search_tsv' = to_jsonb(NEW) - 'search_tsv' THEN
+            RETURN NEW;
+        END IF;
+    END IF;
+
+    SELECT snapshot_version INTO chat_snapshot_version
+    FROM chats WHERE id = NEW.chat_id;
+
+    IF chat_snapshot_version IS NULL THEN
+        RAISE EXCEPTION 'chat % does not exist', NEW.chat_id;
+    END IF;
+
+    NEW.revision = chat_snapshot_version;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION update_chat_history_after_message_update()
+RETURNS trigger AS $$
+BEGIN
+    UPDATE chats c
+    SET history_version = c.snapshot_version,
+        generation_attempt = 0
+    FROM (
+        SELECT DISTINCT n.chat_id
+        FROM chat_message_history_new_rows n
+        JOIN chat_message_history_old_rows o ON o.id = n.id
+        WHERE (to_jsonb(o) - 'search_tsv') IS DISTINCT FROM (to_jsonb(n) - 'search_tsv')
+    ) AS affected
+    WHERE c.id = affected.chat_id
+      AND (
+          c.history_version IS DISTINCT FROM c.snapshot_version
+          OR c.generation_attempt <> 0
+      );
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;

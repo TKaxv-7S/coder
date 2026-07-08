@@ -1865,8 +1865,8 @@ func TestMigration000541ChatMessageSearchText(t *testing.T) {
 	}
 }
 
-// eligibilityPredicate is the shared eligibility portion of the two partial
-// chat_messages search indexes. Queries must repeat it verbatim to use them.
+// Shared eligibility predicate of the two partial chat_messages search
+// indexes. Queries must repeat it verbatim.
 const eligibilityPredicate = `deleted = false
 	AND visibility IN ('user', 'both')
 	AND role IN ('user', 'assistant')`
@@ -1879,7 +1879,6 @@ func TestMigration000541ChatSearchSchemaIndexes(t *testing.T) {
 
 	sqlDB := testSQLDB(t)
 	require.NoError(t, migrations.Up(sqlDB))
-	ctx := testutil.Context(t, testutil.WaitMedium)
 
 	cases := []struct {
 		name    string
@@ -1892,18 +1891,22 @@ func TestMigration000541ChatSearchSchemaIndexes(t *testing.T) {
 		{name: "idx_chat_diff_statuses_pr_title_fts", table: "chat_diff_statuses", partial: false},
 	}
 	for _, tc := range cases {
-		var table string
-		var partial bool
-		err := sqlDB.QueryRowContext(ctx, `
-			SELECT i.tablename, x.indpred IS NOT NULL
-			FROM pg_indexes i
-			JOIN pg_class c ON c.relname = i.indexname
-			JOIN pg_index x ON x.indexrelid = c.oid
-			WHERE i.indexname = $1`, tc.name,
-		).Scan(&table, &partial)
-		require.NoError(t, err, "index %s should exist", tc.name)
-		require.Equal(t, tc.table, table, "index %s table", tc.name)
-		require.Equal(t, tc.partial, partial, "index %s partial", tc.name)
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := testutil.Context(t, testutil.WaitMedium)
+			var table string
+			var partial bool
+			err := sqlDB.QueryRowContext(ctx, `
+				SELECT i.tablename, x.indpred IS NOT NULL
+				FROM pg_indexes i
+				JOIN pg_class c ON c.relname = i.indexname
+				JOIN pg_index x ON x.indexrelid = c.oid
+				WHERE i.indexname = $1`, tc.name,
+			).Scan(&table, &partial)
+			require.NoError(t, err, "index %s should exist", tc.name)
+			require.Equal(t, tc.table, table, "index %s table", tc.name)
+			require.Equal(t, tc.partial, partial, "index %s partial", tc.name)
+		})
 	}
 }
 

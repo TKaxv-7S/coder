@@ -1375,6 +1375,10 @@ BEGIN
         IF OLD IS NOT DISTINCT FROM NEW THEN
             RETURN NEW;
         END IF;
+
+        IF to_jsonb(OLD) - 'search_tsv' = to_jsonb(NEW) - 'search_tsv' THEN
+            RETURN NEW;
+        END IF;
     END IF;
 
     SELECT snapshot_version INTO chat_snapshot_version
@@ -1439,7 +1443,7 @@ BEGIN
         SELECT DISTINCT n.chat_id
         FROM chat_message_history_new_rows n
         JOIN chat_message_history_old_rows o ON o.id = n.id
-        WHERE o IS DISTINCT FROM n
+        WHERE (to_jsonb(o) - 'search_tsv') IS DISTINCT FROM (to_jsonb(n) - 'search_tsv')
     ) AS affected
     WHERE c.id = affected.chat_id
       AND (
