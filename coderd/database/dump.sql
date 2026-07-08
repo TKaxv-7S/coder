@@ -1373,10 +1373,6 @@ BEGIN
             RAISE EXCEPTION 'chat_messages.revision must be assigned by trigger';
         END IF;
 
-        IF OLD IS NOT DISTINCT FROM NEW THEN
-            RETURN NEW;
-        END IF;
-
         cmp := NEW;
         cmp.search_tsv := OLD.search_tsv;
         IF OLD IS NOT DISTINCT FROM cmp THEN
