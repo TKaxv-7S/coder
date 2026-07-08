@@ -48,9 +48,8 @@ import {
 import { TemplateAlternatives } from "./TemplateAlternatives";
 import { TemplateCustomizationsStep } from "./TemplateCustomizationsStep";
 import {
-	initialWizardState,
+	initWizardState,
 	type TemplateBuilderWizardState,
-	toSelectedBaseMeta,
 	type WizardAction,
 	wizardReducer,
 } from "./wizardState";
@@ -79,20 +78,9 @@ export const TemplateBuilderPageView: FC<TemplateBuilderPageViewProps> = ({
 	// normalization effect below.
 	const baseConsumed = useRef(false);
 	const [state, dispatch] = useReducer(wizardReducer, null, () => {
-		const baseParam = searchParams.get("base");
-		if (baseParam && basesData?.bases) {
-			const match = basesData.bases.find((b) => b.id === baseParam);
-			if (match) {
-				const base = toSelectedBaseMeta(match);
-				baseConsumed.current = true;
-				return {
-					...initialWizardState,
-					baseTemplateId: base.id,
-					selectedBase: base,
-				};
-			}
-		}
-		return initialWizardState;
+		const init = initWizardState(searchParams.get("base"), basesData);
+		baseConsumed.current = init.baseConsumed;
+		return init.state;
 	});
 	const modulesQuery = useQuery(templateBuilderModules(state.selectedBase?.id));
 

@@ -1,5 +1,6 @@
 import type {
 	TemplateBuilderBase,
+	TemplateBuilderBasesResponse,
 	TemplateBuilderComposeModule,
 	TemplateBuilderComposeRequest,
 	TemplateBuilderCreateTemplateRequest,
@@ -73,6 +74,33 @@ export const initialWizardState: TemplateBuilderWizardState = {
 	selectedBase: null,
 	selectedModules: [],
 };
+
+/**
+ * Builds the initial wizard state, optionally preselecting a base
+ * template when a matching base ID is found in the provided bases.
+ * Returns whether a base was consumed so the caller can clean up the
+ * URL parameter.
+ */
+export function initWizardState(
+	baseId: string | null,
+	bases: TemplateBuilderBasesResponse | undefined,
+): { state: TemplateBuilderWizardState; baseConsumed: boolean } {
+	if (baseId && bases?.bases) {
+		const match = bases.bases.find((b) => b.id === baseId);
+		if (match) {
+			const base = toSelectedBaseMeta(match);
+			return {
+				state: {
+					...initialWizardState,
+					baseTemplateId: base.id,
+					selectedBase: base,
+				},
+				baseConsumed: true,
+			};
+		}
+	}
+	return { state: initialWizardState, baseConsumed: false };
+}
 
 export type WizardAction =
 	| { type: "SET_BASE"; base: SelectedBaseMeta }
