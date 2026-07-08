@@ -2883,8 +2883,7 @@ func awaitDoTicks(ctx context.Context, t *testing.T, clk *quartz.Mock, n int) fu
 		defer trapReset.Close()
 		defer trapStop.Close()
 		defer trapNow.Close()
-		// Wait for the initial tick signified by a call to Now(), then
-		// the ticker reset that signifies doTick completed.
+		// Initial tick: Now() trap. Completion: TickerReset trap.
 		trapNow.MustWait(ctx).MustRelease(ctx)
 		trapReset.MustWait(ctx).MustRelease(ctx)
 		select {
@@ -2979,9 +2978,7 @@ func TestBackfillChatMessagesSearchTsv(t *testing.T) {
 		_, err := rawDB.ExecContext(ctx, "UPDATE chat_messages SET deleted = true WHERE id = $1", id)
 		require.NoError(t, err)
 	}
-	// countPending repeats the predicate of
-	// idx_chat_messages_search_tsv_pending: what the backfill considers
-	// eligible but not yet backfilled.
+	// Repeats the predicate of idx_chat_messages_search_tsv_pending.
 	countPending := func(ctx context.Context, t *testing.T, rawDB *sql.DB) int {
 		t.Helper()
 		var count int
@@ -3007,8 +3004,7 @@ func TestBackfillChatMessagesSearchTsv(t *testing.T) {
 		isNull, _ := searchTsv(ctx, t, rawDB, id)
 		require.False(t, isNull, msg)
 	}
-	// requireTsvFor asserts the row was backfilled with the tsvector of
-	// expectedText, not just any non-NULL value such as the sentinel.
+	// Asserts the row's tsvector matches expectedText, not just non-NULL.
 	requireTsvFor := func(ctx context.Context, t *testing.T, rawDB *sql.DB, id int64, expectedText string) {
 		t.Helper()
 		var matches bool

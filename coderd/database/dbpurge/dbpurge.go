@@ -66,8 +66,7 @@ func WithClock(clk quartz.Clock) Option {
 	return func(i *instance) { i.clk = clk }
 }
 
-// WithChatSearchBackfillLimits overrides the per-batch row limit and the
-// per-tick batch cap for the chat message search backfill. For tests.
+// WithChatSearchBackfillLimits overrides backfill batch size and cap. For tests.
 func WithChatSearchBackfillLimits(batchSize int32, maxBatches int) Option {
 	return func(i *instance) {
 		i.chatSearchBackfillBatchSize = batchSize
@@ -101,8 +100,7 @@ func New(ctx context.Context, logger slog.Logger, db database.Store, vals *coder
 	}, []string{"record_type"})
 	reg.MustRegister(recordsPurged)
 
-	// The backfill updates rows rather than purging them, so it gets its own
-	// counter instead of a records_purged_total label.
+	// Separate counter: the backfill updates rows, not purges them.
 	chatSearchRowsBackfilled := prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: "coderd",
 		Subsystem: "dbpurge",
