@@ -207,6 +207,10 @@ type ConfiguredProvider struct {
 	CentralAPIKeyEnabled       bool
 	AllowUserAPIKey            bool
 	AllowCentralAPIKeyFallback bool
+	// AmbientCredentials reports that the AI Gateway holds provider-level
+	// credentials for this provider (e.g. Anthropic Workload Identity
+	// Federation), so requests can be served without an explicit API key.
+	AmbientCredentials bool
 }
 
 // ConfiguredModel is an enabled model loaded from database config.
@@ -439,10 +443,12 @@ func ResolveUserProviderKeys(
 			} else {
 				resolved.UnavailableReason = codersdk.ChatModelProviderUnavailableReasonUserAPIKeyRequired
 			}
-		case normalizedProvider == fantasybedrock.Name && provider.CentralAPIKeyEnabled:
-			// Bedrock can use ambient AWS credentials from the Coder server
-			// without an explicit key, but only when the credential policy
-			// allows central credentials to satisfy the request.
+		case (normalizedProvider == fantasybedrock.Name || provider.AmbientCredentials) && provider.CentralAPIKeyEnabled:
+			// Bedrock can use ambient AWS credentials from the Coder server,
+			// and providers flagged AmbientCredentials (e.g. Anthropic WIF)
+			// are authenticated by the AI Gateway itself, so neither needs
+			// an explicit key. Both still honor the credential policy on
+			// whether central credentials may satisfy the request.
 			if !provider.AllowUserAPIKey || provider.AllowCentralAPIKeyFallback {
 				resolved.Available = true
 			} else {
@@ -458,7 +464,7 @@ func ResolveUserProviderKeys(
 			resolved.UnavailableReason = codersdk.ChatModelProviderUnavailableMissingAPIKey
 		}
 
-		setResolvedProviderAPIKey(&merged, normalizedProvider, chosenKey, resolved)
+		setResolvedProviderAPIKey(&merged, provider, chosenKey, resolved)
 		availabilityByProvider[normalizedProvider] = resolved
 	}
 
@@ -469,8 +475,8 @@ func ResolveUserProviderKeys(
 // resolved provider availability. An empty value means ambient
 // credentials may satisfy the provider. An absent entry means the
 // provider is not resolvable.
-func setResolvedProviderAPIKey(keys *ProviderAPIKeys, provider string, apiKey string, availability ProviderAvailability) {
-	normalizedProvider := NormalizeProvider(provider)
+func setResolvedProviderAPIKey(keys *ProviderAPIKeys, provider ConfiguredProvider, apiKey string, availability ProviderAvailability) {
+	normalizedProvider := NormalizeProvider(provider.Provider)
 	if normalizedProvider == "" {
 		return
 	}
@@ -486,7 +492,7 @@ func setResolvedProviderAPIKey(keys *ProviderAPIKeys, provider string, apiKey st
 	case fantasyanthropic.Name:
 		keys.Anthropic = trimmedKey
 	}
-	if trimmedKey != "" || (availability.Available && ProviderAllowsAmbientCredentials(normalizedProvider)) {
+	if trimmedKey != "" || (availability.Available && (provider.AmbientCredentials || ProviderAllowsAmbientCredentials(normalizedProvider))) {
 		keys.ByProvider[normalizedProvider] = trimmedKey
 	}
 }
@@ -945,8 +951,11 @@ func ModelFromConfig(
 	}
 
 	apiKey := providerKeys.APIKey(provider)
-	if apiKey == "" &&
-		!(ProviderAllowsAmbientCredentials(provider) && providerKeys.HasProvider(provider)) {
+	// An empty key with a present ByProvider entry means resolution
+	// determined ambient credentials satisfy this provider (Bedrock AWS
+	// credentials, or AI Gateway-held credentials such as Anthropic WIF);
+	// see setResolvedProviderAPIKey.
+	if apiKey == "" && !providerKeys.HasProvider(provider) {
 		return nil, missingProviderAPIKeyError(provider)
 	}
 	baseURL := providerKeys.BaseURL(provider)
