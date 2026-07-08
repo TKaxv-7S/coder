@@ -399,8 +399,7 @@ func seedChatMessageSearchCorpus(ctx context.Context, t testing.TB, db database.
 
 	faker := gofakeit.New(uint64(1 + chatOffset))
 	organization := dbgen.Organization(t, db, database.Organization{})
-	provider := dbgen.ChatProvider(t, db, database.ChatProvider{})
-	modelConfig := dbgen.ChatModelConfig(t, db, database.ChatModelConfig{Provider: provider.Provider})
+	modelConfig := dbgen.ChatModelConfig(t, db, database.ChatModelConfig{})
 	chatCounter := chatOffset
 	seededMessages := 0
 	for _, profile := range profiles {
@@ -451,7 +450,6 @@ func chatMessageBatchParams(faker *gofakeit.Faker, chat database.Chat, ownerID u
 		Compressed:          make([]bool, messagesPerChat),
 		TotalCostMicros:     make([]int64, messagesPerChat),
 		RuntimeMs:           make([]int64, messagesPerChat),
-		ProviderResponseID:  make([]string, messagesPerChat),
 	}
 
 	for messageIndex := range messagesPerChat {
@@ -860,8 +858,7 @@ func seedScaledChatMessageSearchCorpus(ctx context.Context, t testing.TB, db dat
 
 	faker := gofakeit.New(2)
 	organization := dbgen.Organization(t, db, database.Organization{})
-	provider := dbgen.ChatProvider(t, db, database.ChatProvider{})
-	modelConfig := dbgen.ChatModelConfig(t, db, database.ChatModelConfig{Provider: provider.Provider})
+	modelConfig := dbgen.ChatModelConfig(t, db, database.ChatModelConfig{})
 
 	stats := scaledSeedStats{}
 	chatCounter := 0
