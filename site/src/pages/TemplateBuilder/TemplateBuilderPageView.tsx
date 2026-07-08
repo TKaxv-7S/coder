@@ -2,11 +2,12 @@ import {
 	type FC,
 	type ReactNode,
 	useCallback,
+	useEffect,
 	useReducer,
-	useState,
 } from "react";
 
 import { useQuery } from "react-query";
+import { useSearchParams } from "react-router";
 import { templateBuilderModules } from "#/api/queries/templateBuilder";
 import type {
 	TemplateBuilderBasesResponse,
@@ -69,15 +70,35 @@ export const TemplateBuilderPageView: FC<TemplateBuilderPageViewProps> = ({
 	onClearCreateError,
 }) => {
 	const [state, dispatch] = useReducer(wizardReducer, initialWizardState);
-	const [stepIndex, setStepIndex] = useState(0);
+	const [searchParams, setSearchParams] = useSearchParams();
 	const modulesQuery = useQuery(templateBuilderModules(state.selectedBase?.id));
 
 	const moduleVarMap = Object.fromEntries(
 		state.modules.map((m) => [m.id, m.variables ?? {}]),
 	);
 
-	const currentIndex = nearestVisible(stepIndex, state);
+	// Derive current step from the URL query param.
+	const stepParam = searchParams.get("step") ?? WIZARD_STEPS[0].id;
+	const rawIndex = WIZARD_STEPS.findIndex((s) => s.id === stepParam);
+	const resolvedIndex = rawIndex >= 0 ? rawIndex : 0;
+	const currentIndex = nearestVisible(resolvedIndex, state);
 	const currentStep = WIZARD_STEPS[currentIndex];
+
+	// Normalize the URL when the step param is invalid or refers to a skipped step.
+	useEffect(() => {
+		if (currentStep.id !== stepParam) {
+			const next = new URLSearchParams(searchParams);
+			next.set("step", currentStep.id);
+			setSearchParams(next, { replace: true });
+		}
+	}, [currentStep.id, stepParam, searchParams, setSearchParams]);
+
+	// Reset scroll whenever the active step changes, including on browser
+	// back/forward (popstate) where button click handlers would not fire.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: scroll must reset when step changes
+	useEffect(() => {
+		window.scrollTo(0, 0);
+	}, [currentStep.id]);
 
 	const nextIndex = findNextVisibleIndex(currentIndex, state);
 	const prevIndex = findPrevVisibleIndex(currentIndex, state);
@@ -92,13 +113,21 @@ export const TemplateBuilderPageView: FC<TemplateBuilderPageViewProps> = ({
 		moduleVarMap,
 	);
 
+	const navigateToStep = useCallback(
+		(index: number) => {
+			const next = new URLSearchParams(searchParams);
+			next.set("step", WIZARD_STEPS[index].id);
+			setSearchParams(next, { replace: false });
+		},
+		[searchParams, setSearchParams],
+	);
+
 	const handleBack = () => {
 		if (currentStep.id === "customizations") {
 			dispatch({ type: "RESET_CUSTOMIZATIONS" });
 			onClearCreateError?.();
 		}
-		window.scrollTo(0, 0);
-		setStepIndex(prevIndex);
+		navigateToStep(prevIndex);
 	};
 
 	const handleNext = () => {
@@ -106,8 +135,7 @@ export const TemplateBuilderPageView: FC<TemplateBuilderPageViewProps> = ({
 			onCreateTemplate(state);
 			return;
 		}
-		window.scrollTo(0, 0);
-		setStepIndex(nextIndex);
+		navigateToStep(nextIndex);
 	};
 
 	const handleProvisionerStatusChange = useCallback(
@@ -120,7 +148,9 @@ export const TemplateBuilderPageView: FC<TemplateBuilderPageViewProps> = ({
 	const handleDeselectModule = (moduleId: string) => {
 		// If the only module gets deselected, go back to module selection
 		if (state.modules.length === 1) {
-			setStepIndex(WIZARD_STEPS.findIndex((s) => s.id === "module-select"));
+			navigateToStep(
+				WIZARD_STEPS.findIndex((s) => s.id === "module-select"),
+			);
 		}
 		dispatch({
 			type: "SET_MODULES",
