@@ -11,7 +11,7 @@ import { Spinner } from "#/components/Spinner/Spinner";
 import { getKnownModelsForProvider } from "#/pages/AgentsPage/components/ChatModelAdminPanel/knownModels";
 import { cn } from "#/utils/cn";
 
-interface CoderAgentProviderSetupProps {
+interface CoderAssistantProviderSetupProps {
 	onComplete: () => void;
 	onSkip: () => void;
 }
@@ -74,14 +74,13 @@ function modelsForProvider(provider: ProviderOption): ModelOption[] {
 }
 
 /**
- * Provider setup shown as the first step of the Coder Agent intro flow.
- * Creates an AI provider and a default model config so the Coder Agent
+ * Provider setup shown as the first step of the Coder Assistant intro flow.
+ * Creates an AI provider and a default model config so the Coder Assistant
  * has a working backend before the user first talks to it.
  */
-export const CoderAgentProviderSetup: FC<CoderAgentProviderSetupProps> = ({
-	onComplete,
-	onSkip,
-}) => {
+export const CoderAssistantProviderSetup: FC<
+	CoderAssistantProviderSetupProps
+> = ({ onComplete, onSkip }) => {
 	const queryClient = useQueryClient();
 	const createProvider = useMutation(createAIProviderMutation(queryClient));
 	const createModelConfig = useMutation(createChatModelConfig(queryClient));
@@ -141,10 +140,12 @@ export const CoderAgentProviderSetup: FC<CoderAgentProviderSetupProps> = ({
 	return (
 		<div className="flex flex-col gap-6 w-full">
 			<header className="text-center">
-				<h2 className="text-2xl font-semibold m-0">Set up your Coder Agent</h2>
+				<h2 className="text-2xl font-semibold m-0">
+					Set up your Coder Assistant
+				</h2>
 				<p className="text-sm text-content-secondary mt-2 mb-0">
-					The Coder Agent needs an AI provider to work. Connect one now so it's
-					ready when you are.
+					The Coder Assistant needs an AI provider to work. Connect one now so
+					it's ready when you are.
 				</p>
 			</header>
 

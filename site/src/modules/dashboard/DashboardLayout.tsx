@@ -4,8 +4,8 @@ import { InfoIcon } from "lucide-react";
 import { type FC, type HTMLAttributes, Suspense } from "react";
 import { Outlet } from "react-router";
 import { Button } from "#/components/Button/Button";
-import { CoderAgent } from "#/components/CoderAgent/CoderAgent";
-import { CoderAgentProvider } from "#/components/CoderAgent/CoderAgentProvider";
+import { CoderAssistant } from "#/components/CoderAssistant/CoderAssistant";
+import { CoderAssistantProvider } from "#/components/CoderAssistant/CoderAssistantProvider";
 import { Loader } from "#/components/Loader/Loader";
 import { useAuthenticated } from "#/hooks/useAuthenticated";
 import { AnnouncementBanners } from "#/modules/dashboard/AnnouncementBanners/AnnouncementBanners";
@@ -108,10 +108,10 @@ export const DashboardLayout: FC = () => {
 				/>
 			</div>
 
-			{/* Coder Agent floating assistant */}
-			<CoderAgentProvider>
-				<CoderAgent />
-			</CoderAgentProvider>
+			{/* Coder Assistant floating button and panel */}
+			<CoderAssistantProvider>
+				<CoderAssistant />
+			</CoderAssistantProvider>
 		</>
 	);
 };

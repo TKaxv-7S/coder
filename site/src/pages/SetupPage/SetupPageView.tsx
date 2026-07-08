@@ -182,7 +182,7 @@ export const SetupPageView: FC<SetupPageViewProps> = ({
 			},
 			validationSchema,
 			onSubmit: (values) => {
-				// Persist the Coder Agent preference alongside form submission.
+				// Persist the Coder Assistant preference alongside form submission.
 				// A fresh setup that enables the agent should always see the
 				// intro, so clear any stale completion flag from a previous
 				// session in this browser.
@@ -420,7 +420,7 @@ export const SetupPageView: FC<SetupPageViewProps> = ({
 						</p>
 					</div>
 
-					{/* Coder Agent assistant */}
+					{/* Coder Assistant opt-in */}
 					<label
 						htmlFor="coder-agent-toggle"
 						className="flex cursor-pointer gap-3 items-start p-4 rounded-lg border border-border hover:border-border-secondary transition-colors"
@@ -433,12 +433,14 @@ export const SetupPageView: FC<SetupPageViewProps> = ({
 							className="mt-0.5"
 						/>
 						<div className="flex flex-col gap-0.5">
-							<span className="text-sm font-semibold">Enable Coder Agent</span>
+							<span className="text-sm font-semibold">
+								Enable Coder Assistant
+							</span>
 							<span className="text-xs text-content-secondary leading-relaxed">
-								The Coder Agent is an AI assistant that lives in your dashboard.
-								It can help manage templates, create workspaces, and answer
-								questions about your deployment. Requires an AI provider to be
-								configured.
+								The Coder Assistant is an AI helper that lives in your
+								dashboard. It can help manage templates, create workspaces, and
+								answer questions about your deployment. Requires an AI provider
+								to be configured.
 							</span>
 						</div>
 					</label>

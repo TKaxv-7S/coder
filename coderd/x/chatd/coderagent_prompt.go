@@ -1,5 +1,11 @@
 package chatd
 
+import (
+	"strings"
+
+	"github.com/coder/coder/v2/coderd/database"
+)
+
 // CoderAgentSystemPrompt is the system prompt used when a Coder Agent
 // chat session is created. The Coder Agent is the built-in Coder
 // assistant available to both admins and regular users.
@@ -31,6 +37,53 @@ If you are unsure about something, say so honestly rather than guessing.
 // coderAgentLabelKey is the chat label key that marks a chat as a
 // Coder Agent conversation.
 const coderAgentLabelKey = "coder-agent"
+
+// coderAgentPageLabelKey is the chat label key the dashboard uses to
+// report the path the user is currently viewing. The value is the raw
+// dashboard pathname (for example "/workspaces").
+const coderAgentPageLabelKey = "coder-agent-page"
+
+// CoderAgentUserContext renders a system instruction describing the
+// chat owner so the assistant can tailor its behavior. currentPage is
+// the dashboard path the user is viewing; pass an empty string when it
+// is unknown.
+func CoderAgentUserContext(user database.User, roles []string, orgNames []string, currentPage string) string {
+	var b strings.Builder
+	b.WriteString("<user-context>\n")
+	b.WriteString("You are assisting the following Coder user:\n")
+	b.WriteString("- Username: " + user.Username + "\n")
+	if name := strings.TrimSpace(user.Name); name != "" {
+		b.WriteString("- Name: " + name + "\n")
+	}
+	rolesLine := "member (no elevated deployment roles)"
+	if len(roles) > 0 {
+		rolesLine = strings.Join(roles, ", ")
+	}
+	b.WriteString("- Deployment roles: " + rolesLine + "\n")
+	if len(orgNames) > 0 {
+		b.WriteString("- Organizations: " + strings.Join(orgNames, ", ") + "\n")
+	}
+	if page := sanitizeCoderAgentPage(currentPage); page != "" {
+		b.WriteString("They are currently viewing the " + page + " page in the Coder dashboard.\n")
+	}
+	b.WriteString("Tailor guidance to their permissions: deployment admins can manage templates, users, and settings; members can manage their own workspaces.\n")
+	b.WriteString("</user-context>")
+	return b.String()
+}
+
+// sanitizeCoderAgentPage validates a client-reported dashboard path
+// before it is embedded in a system instruction. It returns an empty
+// string unless the value looks like a plain absolute path.
+func sanitizeCoderAgentPage(page string) string {
+	page = strings.TrimSpace(page)
+	if page == "" || !strings.HasPrefix(page, "/") {
+		return ""
+	}
+	if strings.ContainsAny(page, " \t\r\n<>`\"'\\") {
+		return ""
+	}
+	return page
+}
 
 // IsCoderAgentChat reports whether the given chat labels indicate a
 // Coder Agent conversation.

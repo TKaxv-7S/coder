@@ -3,11 +3,11 @@ import {
 	selectOrderedMessageIDs,
 	useChatSelector,
 } from "#/pages/AgentsPage/components/ChatConversation/chatStore";
-import { CoderAgentButton } from "./CoderAgentButton";
-import { CoderAgentPanel } from "./CoderAgentPanel";
-import { useCoderAgentContext } from "./CoderAgentProvider";
+import { CoderAssistantButton } from "./CoderAssistantButton";
+import { CoderAssistantPanel } from "./CoderAssistantPanel";
+import { useCoderAssistantContext } from "./CoderAssistantProvider";
 
-export const CoderAgent: FC = () => {
+export const CoderAssistant: FC = () => {
 	const {
 		enabled,
 		open,
@@ -30,7 +30,7 @@ export const CoderAgent: FC = () => {
 		hasModelOptions,
 		modelSelectorPlaceholder,
 		isModelCatalogLoading,
-	} = useCoderAgentContext();
+	} = useCoderAssistantContext();
 
 	const orderedMessageIDs = useChatSelector(store, selectOrderedMessageIDs);
 	const messageCount = orderedMessageIDs.length;
@@ -51,7 +51,7 @@ export const CoderAgent: FC = () => {
 
 	return (
 		<>
-			<CoderAgentPanel
+			<CoderAssistantPanel
 				open={open}
 				onClose={close}
 				onNewChat={startNewChat}
@@ -72,7 +72,7 @@ export const CoderAgent: FC = () => {
 				modelSelectorPlaceholder={modelSelectorPlaceholder}
 				isModelCatalogLoading={isModelCatalogLoading}
 			/>
-			<CoderAgentButton
+			<CoderAssistantButton
 				open={open}
 				onToggle={toggle}
 				isThinking={isThinking}

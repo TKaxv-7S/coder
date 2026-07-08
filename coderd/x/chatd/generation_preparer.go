@@ -2,6 +2,7 @@ package chatd
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"slices"
 	"strings"
@@ -14,6 +15,7 @@ import (
 
 	"cdr.dev/slog/v3"
 	"github.com/coder/coder/v2/coderd/database"
+	"github.com/coder/coder/v2/coderd/database/dbauthz"
 	"github.com/coder/coder/v2/coderd/x/chatd/chatadvisor"
 	"github.com/coder/coder/v2/coderd/x/chatd/chatloop"
 	"github.com/coder/coder/v2/coderd/x/chatd/chatprompt"
@@ -356,6 +358,7 @@ func (server *Server) prepareGeneration(
 	)
 	if IsCoderAgentChat(chat.Labels) {
 		prompt = chatprompt.InsertSystem(prompt, CoderAgentSystemPrompt)
+		prompt = chatprompt.InsertSystem(prompt, server.coderAgentUserContextBlock(ctx, chat, logger))
 	}
 	if advisorRuntime != nil {
 		prompt = chatprompt.InsertSystem(prompt, chatadvisor.ParentGuidanceBlock)
@@ -626,6 +629,43 @@ func (server *Server) prepareGeneration(
 		Cleanup: cleanup,
 		Debug:   debug,
 	}, nil
+}
+
+// coderAgentUserContextBlock loads the chat owner's identity, deployment
+// roles, and organization memberships to build the Coder Agent
+// user-context system instruction. Best-effort: it logs and returns an
+// empty string when the owner cannot be loaded so the turn still runs.
+func (server *Server) coderAgentUserContextBlock(
+	ctx context.Context,
+	chat database.Chat,
+	logger slog.Logger,
+) string {
+	// The chatd subject cannot read user or organization rows. These are
+	// narrow reads of the chat owner's own identity used only to describe
+	// them in the system prompt.
+	//nolint:gocritic // See above; system access is scoped to two reads.
+	sysCtx := dbauthz.AsSystemRestricted(ctx)
+
+	owner, err := server.db.GetUserByID(sysCtx, chat.OwnerID)
+	if err != nil {
+		logger.Warn(ctx, "coder agent user context: load chat owner", slog.Error(err))
+		return ""
+	}
+
+	var orgNames []string
+	orgs, err := server.db.GetOrganizationsByUserID(sysCtx, database.GetOrganizationsByUserIDParams{
+		UserID:  chat.OwnerID,
+		Deleted: sql.NullBool{Bool: false, Valid: true},
+	})
+	if err != nil {
+		logger.Debug(ctx, "coder agent user context: load organizations", slog.Error(err))
+	} else {
+		for _, org := range orgs {
+			orgNames = append(orgNames, org.Name)
+		}
+	}
+
+	return CoderAgentUserContext(owner, owner.RBACRoles, orgNames, chat.Labels[coderAgentPageLabelKey])
 }
 
 func latestPromptUsage(messages []database.ChatMessage) fantasy.Usage {

@@ -13,6 +13,7 @@ import {
 	useQuery,
 	useQueryClient,
 } from "react-query";
+import { useLocation } from "react-router";
 import {
 	chat,
 	chatMessagesForInfiniteScroll,
@@ -21,6 +22,7 @@ import {
 	createChat,
 	createChatMessage,
 	interruptChat,
+	updateChatLabels,
 	userChatProviderConfigs,
 } from "#/api/queries/chats";
 import type * as TypesGen from "#/api/typesGenerated";
@@ -40,7 +42,7 @@ import {
 } from "#/pages/AgentsPage/utils/modelOptions";
 import type { ChatDetailError } from "#/pages/AgentsPage/utils/usageLimitMessage";
 
-interface CoderAgentContextValue {
+interface CoderAssistantContextValue {
 	enabled: boolean;
 	open: boolean;
 	toggle: () => void;
@@ -70,9 +72,24 @@ interface CoderAgentContextValue {
 	isModelCatalogLoading: boolean;
 }
 
-const CoderAgentContext = createContext<CoderAgentContextValue | null>(null);
+const CoderAssistantContext = createContext<CoderAssistantContextValue | null>(
+	null,
+);
 
 const CHAT_ID_STORAGE_KEY = "coder_agent_chat_id";
+
+// Label key the server reads to learn which dashboard page the user is
+// viewing. The value is the raw pathname; label values allow "/" and
+// are capped at 256 bytes server-side.
+const PAGE_LABEL_KEY = "coder-agent-page";
+const MAX_PAGE_LABEL_LENGTH = 256;
+
+function pageLabelValue(pathname: string): string | undefined {
+	if (!pathname || pathname.length > MAX_PAGE_LABEL_LENGTH) {
+		return undefined;
+	}
+	return pathname;
+}
 
 // Same key the agents chat page uses, so the panel and the full
 // page share the user's last model choice.
@@ -102,7 +119,7 @@ function writeLocalStorage(key: string, value: string | null): void {
 	}
 }
 
-export const CoderAgentProvider: FC<
+export const CoderAssistantProvider: FC<
 	PropsWithChildren<{ forceEnabled?: boolean }>
 > = ({ children, forceEnabled }) => {
 	const [enabled, setEnabled] = useState(
@@ -210,6 +227,30 @@ export const CoderAgentProvider: FC<
 		useMutation(createChatMessage(queryClient, chatId ?? ""));
 	const { isPending: isInterruptPending, mutateAsync: interruptAsync } =
 		useMutation(interruptChat(queryClient, chatId ?? ""));
+	const { mutate: updateLabels } = useMutation(updateChatLabels(queryClient));
+
+	// Keep the chat's page label in sync with the current route so the
+	// assistant knows where the user is in the dashboard. Debounced so
+	// rapid navigation doesn't spam the PATCH endpoint. Labels are
+	// replaced wholesale by the endpoint, so the existing set is merged.
+	const { pathname } = useLocation();
+	const chatLabels = chatQuery.data?.labels;
+	useEffect(() => {
+		if (!chatId || !chatLabels) {
+			return;
+		}
+		const page = pageLabelValue(pathname);
+		if (!page || chatLabels[PAGE_LABEL_KEY] === page) {
+			return;
+		}
+		const timeout = window.setTimeout(() => {
+			updateLabels({
+				chatId,
+				labels: { ...chatLabels, [PAGE_LABEL_KEY]: page },
+			});
+		}, 1000);
+		return () => window.clearTimeout(timeout);
+	}, [chatId, chatLabels, pathname, updateLabels]);
 
 	// Model selector, wired the same way as the agents chat page.
 	const chatModelsQuery = useQuery(chatModels());
@@ -302,11 +343,15 @@ export const CoderAgentProvider: FC<
 							model_config_id: modelConfigId,
 						});
 					} else {
+						const page = pageLabelValue(window.location.pathname);
 						const created = await createChatAsync({
 							organization_id: organizationId,
 							content,
 							model_config_id: modelConfigId,
-							labels: { "coder-agent": "true" },
+							labels: {
+								"coder-agent": "true",
+								...(page ? { [PAGE_LABEL_KEY]: page } : {}),
+							},
 							client_type: "ui",
 						});
 						clearChatErrorReason(PENDING_CHAT_ERROR_KEY);
@@ -345,7 +390,7 @@ export const CoderAgentProvider: FC<
 	}, [clearChatErrorReason, setChatId]);
 
 	return (
-		<CoderAgentContext.Provider
+		<CoderAssistantContext.Provider
 			value={{
 				enabled,
 				open,
@@ -372,15 +417,15 @@ export const CoderAgentProvider: FC<
 			}}
 		>
 			{children}
-		</CoderAgentContext.Provider>
+		</CoderAssistantContext.Provider>
 	);
 };
 
-export function useCoderAgentContext(): CoderAgentContextValue {
-	const ctx = useContext(CoderAgentContext);
+export function useCoderAssistantContext(): CoderAssistantContextValue {
+	const ctx = useContext(CoderAssistantContext);
 	if (!ctx) {
 		throw new Error(
-			"useCoderAgentContext must be used within a CoderAgentProvider",
+			"useCoderAssistantContext must be used within a CoderAssistantProvider",
 		);
 	}
 	return ctx;

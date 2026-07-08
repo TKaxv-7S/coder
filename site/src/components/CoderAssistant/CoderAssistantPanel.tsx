@@ -36,7 +36,7 @@ const SUGGESTED_PROMPTS = [
 	"Help me build a template",
 ];
 
-interface CoderAgentPanelProps {
+interface CoderAssistantPanelProps {
 	open: boolean;
 	onClose: () => void;
 	onNewChat: () => void;
@@ -50,7 +50,7 @@ interface CoderAgentPanelProps {
 	chatId: string | null;
 	store: ChatStore;
 	persistedError: ChatDetailError | undefined;
-	// Model selector state, provided by CoderAgentProvider.
+	// Model selector state, provided by CoderAssistantProvider.
 	modelOptions: readonly ModelSelectorOption[];
 	selectedModel: string;
 	onModelChange: (id: string) => void;
@@ -59,7 +59,7 @@ interface CoderAgentPanelProps {
 	isModelCatalogLoading: boolean;
 }
 
-export const CoderAgentPanel: FC<CoderAgentPanelProps> = ({
+export const CoderAssistantPanel: FC<CoderAssistantPanelProps> = ({
 	open,
 	onClose,
 	onNewChat,
@@ -189,7 +189,7 @@ export const CoderAgentPanel: FC<CoderAgentPanelProps> = ({
 						size="icon"
 						onClick={onClose}
 						className="size-7 text-content-secondary hover:text-content-primary"
-						aria-label="Close Coder Agent"
+						aria-label="Close Coder Assistant"
 					>
 						<XIcon className="size-4" />
 					</Button>
@@ -231,7 +231,7 @@ export const CoderAgentPanel: FC<CoderAgentPanelProps> = ({
 									<SparklesIcon className="size-8 text-content-disabled" />
 									<div>
 										<p className="text-sm font-medium text-content-primary">
-											Hi, I'm your Coder Agent
+											Hi, I'm your Coder Assistant
 										</p>
 										<p className="mt-1 text-xs text-content-secondary">
 											Your AI assistant for Coder. Ask me anything about your

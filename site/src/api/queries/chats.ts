@@ -1241,6 +1241,28 @@ export const updateChatTitle = (queryClient: QueryClient) => ({
 	},
 });
 
+type UpdateChatLabelsVariables = {
+	chatId: string;
+	labels: Record<string, string>;
+};
+
+// Labels are replaced wholesale by the PATCH endpoint, so callers must
+// send the full desired label set, not just the keys that changed.
+export const updateChatLabels = (queryClient: QueryClient) => ({
+	mutationFn: ({ chatId, labels }: UpdateChatLabelsVariables) =>
+		API.experimental.updateChat(chatId, { labels }),
+
+	onSuccess: (
+		_data: unknown,
+		{ chatId, labels }: UpdateChatLabelsVariables,
+	) => {
+		queryClient.setQueryData<TypesGen.Chat | undefined>(
+			chatKey(chatId),
+			(chat) => (chat ? { ...chat, labels } : chat),
+		);
+	},
+});
+
 export const chatDebugRunsKey = (chatId: string) =>
 	[...chatKey(chatId), "debug-runs"] as const;
 

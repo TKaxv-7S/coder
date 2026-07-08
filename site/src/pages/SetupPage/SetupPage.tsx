@@ -40,7 +40,7 @@ export const SetupPage: FC = () => {
 
 	// If the user is logged in, navigate to the app
 	if (isSignedIn) {
-		// If the Coder Agent was enabled during setup and the intro hasn't
+		// If the Coder Assistant was enabled during setup and the intro hasn't
 		// been seen, show the intro page first. Checked via localStorage
 		// rather than the setupRequired ref because the component can
 		// remount after sign-in, which resets the ref.
