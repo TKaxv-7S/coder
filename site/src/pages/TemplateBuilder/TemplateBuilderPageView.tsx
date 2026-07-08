@@ -4,6 +4,7 @@ import {
 	useCallback,
 	useEffect,
 	useReducer,
+	useRef,
 } from "react";
 
 import { useQuery } from "react-query";
@@ -48,8 +49,8 @@ import { TemplateAlternatives } from "./TemplateAlternatives";
 import { TemplateCustomizationsStep } from "./TemplateCustomizationsStep";
 import {
 	initialWizardState,
-	type SelectedBaseMeta,
 	type TemplateBuilderWizardState,
+	toSelectedBaseMeta,
 	type WizardAction,
 	wizardReducer,
 } from "./wizardState";
@@ -57,7 +58,6 @@ import {
 interface TemplateBuilderPageViewProps {
 	error: unknown;
 	basesData: TemplateBuilderBasesResponse | undefined;
-	preselectedBase?: SelectedBaseMeta;
 	onCreateTemplate: (state: TemplateBuilderWizardState) => void;
 	createError: Error | null;
 	isCreating: boolean;
@@ -67,34 +67,47 @@ interface TemplateBuilderPageViewProps {
 export const TemplateBuilderPageView: FC<TemplateBuilderPageViewProps> = ({
 	error,
 	basesData,
-	preselectedBase,
 	onCreateTemplate,
 	createError,
 	isCreating,
 	onClearCreateError,
 }) => {
-	const resolvedInitialState = preselectedBase
-		? {
-				...initialWizardState,
-				baseTemplateId: preselectedBase.id,
-				selectedBase: preselectedBase,
-			}
-		: initialWizardState;
-	const [state, dispatch] = useReducer(wizardReducer, resolvedInitialState);
 	const [searchParams, setSearchParams] = useSearchParams();
+
+	// Resolve a ?base= param into initial reducer state on mount.
+	// The param is consumed and removed from the URL in the
+	// normalization effect below.
+	const baseConsumed = useRef(false);
+	const [state, dispatch] = useReducer(wizardReducer, null, () => {
+		const baseParam = searchParams.get("base");
+		if (baseParam && basesData?.bases) {
+			const match = basesData.bases.find((b) => b.id === baseParam);
+			if (match) {
+				const base = toSelectedBaseMeta(match);
+				baseConsumed.current = true;
+				return {
+					...initialWizardState,
+					baseTemplateId: base.id,
+					selectedBase: base,
+				};
+			}
+		}
+		return initialWizardState;
+	});
 	const modulesQuery = useQuery(templateBuilderModules(state.selectedBase?.id));
 
 	const moduleVarMap = Object.fromEntries(
 		state.modules.map((m) => [m.id, m.variables ?? {}]),
 	);
 
-	// Derive current step from the URL query param. When a base is
-	// preselected and no explicit step param is present, skip past
+	// Derive current step from the URL query param. When a base was
+	// consumed from the URL and no explicit step is present, skip past
 	// base-infra so the user lands on the next meaningful step.
 	const explicitStep = searchParams.get("step");
-	const defaultStepId = preselectedBase
-		? (WIZARD_STEPS[findNextVisibleIndex(0, state)]?.id ?? WIZARD_STEPS[0].id)
-		: WIZARD_STEPS[0].id;
+	const defaultStepId =
+		baseConsumed.current && !explicitStep
+			? (WIZARD_STEPS[findNextVisibleIndex(0, state)]?.id ?? WIZARD_STEPS[0].id)
+			: WIZARD_STEPS[0].id;
 	const stepParam = explicitStep ?? defaultStepId;
 	const rawIndex = WIZARD_STEPS.findIndex((s) => s.id === stepParam);
 	const resolvedIndex = rawIndex >= 0 ? rawIndex : 0;
@@ -102,14 +115,29 @@ export const TemplateBuilderPageView: FC<TemplateBuilderPageViewProps> = ({
 	const currentIndex = nearestVisible(clampedIndex, state);
 	const currentStep = WIZARD_STEPS[currentIndex];
 
-	// Normalize the URL when the step param is invalid or refers to a skipped step.
+	// Normalize the URL on mount and when the resolved step diverges from
+	// the URL. Consumes ?base= (removes it) and ensures ?step= reflects
+	// the actual current step.
 	useEffect(() => {
-		if (currentStep.id !== stepParam) {
-			const next = new URLSearchParams(searchParams);
+		const next = new URLSearchParams(searchParams);
+		let dirty = false;
+
+		// Consume the base param so it does not stick around in the URL.
+		if (next.has("base")) {
+			next.delete("base");
+			dirty = true;
+		}
+
+		// Initialize or correct the step param.
+		if (next.get("step") !== currentStep.id) {
 			next.set("step", currentStep.id);
+			dirty = true;
+		}
+
+		if (dirty) {
 			setSearchParams(next, { replace: true });
 		}
-	}, [currentStep.id, stepParam, searchParams, setSearchParams]);
+	}, [currentStep.id, searchParams, setSearchParams]);
 
 	// Reset scroll whenever the active step changes, including on browser
 	// back/forward (popstate) where button click handlers would not fire.
