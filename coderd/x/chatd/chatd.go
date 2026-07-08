@@ -4788,11 +4788,12 @@ func (p *Server) maybeGenerateChatSummaryAsync(
 	if chat.ParentChatID.Valid {
 		return
 	}
-	// goInflight serializes the WaitGroup add with shutdown drain and drops the
-	// launch once closing, so Close() is not blocked by an in-flight summary.
+	summaryCtx, stopSummaryCtx := p.inflightContext(ctx)
 	if err := p.goInflight(func() {
-		p.generateAndStoreChatSummary(context.WithoutCancel(ctx), chat, logger)
+		defer stopSummaryCtx()
+		p.generateAndStoreChatSummary(summaryCtx, chat, logger)
 	}); err != nil {
+		stopSummaryCtx()
 		logger.Debug(context.WithoutCancel(ctx), "skipped chat summary generation",
 			slog.F("chat_id", chat.ID), slog.Error(err))
 	}

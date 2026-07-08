@@ -125,6 +125,42 @@ func TestUpdateChatSummaryTrimsAndSkipsBlank(t *testing.T) {
 	})
 }
 
+func TestMaybeGenerateChatSummaryAsync_CloseCancelsInflight(t *testing.T) {
+	t.Parallel()
+
+	ctx := testutil.Context(t, testutil.WaitShort)
+
+	ctrl := gomock.NewController(t)
+	db := dbmock.NewMockStore(ctrl)
+	serverCtx, serverCancel := context.WithCancel(context.Background())
+	t.Cleanup(serverCancel)
+	server := &Server{ctx: serverCtx, cancel: serverCancel, db: db}
+	logger := slogtest.Make(t, &slogtest.Options{IgnoreErrors: true})
+	chat := database.Chat{ID: uuid.New(), OwnerID: uuid.New()}
+
+	entered := make(chan struct{})
+	db.EXPECT().GetChatByID(gomock.Any(), chat.ID).DoAndReturn(
+		func(readCtx context.Context, _ uuid.UUID) (database.Chat, error) {
+			close(entered)
+			// Hang like an unreachable callee until the context is
+			// canceled; only server shutdown can release this before
+			// chatSummaryWorkTimeout.
+			<-readCtx.Done()
+			return database.Chat{}, readCtx.Err()
+		},
+	)
+
+	server.maybeGenerateChatSummaryAsync(ctx, chat, logger)
+	testutil.TryReceive(ctx, t, entered)
+
+	closed := make(chan struct{})
+	go func() {
+		defer close(closed)
+		_ = server.Close()
+	}()
+	testutil.TryReceive(ctx, t, closed)
+}
+
 func TestComputerUseProviderAndModelFromConfig(t *testing.T) {
 	t.Parallel()
 
