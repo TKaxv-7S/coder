@@ -2267,10 +2267,20 @@ LEFT JOIN chats rc ON rc.id = cc.root_chat_id
 ORDER BY cc.total_cost_micros DESC;
 
 -- name: GetChatModelUsageCostByChatID :one
-WITH target AS (
+-- Assistant-message cost rolled up over the requested chat's subtree: the
+-- chat itself plus every descendant reachable through parent_chat_id. A
+-- root chat therefore reports its whole tree, while a subagent chat
+-- reports only its own spend plus any nested subagents it spawned.
+WITH RECURSIVE target AS (
     SELECT id AS chat_id
     FROM chats
     WHERE id = @chat_id::uuid
+), subtree AS (
+    SELECT chat_id AS id FROM target
+    UNION ALL
+    SELECT c.id
+    FROM chats c
+    JOIN subtree s ON c.parent_chat_id = s.id
 ), costs AS (
     SELECT
         COALESCE(SUM(cm.total_cost_micros), 0)::bigint AS total_cost_micros,
@@ -2288,13 +2298,8 @@ WITH target AS (
                 )
         )::bigint AS unpriced_messages_with_usage_count
     FROM chat_messages cm
-    JOIN chats c ON c.id = cm.chat_id
-    WHERE
-        (
-            c.id = (SELECT chat_id FROM target)
-            OR c.root_chat_id = (SELECT chat_id FROM target)
-        )
-        AND cm.role = 'assistant'
+    JOIN subtree s ON s.id = cm.chat_id
+    WHERE cm.role = 'assistant'
 )
 SELECT
     t.chat_id,

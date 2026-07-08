@@ -967,6 +967,17 @@ describe(chatCostIdsToInvalidate.name, () => {
 			expected: ["child-1", "root-1"],
 		},
 		{
+			name: "invalidates the parent and root when a nested subagent finishes",
+			updatedChat: chatForFilterInvalidation({
+				id: "grandchild-1",
+				parent_chat_id: "child-1",
+				root_chat_id: "root-1",
+				status: "waiting",
+			}),
+			eventKind: "status_change",
+			expected: ["grandchild-1", "child-1", "root-1"],
+		},
+		{
 			name: "waits while the chat is still active",
 			updatedChat: chatForFilterInvalidation({ status: "running" }),
 			eventKind: "status_change",

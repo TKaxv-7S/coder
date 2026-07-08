@@ -97,10 +97,12 @@ export const shouldInvalidateFilteredChatList = (
 // Chat IDs whose cost queries must refetch after a watch event, or an
 // empty array when the event cannot change any cost. Cost accrues while
 // a chat generates, so refetch when a status change lands in a
-// non-active status. The cost endpoint rolls subagent spend up into the
-// root chat (GetChatModelUsageCostByChatID sums over root_chat_id), so
-// a subagent going idle must also refresh the root chat's cost query,
-// not just its own.
+// non-active status. The cost endpoint sums the requested chat's
+// subtree (GetChatModelUsageCostByChatID walks parent_chat_id), so a
+// subagent going idle must also refresh its ancestors' rolled-up
+// totals. The watch payload only carries the immediate parent and the
+// root, which covers every ancestor for nesting up to two levels deep;
+// deeper intermediate ancestors are refreshed by the query staleTime.
 export const chatCostIdsToInvalidate = (
 	chat: TypesGen.Chat,
 	eventKind: TypesGen.ChatWatchEventKind,
@@ -108,12 +110,16 @@ export const chatCostIdsToInvalidate = (
 	if (eventKind !== "status_change" || isActiveChatStatus(chat.status)) {
 		return [];
 	}
-	// root_chat_id is self-referential on root chats; only include it
-	// when it points at a different (parent) chat.
-	if (chat.root_chat_id && chat.root_chat_id !== chat.id) {
-		return [chat.id, chat.root_chat_id];
+	// root_chat_id is self-referential on root chats and parent_chat_id
+	// equals root_chat_id at depth one; the set dedupes both cases.
+	const ids = new Set([chat.id]);
+	if (chat.parent_chat_id) {
+		ids.add(chat.parent_chat_id);
 	}
-	return [chat.id];
+	if (chat.root_chat_id) {
+		ids.add(chat.root_chat_id);
+	}
+	return [...ids];
 };
 
 const AgentsPage: FC = () => {

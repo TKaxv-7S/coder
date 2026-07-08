@@ -52,7 +52,9 @@ func TestGetChatCostSurfacesReadAuthzRace(t *testing.T) {
 	require.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
-func TestGetChatCostNormalizesChildToRoot(t *testing.T) {
+// A subagent chat's cost is scoped to its own subtree, so the handler
+// must query the requested chat ID rather than resolving to the root.
+func TestGetChatCostQueriesRequestedChat(t *testing.T) {
 	t.Parallel()
 
 	ctrl := gomock.NewController(t)
@@ -62,15 +64,16 @@ func TestGetChatCostNormalizesChildToRoot(t *testing.T) {
 		ID:             uuid.New(),
 		OrganizationID: uuid.New(),
 		OwnerID:        uuid.New(),
+		ParentChatID:   uuid.NullUUID{UUID: rootID, Valid: true},
 		RootChatID:     uuid.NullUUID{UUID: rootID, Valid: true},
 	}
 
 	dbm.EXPECT().GetChatByID(gomock.Any(), child.ID).Return(child, nil)
-	dbm.EXPECT().GetChatModelUsageCostByChatID(gomock.Any(), rootID).Return(
+	dbm.EXPECT().GetChatModelUsageCostByChatID(gomock.Any(), child.ID).Return(
 		database.GetChatModelUsageCostByChatIDRow{
-			ChatID:             rootID,
-			TotalCostMicros:    750,
-			PricedMessageCount: 2,
+			ChatID:             child.ID,
+			TotalCostMicros:    250,
+			PricedMessageCount: 1,
 		},
 		nil,
 	)
@@ -88,9 +91,9 @@ func TestGetChatCostNormalizesChildToRoot(t *testing.T) {
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	var cost codersdk.ChatCost
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&cost))
-	require.Equal(t, rootID, cost.ChatID)
-	require.Equal(t, int64(750), cost.TotalCostMicros)
-	require.Equal(t, int64(2), cost.PricedMessageCount)
+	require.Equal(t, child.ID, cost.ChatID)
+	require.Equal(t, int64(250), cost.TotalCostMicros)
+	require.Equal(t, int64(1), cost.PricedMessageCount)
 }
 
 func TestValidateChatModelProviderOptions_AnthropicThinkingDisplay(t *testing.T) {

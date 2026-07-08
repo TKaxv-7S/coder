@@ -1870,8 +1870,10 @@ type ChatCostChatBreakdown struct {
 	TotalRuntimeMs           int64     `json:"total_runtime_ms"`
 }
 
-// ChatCost is the cumulative cost for a selected chat and its child
-// (subagent) chats.
+// ChatCost is the cumulative cost for a selected chat's subtree: the
+// chat itself plus every descendant (subagent) chat it spawned. A root
+// chat therefore reports its whole tree, while a subagent reports only
+// its own spend plus any nested subagents.
 type ChatCost struct {
 	ChatID                         uuid.UUID `json:"chat_id" format:"uuid"`
 	TotalCostMicros                int64     `json:"total_cost_micros"`

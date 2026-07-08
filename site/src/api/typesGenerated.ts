@@ -1853,8 +1853,10 @@ export interface ChatContextTool {
 
 // From codersdk/chats.go
 /**
- * ChatCost is the cumulative cost for a selected chat and its child
- * (subagent) chats.
+ * ChatCost is the cumulative cost for a selected chat's subtree: the
+ * chat itself plus every descendant (subagent) chat it spawned. A root
+ * chat therefore reports its whole tree, while a subagent reports only
+ * its own spend plus any nested subagents.
  */
 export interface ChatCost {
 	readonly chat_id: string;

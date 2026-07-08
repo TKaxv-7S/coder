@@ -2229,12 +2229,10 @@ func (api *API) getChatCost(rw http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	chat := httpmw.ChatParam(r)
 
-	rootChatID := chat.ID
-	if chat.RootChatID.Valid {
-		rootChatID = chat.RootChatID.UUID
-	}
-
-	row, err := api.Database.GetChatModelUsageCostByChatID(ctx, rootChatID)
+	// The query rolls up the requested chat's subtree, so a root chat
+	// reports itself plus all subagents while a subagent reports only
+	// its own spend (plus any nested subagents it spawned).
+	row, err := api.Database.GetChatModelUsageCostByChatID(ctx, chat.ID)
 	if err != nil {
 		if httpapi.Is404Error(err) {
 			httpapi.ResourceNotFound(rw)

@@ -10600,7 +10600,7 @@ func TestGetChatCost(t *testing.T) {
 		require.Equal(t, int64(0), cost.UnpricedMessagesWithUsageCount)
 	})
 
-	t.Run("RollsUpChildChats", func(t *testing.T) {
+	t.Run("RollsUpSubtree", func(t *testing.T) {
 		t.Parallel()
 
 		client, db := newChatClientWithDatabase(t)
@@ -10635,22 +10635,46 @@ func TestGetChatCost(t *testing.T) {
 			TotalCostMicros: sql.NullInt64{Int64: 250, Valid: true},
 		})
 
+		// root_chat_id is flattened to the top-level root at any depth,
+		// so subtree traversal must follow parent_chat_id instead.
+		grandchildChat := dbgen.Chat(t, db, database.Chat{
+			OrganizationID:    firstUser.OrganizationID,
+			OwnerID:           firstUser.UserID,
+			LastModelConfigID: modelConfig.ID,
+			Title:             "grandchild chat",
+			ParentChatID:      uuid.NullUUID{UUID: childChat.ID, Valid: true},
+			RootChatID:        uuid.NullUUID{UUID: rootChat.ID, Valid: true},
+		})
+		_ = dbgen.ChatMessage(t, db, database.ChatMessage{
+			ChatID:          grandchildChat.ID,
+			ModelConfigID:   uuid.NullUUID{UUID: modelConfig.ID, Valid: true},
+			Role:            database.ChatMessageRoleAssistant,
+			TotalCostMicros: sql.NullInt64{Int64: 100, Valid: true},
+		})
+
 		ctx := testutil.Context(t, testutil.WaitLong)
 
-		// Root query rolls up the child's cost.
+		// The root rolls up every descendant's cost.
 		rootCost, err := client.GetChatCost(ctx, rootChat.ID)
 		require.NoError(t, err)
 		require.Equal(t, rootChat.ID, rootCost.ChatID)
-		require.Equal(t, int64(750), rootCost.TotalCostMicros)
-		require.Equal(t, int64(2), rootCost.PricedMessageCount)
+		require.Equal(t, int64(850), rootCost.TotalCostMicros)
+		require.Equal(t, int64(3), rootCost.PricedMessageCount)
 
-		// Child route IDs are normalized to the root chat before the
-		// cost query so the summary panel shows whole-chat cost.
+		// A subagent reports only its own subtree: itself plus the
+		// nested subagents it spawned, excluding the parent's spend.
 		childCost, err := client.GetChatCost(ctx, childChat.ID)
 		require.NoError(t, err)
-		require.Equal(t, rootChat.ID, childCost.ChatID)
-		require.Equal(t, int64(750), childCost.TotalCostMicros)
+		require.Equal(t, childChat.ID, childCost.ChatID)
+		require.Equal(t, int64(350), childCost.TotalCostMicros)
 		require.Equal(t, int64(2), childCost.PricedMessageCount)
+
+		// A leaf subagent reports only its own spend.
+		grandchildCost, err := client.GetChatCost(ctx, grandchildChat.ID)
+		require.NoError(t, err)
+		require.Equal(t, grandchildChat.ID, grandchildCost.ChatID)
+		require.Equal(t, int64(100), grandchildCost.TotalCostMicros)
+		require.Equal(t, int64(1), grandchildCost.PricedMessageCount)
 	})
 
 	t.Run("UnpricedMessages", func(t *testing.T) {
