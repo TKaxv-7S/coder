@@ -16,8 +16,9 @@ import {
 	MockDefaultOrganization,
 	MockOrganization2,
 	MockWorkspace,
+	MockWorkspaceAgent,
 } from "#/testHelpers/entities";
-import { withDashboardProvider } from "#/testHelpers/storybook";
+import { withDashboardProvider, withToaster } from "#/testHelpers/storybook";
 import { AgentCreateForm } from "./AgentCreateForm";
 
 // Query key used by permittedOrganizations() in the form.
@@ -827,5 +828,310 @@ export const PermittedOrgsResolvesToSubset: Story = {
 			throw new Error("Expected onCreateChat to receive options");
 		}
 		expect(options.organizationId).toBe(MockOrganization2.id);
+	},
+};
+
+// Deferred workspace uploads: with a workspace selected, files that
+// cannot ride the attachment pipeline (e.g. zips) queue locally and
+// upload during submit, after the chat is created.
+
+const attachZipFile = async (canvasElement: HTMLElement) => {
+	const fileInput =
+		canvasElement.querySelector<HTMLInputElement>('input[type="file"]');
+	if (!fileInput) {
+		throw new Error("Expected the hidden attachment file input.");
+	}
+	const zip = new File([new Uint8Array([0x50, 0x4b, 3, 4])], "bundle.zip", {
+		type: "application/zip",
+	});
+	// Without a workspace the input's accept attribute excludes zips;
+	// bypass it to exercise the routing logic like a drag-and-drop
+	// would.
+	await userEvent.upload(fileInput, zip, { applyAccept: false });
+};
+
+export const WorkspaceFileQueuedForDeferredUpload: Story = {
+	args: {
+		workspaceOptions: mockWorkspaces,
+		workspaceCount: mockWorkspaces.length,
+	},
+	beforeEach: () => {
+		localStorage.clear();
+		localStorage.setItem("agents.selected-workspace-id", "ws-1");
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await attachZipFile(canvasElement);
+		// The zip queues locally instead of erroring: no chat exists
+		// yet, so the upload happens during submit.
+		await waitFor(() => {
+			expect(canvas.getByText("bundle.zip")).toBeInTheDocument();
+			expect(canvas.getByText("Uploads when sent")).toBeInTheDocument();
+		});
+	},
+};
+
+export const WorkspaceFileWithDisconnectedAgentShowsSelectToast: Story = {
+	args: {
+		workspaceOptions: [
+			{
+				...MockWorkspace,
+				id: "ws-stopped",
+				latest_build: {
+					...MockWorkspace.latest_build,
+					status: "stopped" as const,
+					resources: [
+						{
+							...MockWorkspace.latest_build.resources[0],
+							agents: [
+								{ ...MockWorkspaceAgent, status: "disconnected" as const },
+							],
+						},
+					],
+				},
+			},
+		],
+		workspaceCount: 1,
+	},
+	decorators: [withToaster],
+	beforeEach: () => {
+		localStorage.clear();
+		localStorage.setItem("agents.selected-workspace-id", "ws-stopped");
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		const body = within(canvasElement.ownerDocument.body);
+		await attachZipFile(canvasElement);
+		// A selected but stopped workspace cannot accept uploads (the
+		// agent endpoint rejects unless connected), so the zip must not
+		// queue for a send that is guaranteed to fail.
+		await waitFor(() => {
+			expect(
+				body.getByText(
+					"This file type is uploaded into the chat's workspace. Select a running workspace, then try again.",
+				),
+			).toBeInTheDocument();
+		});
+		expect(canvas.queryByText("bundle.zip")).not.toBeInTheDocument();
+	},
+};
+
+export const WorkspaceFileWithoutWorkspaceShowsSelectToast: Story = {
+	args: {
+		workspaceOptions: mockWorkspaces,
+		workspaceCount: mockWorkspaces.length,
+	},
+	decorators: [withToaster],
+	beforeEach: () => {
+		localStorage.clear();
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		const body = within(canvasElement.ownerDocument.body);
+		await attachZipFile(canvasElement);
+		// Without a selected workspace the zip cannot upload anywhere;
+		// the toast says to select one (not "attach to the chat",
+		// which is the existing-chat copy).
+		await waitFor(() => {
+			expect(
+				body.getByText(
+					"This file type is uploaded into the chat's workspace. Select a running workspace, then try again.",
+				),
+			).toBeInTheDocument();
+		});
+		expect(canvas.queryByText("bundle.zip")).not.toBeInTheDocument();
+	},
+};
+
+export const QueuedWorkspaceFileSubmitsWithUploadCallback: Story = {
+	args: {
+		onCreateChat: fn().mockResolvedValue(undefined),
+		workspaceOptions: mockWorkspaces,
+		workspaceCount: mockWorkspaces.length,
+	},
+	beforeEach: () => {
+		localStorage.clear();
+		localStorage.setItem("agents.selected-workspace-id", "ws-1");
+	},
+	play: async ({ canvasElement, args }) => {
+		const canvas = within(canvasElement);
+		await attachZipFile(canvasElement);
+		await waitFor(() => {
+			expect(canvas.getByText("Uploads when sent")).toBeInTheDocument();
+		});
+		await submitMessage(canvasElement, "inspect this archive");
+		await waitFor(() => {
+			expect(args.onCreateChat).toHaveBeenCalled();
+		});
+		const options = (args.onCreateChat as ReturnType<typeof fn>).mock
+			.calls[0]?.[0] as
+			| { workspaceId?: string; uploadWorkspaceFiles?: unknown }
+			| undefined;
+		if (!options) {
+			throw new Error("Expected onCreateChat to receive options.");
+		}
+		// The page uses the callback's presence to switch to the
+		// create-empty -> upload -> first-message sequence.
+		expect(options.workspaceId).toBe("ws-1");
+		expect(typeof options.uploadWorkspaceFiles).toBe("function");
+	},
+};
+
+export const TextOnlySubmitSkipsUploadCallback: Story = {
+	args: {
+		onCreateChat: fn().mockResolvedValue(undefined),
+		workspaceOptions: mockWorkspaces,
+		workspaceCount: mockWorkspaces.length,
+	},
+	beforeEach: () => {
+		localStorage.clear();
+		localStorage.setItem("agents.selected-workspace-id", "ws-1");
+	},
+	play: async ({ canvasElement, args }) => {
+		await submitMessage(canvasElement, "plain text message");
+		await waitFor(() => {
+			expect(args.onCreateChat).toHaveBeenCalled();
+		});
+		const options = (args.onCreateChat as ReturnType<typeof fn>).mock
+			.calls[0]?.[0] as { uploadWorkspaceFiles?: unknown } | undefined;
+		expect(options?.uploadWorkspaceFiles).toBeUndefined();
+	},
+};
+
+export const DetachingWorkspaceDropsQueuedFiles: Story = {
+	args: {
+		workspaceOptions: mockWorkspaces,
+		workspaceCount: mockWorkspaces.length,
+	},
+	decorators: [withToaster],
+	beforeEach: () => {
+		localStorage.clear();
+		localStorage.setItem("agents.selected-workspace-id", "ws-1");
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		const body = within(canvasElement.ownerDocument.body);
+		await attachZipFile(canvasElement);
+		await waitFor(() => {
+			expect(canvas.getByText("bundle.zip")).toBeInTheDocument();
+		});
+		// Detach the workspace via its composer badge; the queued file
+		// has nowhere to upload, so it is dropped with a notice.
+		await userEvent.click(
+			canvas.getByRole("button", { name: "Remove workspace my-project" }),
+		);
+		await waitFor(() => {
+			expect(canvas.queryByText("bundle.zip")).not.toBeInTheDocument();
+		});
+		await waitFor(() => {
+			expect(
+				body.getByText("Removed 1 file that uploads to the workspace"),
+			).toBeInTheDocument();
+		});
+	},
+};
+
+export const OrgChangeWithQueuedWorkspaceFilesAsksConfirmation: Story = {
+	parameters: {
+		showOrganizations: true,
+		organizations: [MockDefaultOrganization, MockOrganization2],
+		queries: [
+			{
+				key: permittedOrgsKey,
+				data: [MockDefaultOrganization, MockOrganization2],
+			},
+		],
+	},
+	args: {
+		workspaceOptions: mockWorkspaces,
+		workspaceCount: mockWorkspaces.length,
+	},
+	beforeEach: () => {
+		localStorage.clear();
+		localStorage.setItem("agents.selected-workspace-id", "ws-1");
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await attachZipFile(canvasElement);
+		await waitFor(() => {
+			expect(canvas.getByText("bundle.zip")).toBeInTheDocument();
+		});
+		// Switching orgs clears the workspace selection, which drops
+		// queued workspace files, so it must ask for the same
+		// confirmation DB attachments get instead of discarding them.
+		await userEvent.click(canvas.getByTestId("compact-org-selector"));
+		const option = await screen.findByText("My Organization 2");
+		await userEvent.click(option);
+		const dialog = await screen.findByRole("dialog");
+		expect(
+			within(dialog).getByText("Change organization?"),
+		).toBeInTheDocument();
+		// Cancelling keeps the queued file.
+		await userEvent.click(
+			within(dialog).getByRole("button", { name: /cancel/i }),
+		);
+		await waitFor(() => {
+			expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+		});
+		expect(canvas.getByText("bundle.zip")).toBeInTheDocument();
+	},
+};
+
+export const SwitchingToStoppedWorkspaceDropsQueuedFiles: Story = {
+	args: {
+		workspaceOptions: [
+			mockWorkspaces[0],
+			{
+				...MockWorkspace,
+				id: "ws-stopped",
+				name: "stopped-project",
+				owner_name: "johndoe",
+				owner_id: "user-1",
+				latest_build: {
+					...MockWorkspace.latest_build,
+					status: "stopped" as const,
+					resources: [
+						{
+							...MockWorkspace.latest_build.resources[0],
+							agents: [
+								{ ...MockWorkspaceAgent, status: "disconnected" as const },
+							],
+						},
+					],
+				},
+			},
+		],
+		workspaceCount: 2,
+	},
+	decorators: [withToaster],
+	beforeEach: () => {
+		localStorage.clear();
+		localStorage.setItem("agents.selected-workspace-id", "ws-1");
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		const body = within(canvasElement.ownerDocument.body);
+		await attachZipFile(canvasElement);
+		await waitFor(() => {
+			expect(canvas.getByText("bundle.zip")).toBeInTheDocument();
+		});
+		// Switch the picker to a stopped workspace. Its agent cannot
+		// accept uploads, so keeping the queued file would doom the
+		// submit; it drops with the same notice as a deselect.
+		await userEvent.click(canvas.getByRole("button", { name: "More options" }));
+		const attachWorkspaceButton = (
+			await body.findByText("Attach workspace")
+		).closest("button");
+		if (!(attachWorkspaceButton instanceof HTMLButtonElement)) {
+			throw new Error("Expected Attach workspace to be a button.");
+		}
+		await userEvent.click(attachWorkspaceButton);
+		await userEvent.click(await body.findByText("stopped-project"));
+		await waitFor(() => {
+			expect(
+				body.getByText("Removed 1 file that uploads to the workspace"),
+			).toBeInTheDocument();
+		});
+		expect(canvas.queryByText("bundle.zip")).not.toBeInTheDocument();
 	},
 };

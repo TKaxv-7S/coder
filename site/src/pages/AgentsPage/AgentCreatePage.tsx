@@ -4,10 +4,12 @@ import { useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
 import { getErrorMessage } from "#/api/errors";
 import {
+	archiveChat,
 	chatModelConfigs,
 	chatModels,
 	chatProviderConfigs,
 	createChat,
+	createChatMessageByChatId,
 	mcpServerConfigs,
 	userChatPersonalModelOverrides,
 	userChatProviderConfigs,
@@ -57,6 +59,10 @@ const AgentCreatePage: FC = () => {
 	const mcpServersQuery = useQuery(mcpServerConfigs());
 	const workspacesQuery = useQuery(workspaces({ q: "owner:me", limit: 0 }));
 	const createMutation = useMutation(createChat(queryClient));
+	const sendFirstMessageMutation = useMutation(
+		createChatMessageByChatId(queryClient),
+	);
+	const archiveMutation = useMutation(archiveChat(queryClient));
 	const webPush = useWebpushNotifications();
 	const [chimeEnabled, setChimeEnabledState] = useState(getChimeEnabled);
 
@@ -91,6 +97,7 @@ const AgentCreatePage: FC = () => {
 		mcpServerIds,
 		organizationId,
 		planMode,
+		uploadWorkspaceFiles,
 	}: CreateChatOptions) => {
 		const content: TypesGen.ChatInputPart[] = [];
 		if (message.trim()) {
@@ -103,7 +110,10 @@ const AgentCreatePage: FC = () => {
 		}
 		const createRequest: TypesGen.CreateChatRequest = {
 			organization_id: organizationId,
-			content,
+			// Workspace files need the chat ID to upload, so the chat is
+			// created idle without content and the first message follows
+			// after the uploads land.
+			content: uploadWorkspaceFiles ? [] : content,
 			workspace_id: workspaceId,
 			mcp_server_ids:
 				mcpServerIds && mcpServerIds.length > 0 ? mcpServerIds : undefined,
@@ -116,6 +126,73 @@ const AgentCreatePage: FC = () => {
 		if (model) {
 			localStorage.setItem(lastModelConfigIDStorageKey, model);
 		}
+
+		if (uploadWorkspaceFiles) {
+			let uploaded: Awaited<ReturnType<typeof uploadWorkspaceFiles>>;
+			try {
+				uploaded = await uploadWorkspaceFiles(createdChat.id);
+			} catch (error) {
+				// The empty chat never started generating, so archiving it
+				// right away is the cleanup path; retry creates a fresh one.
+				void archiveMutation.mutateAsync(createdChat.id).catch(() => {});
+				toast.error(
+					getErrorMessage(error, "Failed to upload files to the workspace."),
+				);
+				throw error;
+			}
+			const failedCount = uploaded.filter(
+				(upload) => upload.status !== "uploaded" || !upload.response,
+			).length;
+			if (failedCount > 0) {
+				void archiveMutation.mutateAsync(createdChat.id).catch(() => {});
+				toast.error(
+					`${failedCount} file${failedCount > 1 ? "s" : ""} failed to upload to the workspace. Remove or retry the failed files, then send again.`,
+				);
+				throw new Error("workspace file upload failed");
+			}
+			for (const upload of uploaded) {
+				if (!upload.response) {
+					continue;
+				}
+				content.push({
+					type: "workspace-file-reference",
+					workspace_file_path: upload.response.path,
+					workspace_file_name: upload.response.name,
+					workspace_file_size: upload.response.size,
+					workspace_file_media_type:
+						upload.response.media_type || "application/octet-stream",
+					workspace_file_workspace_id: upload.response.workspace_id,
+				});
+			}
+			// All entries removed mid-upload leaves nothing to say; the
+			// idle chat behaves like a plain empty create.
+			if (content.length > 0) {
+				// Built outside the try block: React Compiler does not
+				// support value blocks inside try/catch.
+				const firstMessageReq: TypesGen.CreateChatMessageRequest = {
+					content,
+					mcp_server_ids:
+						mcpServerIds && mcpServerIds.length > 0 ? mcpServerIds : undefined,
+					plan_mode: planMode === "plan" ? "plan" : undefined,
+					...(model ? { model_config_id: model } : {}),
+				};
+				const firstMessage = {
+					chatId: createdChat.id,
+					req: firstMessageReq,
+				};
+				try {
+					await sendFirstMessageMutation.mutateAsync(firstMessage);
+				} catch (error) {
+					// Without the message the fresh chat is an empty shell,
+					// so archive it and stay on the composer with the draft
+					// intact; a retry re-creates the chat and re-uploads.
+					void archiveMutation.mutateAsync(createdChat.id).catch(() => {});
+					toast.error(getErrorMessage(error, "Failed to send the message."));
+					throw error;
+				}
+			}
+		}
+
 		navigate({
 			pathname: buildAgentChatPath({ chatId: createdChat.id }),
 			search: location.search,

@@ -1344,6 +1344,29 @@ export const createChatMessage = (
 	},
 });
 
+// Variant of createChatMessage for callers that only learn the chat ID
+// at mutate time, such as the new-chat page sending the first message
+// right after creating the chat.
+export const createChatMessageByChatId = (queryClient: QueryClient) => ({
+	mutationFn: ({
+		chatId,
+		req,
+	}: {
+		chatId: string;
+		req: TypesGen.CreateChatMessageRequest;
+	}) => API.experimental.createChatMessage(chatId, req),
+	onSuccess: (
+		_: TypesGen.CreateChatMessageResponse,
+		{ chatId }: { chatId: string; req: TypesGen.CreateChatMessageRequest },
+	) => {
+		void invalidateChatDebugRuns(queryClient, chatId);
+		void queryClient.invalidateQueries({
+			queryKey: chatPromptsKey(chatId),
+			exact: true,
+		});
+	},
+});
+
 type EditChatMessageMutationArgs = {
 	messageId: number;
 	optimisticMessage?: TypesGen.ChatMessage;

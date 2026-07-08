@@ -39,6 +39,22 @@ export const Uploaded: Story = {
 	},
 };
 
+export const Queued: Story = {
+	args: {
+		uploads: [
+			{
+				id: "queued-1",
+				file: createMockFile("bundle.zip", "application/zip"),
+				status: "queued",
+			},
+		],
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		expect(canvas.getByText("Uploads when sent")).toBeInTheDocument();
+	},
+};
+
 export const Uploading: Story = {
 	args: {
 		uploads: [
