@@ -105,28 +105,19 @@ export const TemplateBuilderPageView: FC<TemplateBuilderPageViewProps> = ({
 	const currentIndex = nearestVisible(clampedIndex, state);
 	const currentStep = WIZARD_STEPS[currentIndex];
 
-	// Normalize the URL on mount and when the resolved step diverges from
-	// the URL. Consumes ?base= (removes it) and ensures ?step= reflects
-	// the actual current step.
+	// Ensure the URL reflects the resolved step and does not carry
+	// consumed params like ?base=.
 	useEffect(() => {
+		if (
+			searchParams.get("step") === currentStep.id &&
+			!searchParams.has("base")
+		) {
+			return;
+		}
 		const next = new URLSearchParams(searchParams);
-		let dirty = false;
-
-		// Consume the base param so it does not stick around in the URL.
-		if (next.has("base")) {
-			next.delete("base");
-			dirty = true;
-		}
-
-		// Initialize or correct the step param.
-		if (next.get("step") !== currentStep.id) {
-			next.set("step", currentStep.id);
-			dirty = true;
-		}
-
-		if (dirty) {
-			setSearchParams(next, { replace: true });
-		}
+		next.delete("base");
+		next.set("step", currentStep.id);
+		setSearchParams(next, { replace: true });
 	}, [currentStep.id, searchParams, setSearchParams]);
 
 	// Reset scroll whenever the active step changes, including on browser
