@@ -5693,6 +5693,8 @@ CreateWorkspaceRequest provides options for creating a new workspace. Only one o
       "allow_path_app_sharing": true,
       "allow_path_app_site_owner_access": true
     },
+    "dashboard_sentry_dsn": "string",
+    "dashboard_sentry_environment": "string",
     "derp": {
       "config": {
         "block_direct": true,
@@ -6302,6 +6304,8 @@ CreateWorkspaceRequest provides options for creating a new workspace. Only one o
     "allow_path_app_sharing": true,
     "allow_path_app_site_owner_access": true
   },
+  "dashboard_sentry_dsn": "string",
+  "dashboard_sentry_environment": "string",
   "derp": {
     "config": {
       "block_direct": true,
@@ -6725,6 +6729,8 @@ CreateWorkspaceRequest provides options for creating a new workspace. Only one o
 | `config`                                       | string                                                                                               | false    |              |                                                                    |
 | `config_ssh`                                   | [codersdk.SSHConfig](#codersdksshconfig)                                                             | false    |              |                                                                    |
 | `dangerous`                                    | [codersdk.DangerousConfig](#codersdkdangerousconfig)                                                 | false    |              |                                                                    |
+| `dashboard_sentry_dsn`                         | string                                                                                               | false    |              |                                                                    |
+| `dashboard_sentry_environment`                 | string                                                                                               | false    |              |                                                                    |
 | `derp`                                         | [codersdk.DERP](#codersdkderp)                                                                       | false    |              |                                                                    |
 | `disable_chat_sharing`                         | boolean                                                                                              | false    |              |                                                                    |
 | `disable_owner_workspace_exec`                 | boolean                                                                                              | false    |              |                                                                    |
