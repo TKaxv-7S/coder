@@ -69,6 +69,13 @@ type clusterTLS struct {
 	// sequence, so the pool is built once and reused across handshakes. Expired
 	// entries are pruned on insert to bound the map across rotations.
 	verifyPools map[string]cachedVerifyPool
+
+	// peerIPs returns the current set of replica cluster IPs a route may be
+	// accepted from. It is the same set this replica dials (the NATS peer
+	// fetcher, ultimately the replicas table), queried live per handshake so it
+	// tracks replicas joining and leaving without a cached copy. Handshakes are
+	// rare (cluster routes are long-lived), so a live query is cheap.
+	peerIPs func() []net.IP
 }
 
 // cachedVerifyPool is a verify root pool plus the NotAfter of the CA cert it
@@ -356,6 +363,20 @@ func (t *clusterTLS) verify(cs tls.ConnectionState, sourceIP net.IP) error {
 	// peer actually connected from.
 	if len(sourceIP) != 0 && !slices.ContainsFunc(leaf.IPAddresses, sourceIP.Equal) {
 		return xerrors.Errorf("peer leaf IP SANs %v do not match source IP %s", leaf.IPAddresses, sourceIP)
+	}
+
+	// On the accept side, the source must also be a currently-known replica, so
+	// a valid leaf presented from an address outside the cluster is rejected.
+	// The replica set is the source of truth: an empty or unavailable set
+	// rejects, rather than falling open.
+	if len(sourceIP) != 0 {
+		var known []net.IP
+		if t.peerIPs != nil {
+			known = t.peerIPs()
+		}
+		if !slices.ContainsFunc(known, sourceIP.Equal) {
+			return xerrors.Errorf("source IP %s is not a known replica", sourceIP)
+		}
 	}
 	return nil
 }

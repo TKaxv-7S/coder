@@ -63,6 +63,39 @@ func (p *Pubsub) SetClusterCA(ca ClusterCAKeycache, ip net.IP) {
 	p.RefreshPeers()
 }
 
+// knownPeerIPs returns the IPs of the currently configured cluster routes, so
+// the set a route may be accepted from is exactly the set this replica dials.
+// It reads the snapshot published by setPeerAddresses without taking clusterMu,
+// so the accept-side handshake path (which runs while setPeerAddresses may hold
+// clusterMu across a server reload) never blocks on route reconfiguration.
+func (p *Pubsub) knownPeerIPs() []net.IP {
+	if ips := p.peerIPs.Load(); ips != nil {
+		return *ips
+	}
+	return nil
+}
+
+// routeIPs derives the accept-side peer IP set from configured routes, skipping
+// non-IP hosts. It reuses the same route set setPeerAddresses applies, so the
+// accepted-from set stays in lockstep with the dialed set (both from the peer
+// fetcher, ultimately the replicas table).
+func routeIPs(routes []*url.URL) []net.IP {
+	ips := make([]net.IP, 0, len(routes))
+	for _, route := range routes {
+		if route == nil {
+			continue
+		}
+		host, _, err := net.SplitHostPort(route.Host)
+		if err != nil {
+			continue
+		}
+		if ip := net.ParseIP(host); ip != nil {
+			ips = append(ips, ip)
+		}
+	}
+	return ips
+}
+
 // RefreshPeers signals the peer refresh worker to fetch and apply the latest
 // peer route addresses. Multiple pending refreshes are coalesced.
 func (p *Pubsub) RefreshPeers() {
@@ -131,6 +164,10 @@ func (p *Pubsub) setPeerAddresses(addresses []string) error {
 	}
 	p.serverOpts = newOpts.Clone()
 	p.currentRoutes = cloneRouteURLs(routes)
+	// Publish the accept-side peer IP set in lockstep with the routes so the
+	// handshake path reads it lock-free (see knownPeerIPs).
+	ips := routeIPs(routes)
+	p.peerIPs.Store(&ips)
 	return nil
 }
 

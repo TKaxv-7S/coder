@@ -114,11 +114,14 @@ func TestPubsub_ClusterTLS(t *testing.T) {
 		b := newTLSPubsub(t, cache(), net.IPv4(127, 0, 0, 1))
 		c := newTLSPubsub(t, cache(), net.IPv4(127, 0, 0, 1))
 
+		addrA := clusterRouteAddress(t, a)
 		addrB := clusterRouteAddress(t, b)
 		addrC := clusterRouteAddress(t, c)
-		// Full mesh so any pair can exchange messages over an mTLS route.
+		// Full symmetric mesh: every node must know a peer to accept a route
+		// from it (accept-side membership), so each is given the other two.
 		require.NoError(t, a.setPeerAddresses([]string{addrB, addrC}))
-		require.NoError(t, b.setPeerAddresses([]string{addrC}))
+		require.NoError(t, b.setPeerAddresses([]string{addrA, addrC}))
+		require.NoError(t, c.setPeerAddresses([]string{addrA, addrB}))
 
 		event := "tls-mesh"
 		got := make(chan []byte, 8)
@@ -171,7 +174,9 @@ func TestPubsub_ClusterTLS(t *testing.T) {
 		a := newTLSPubsub(t, &fakeCACache{active: ca1, byID: bundle}, net.IPv4(127, 0, 0, 1))
 		b := newTLSPubsub(t, &fakeCACache{active: ca2, byID: bundle}, net.IPv4(127, 0, 0, 1))
 
+		// Symmetric peers so each side accepts a route from the other.
 		require.NoError(t, a.setPeerAddresses([]string{clusterRouteAddress(t, b)}))
+		require.NoError(t, b.setPeerAddresses([]string{clusterRouteAddress(t, a)}))
 
 		require.Eventually(t, func() bool {
 			return numRoutes(t, a) > 0 && numRoutes(t, b) > 0
@@ -282,6 +287,9 @@ func TestClusterTLS_verify(t *testing.T) {
 
 	leafIP := net.IPv4(10, 0, 0, 5)
 	ct := newClusterTLS(ctx, slogtest.Make(t, nil), nil, cache, net.IPv4(10, 0, 0, 1))
+	// leafIP is a known replica so accept-side membership passes; the source
+	// binding and CA checks are what these subtests exercise.
+	ct.peerIPs = func() []net.IP { return []net.IP{leafIP} }
 
 	// A leaf bound to leafIP, signed by the trusted CA.
 	leafCert, err := mintLeaf(ca, leafIP, time.Now())
@@ -320,6 +328,57 @@ func TestClusterTLS_verify(t *testing.T) {
 		// The stamped sequence (9) is not in the cache, so the CA lookup fails.
 		err = ct.verify(tls.ConnectionState{PeerCertificates: []*x509.Certificate{stranger}}, nil)
 		require.Error(t, err)
+	})
+}
+
+// TestClusterTLS_verifyReplicaMembership asserts that, on the accept side, the
+// connection source IP must belong to the current peer (replica) set. A valid
+// leaf with a matching SAN is still rejected when its source is not a known
+// replica, and an empty set rejects rather than falling open.
+func TestClusterTLS_verifyReplicaMembership(t *testing.T) {
+	t.Parallel()
+
+	// newVerifier builds a fresh clusterTLS plus a valid leaf/connection state
+	// bound to leafIP, signed by a trusted CA, with peerIPs returning peers.
+	leafIP := net.IPv4(10, 0, 0, 5)
+	newVerifier := func(t *testing.T, peers ...net.IP) (*clusterTLS, tls.ConnectionState) {
+		t.Helper()
+		ctx := testutil.Context(t, testutil.WaitShort)
+		ca := generateTestCA(t, 1)
+		cache := &fakeCACache{active: ca, byID: map[string]*cryptokeys.NATSCA{"1": ca}}
+		ct := newClusterTLS(ctx, slogtest.Make(t, nil), nil, cache, leafIP)
+		ct.peerIPs = func() []net.IP { return peers }
+		leafCert, err := mintLeaf(ca, leafIP, time.Now())
+		require.NoError(t, err)
+		leaf, err := x509.ParseCertificate(leafCert.Certificate[0])
+		require.NoError(t, err)
+		return ct, tls.ConnectionState{PeerCertificates: []*x509.Certificate{leaf}}
+	}
+
+	t.Run("NotAKnownReplica", func(t *testing.T) {
+		t.Parallel()
+		// Peer set does NOT include leafIP: even with a valid chain and a SAN
+		// matching the source, a source IP that is not a known replica is
+		// rejected.
+		ct, cs := newVerifier(t, net.IPv4(10, 0, 0, 9))
+		err := ct.verify(cs, leafIP)
+		require.ErrorContains(t, err, "not a known replica")
+	})
+
+	t.Run("KnownReplica", func(t *testing.T) {
+		t.Parallel()
+		// leafIP is in the peer set and matches the SAN + source: accepted.
+		ct, cs := newVerifier(t, leafIP)
+		require.NoError(t, ct.verify(cs, leafIP))
+	})
+
+	t.Run("EmptySetRejects", func(t *testing.T) {
+		t.Parallel()
+		// The replica set is the source of truth: with no known peers, a route
+		// is rejected rather than accepted.
+		ct, cs := newVerifier(t)
+		err := ct.verify(cs, leafIP)
+		require.ErrorContains(t, err, "not a known replica")
 	})
 }
 
