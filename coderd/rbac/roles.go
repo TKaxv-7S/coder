@@ -614,7 +614,7 @@ func ReloadBuiltinRoles(opts *RoleOptions) {
 							// with site-wide auditors and owners.
 							allPermsExcept(ResourceWorkspace, ResourceWorkspaceDormant, ResourcePrebuiltWorkspace, ResourceAssignRole, ResourceUserSecret, ResourceBoundaryUsage, ResourceBoundaryLog, ResourceAiSeat, ResourceWorkspaceBuildOrchestration, ResourceAibridgeInterception),
 							Permissions(map[string][]policy.Action{
-								ResourceWorkspace.Type:        slice.Omit(ResourceWorkspace.AvailableActions(), policy.ActionApplicationConnect, policy.ActionSSH),
+								ResourceWorkspace.Type:        slice.Omit(ResourceWorkspace.AvailableActions(), policy.ActionApplicationConnect, policy.ActionSSH, policy.ActionUseShared),
 								ResourceWorkspaceDormant.Type: {policy.ActionRead, policy.ActionDelete, policy.ActionCreate, policy.ActionUpdate, policy.ActionWorkspaceStop, policy.ActionCreateAgent, policy.ActionDeleteAgent, policy.ActionUpdateAgent},
 								// PrebuiltWorkspaces are a subset of Workspaces.
 								// Explicitly setting PrebuiltWorkspace permissions for clarity.

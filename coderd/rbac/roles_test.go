@@ -481,6 +481,37 @@ func TestRolePermissions(t *testing.T) {
 			},
 		},
 		{
+			Name: "MyWorkspaceInOrgUseShared",
+			// use_shared is the ACL precondition capability: holding it in an
+			// org makes workspace ACL grants effective there. It travels with
+			// organization-workspace-access.
+			Actions:  []policy.Action{policy.ActionUseShared},
+			Resource: rbac.ResourceWorkspace.WithID(workspaceID).InOrg(orgID).WithOwner(currentUser.String()),
+			AuthorizeMap: map[bool][]hasAuthSubjects{
+				true:  {owner, orgWorkspaceAccessUser},
+				false: {setOtherOrg, setOrgNotMe, memberMe, agentsAccessUser, templateAdmin, userAdmin},
+			},
+		},
+		{
+			// A workspace owned by another org member, shared with
+			// currentUser through the ACL. The grant only takes effect for
+			// subjects holding workspace.use_shared in the org
+			// (acl_use_precondition), so revoking workspace access roles also
+			// revokes shared access.
+			Name:    "SharedWorkspaceACLUse",
+			Actions: []policy.Action{policy.ActionSSH, policy.ActionApplicationConnect},
+			Resource: rbac.ResourceWorkspace.WithID(workspaceID).InOrg(orgID).WithOwner(uuid.NewString()).WithACLUserList(map[string][]policy.Action{
+				currentUser.String(): {policy.ActionSSH, policy.ActionApplicationConnect},
+			}),
+			AuthorizeMap: map[bool][]hasAuthSubjects{
+				true: {owner, orgWorkspaceAccessUser},
+				false: {
+					setOtherOrg, setOrgNotMe, memberMe, agentsAccessUser,
+					templateAdmin, userAdmin, orgAIGatewayAccessUser,
+				},
+			},
+		},
+		{
 			Name: "MyWorkspaceInOrgAppConnect",
 			// When creating the WithID won't be set, but it does not change the result.
 			Actions:  []policy.Action{policy.ActionApplicationConnect},
@@ -797,6 +828,18 @@ func TestRolePermissions(t *testing.T) {
 		{
 			Name:     "WorkspaceDormantUse",
 			Actions:  []policy.Action{policy.ActionWorkspaceStart, policy.ActionApplicationConnect, policy.ActionSSH},
+			Resource: rbac.ResourceWorkspaceDormant.WithID(uuid.New()).InOrg(orgID).WithOwner(memberMe.Actor.ID),
+			AuthorizeMap: map[bool][]hasAuthSubjects{
+				true:  {},
+				false: {setOtherOrg, setOrgNotMe, memberMe, agentsAccessUser, userAdmin, owner, templateAdmin, orgWorkspaceAccessUser},
+			},
+		},
+		{
+			// Dormant workspace objects carry no ACLs, so use_shared is
+			// never consulted for them; no role grants it on the dormant
+			// resource type.
+			Name:     "WorkspaceDormantUseShared",
+			Actions:  []policy.Action{policy.ActionUseShared},
 			Resource: rbac.ResourceWorkspaceDormant.WithID(uuid.New()).InOrg(orgID).WithOwner(memberMe.Actor.ID),
 			AuthorizeMap: map[bool][]hasAuthSubjects{
 				true:  {},

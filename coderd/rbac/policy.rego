@@ -328,11 +328,38 @@ object_is_included_in_scope_allow_list if {
 # ACL rules                                                                    #
 #==============================================================================#
 
+# shared_use_orgs is the set of organizations in which the subject holds
+# the workspace.use_shared capability at the member level. Workspace ACL
+# grants only take effect in these orgs, so revoking a subject's workspace
+# access roles also revokes access they were granted through sharing. The
+# set derives entirely from subject roles (known at prepare time), keeping
+# unknown object attributes out of the comprehension for partial
+# evaluation.
+shared_use_orgs := {org_id |
+	org_id := org_memberships[_]
+	perm := input.subject.roles[_].by_org_id[org_id].member[_]
+	perm.resource_type in ["workspace", "*"]
+	perm.action in ["use_shared", "*"]
+	not perm.negate
+}
+
+# acl_use_precondition gates ACL grants on workspaces. Other resource
+# types (templates, chats) rely on ACL-only grants by design and are
+# unaffected.
+acl_use_precondition if {
+	input.object.type != "workspace"
+}
+
+acl_use_precondition if {
+	input.object.org_owner in shared_use_orgs
+}
+
 # ACL for users
 acl_allow if {
 	# The subject must be a member of the object's organization for a
 	# user ACL grant to apply.
 	is_org_member
+	acl_use_precondition
 	perms := input.object.acl_user_list[input.subject.id]
 
 	# Check if either the action or * is allowed
@@ -345,6 +372,7 @@ acl_allow if {
 	# If there is no organization owner, the object cannot be owned by an
 	# org-scoped group.
 	is_org_member
+	acl_use_precondition
 	some group in input.subject.groups
 	perms := input.object.acl_group_list[group]
 
@@ -358,6 +386,7 @@ acl_allow if {
 	# If there is no organization owner, the object cannot be owned by an
 	# org-scoped group.
 	is_org_member
+	acl_use_precondition
 	perms := input.object.acl_group_list[input.object.org_owner]
 
 	# Check if either the action or * is allowed

@@ -87,6 +87,19 @@ For example, you may have a scope like...
 
 The final policy decision is determined by evaluating each of these checks in their proper precedence order from the `allow` rule.
 
+## Workspace ACL precondition
+
+ACL grants on `workspace` objects only take effect while the subject holds
+the `workspace.use_shared` action at the member level in the workspace's
+organization (`acl_use_precondition` / `shared_use_orgs`). The capability
+travels with the `organization-workspace-access` role (and, while
+`MinimumImplicitMember` is off, with the elevation bundled into
+`organization-member`), so revoking a subject's workspace access roles
+also revokes any access they were granted through sharing, evaluated live
+on every authorization. Other resource types (templates, chats) keep
+ACL-only grants: templates in particular rely on the Everyone-group ACL
+for baseline access, and a blanket precondition would break that.
+
 ## Unknown values
 
 This policy is specifically constructed to compress to a set of queries if 'input.object.owner' and 'input.object.org_owner' are unknown. There is no specific set of rules that will guarantee that this policy has this property, however, there are some tricks. We have tests that enforce this property, so any changes that pass the tests will be okay.
