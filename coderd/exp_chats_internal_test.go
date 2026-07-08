@@ -10,9 +10,10 @@ import (
 	"github.com/coder/coder/v2/codersdk"
 )
 
-// TestResolveChatStartVersion covers the RequireActiveVersion
-// auto-update behavior for chat-initiated workspace starts, including
-// the DEREM-16/17 regression cases previously covered end-to-end.
+// TestResolveChatStartVersion covers the version pinning decision
+// behind the RequireActiveVersion auto-update for chat workspace
+// starts. Wiring into the build path is covered end-to-end in
+// coderd/x/chatd tests.
 func TestResolveChatStartVersion(t *testing.T) {
 	t.Parallel()
 
