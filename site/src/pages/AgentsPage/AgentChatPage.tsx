@@ -840,9 +840,6 @@ const AgentChatPage: FC = () => {
 
 	// Subscribe to live workspace updates so that agent status changes
 	// (e.g. connected/disconnected) are reflected without a page refresh.
-	// The updater is a useEffectEvent so it can read chatAgentId without
-	// listing it in the effect deps; agent_id changing (e.g. backend
-	// enrichment after creation) must not tear down and reopen the socket.
 	const applyWatchedWorkspaceUpdate = useEffectEvent(
 		(watchedWorkspaceId: string, next: TypesGen.Workspace) => {
 			queryClient.setQueryData<TypesGen.Workspace | undefined>(

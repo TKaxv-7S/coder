@@ -482,7 +482,7 @@ func (api *API) listChats(rw http.ResponseWriter, r *http.Request) {
 // response-only; on error the field stays null.
 func (api *API) enrichChatAgentIDs(ctx context.Context, chats []codersdk.Chat) {
 	agentIDByWorkspace := make(map[uuid.UUID]*uuid.UUID)
-	resolve := func(workspaceID uuid.UUID) *uuid.UUID {
+	resolveAgentID := func(workspaceID uuid.UUID) *uuid.UUID {
 		if agentID, ok := agentIDByWorkspace[workspaceID]; ok {
 			return agentID
 		}
@@ -507,12 +507,12 @@ func (api *API) enrichChatAgentIDs(ctx context.Context, chats []codersdk.Chat) {
 	}
 	for i := range chats {
 		if chats[i].AgentID == nil && chats[i].WorkspaceID != nil {
-			chats[i].AgentID = resolve(*chats[i].WorkspaceID)
+			chats[i].AgentID = resolveAgentID(*chats[i].WorkspaceID)
 		}
 		for j := range chats[i].Children {
 			child := &chats[i].Children[j]
 			if child.AgentID == nil && child.WorkspaceID != nil {
-				child.AgentID = resolve(*child.WorkspaceID)
+				child.AgentID = resolveAgentID(*child.WorkspaceID)
 			}
 		}
 	}
