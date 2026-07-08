@@ -15,6 +15,16 @@ var (
 		Type: "*",
 	}
 
+	// ResourceAIGatewayKey
+	// Valid Actions
+	//  - "ActionCreate" :: create an AI Gateway key
+	//  - "ActionDelete" :: delete an AI Gateway key
+	//  - "ActionRead" :: read AI Gateway keys
+	//  - "ActionUpdate" :: update an AI Gateway key
+	ResourceAIGatewayKey = Object{
+		Type: "ai_gateway_key",
+	}
+
 	// ResourceAiModelPrice
 	// Valid Actions
 	//  - "ActionRead" :: read AI model prices
@@ -87,6 +97,15 @@ var (
 	//  - "ActionRead" :: read audit logs
 	ResourceAuditLog = Object{
 		Type: "audit_log",
+	}
+
+	// ResourceBoundaryLog
+	// Valid Actions
+	//  - "ActionCreate" :: create boundary log records
+	//  - "ActionDelete" :: delete boundary logs
+	//  - "ActionRead" :: read boundary logs and session metadata
+	ResourceBoundaryLog = Object{
+		Type: "boundary_log",
 	}
 
 	// ResourceBoundaryUsage
@@ -385,6 +404,16 @@ var (
 		Type: "user_secret",
 	}
 
+	// ResourceUserSkill
+	// Valid Actions
+	//  - "ActionCreate" :: create a user skill
+	//  - "ActionDelete" :: delete a user skill
+	//  - "ActionRead" :: read user skill metadata and content
+	//  - "ActionUpdate" :: update user skill metadata and content
+	ResourceUserSkill = Object{
+		Type: "user_skill",
+	}
+
 	// ResourceWebpushSubscription
 	// Valid Actions
 	//  - "ActionCreate" :: create webpush subscriptions
@@ -428,6 +457,16 @@ var (
 		Type: "workspace_agent_resource_monitor",
 	}
 
+	// ResourceWorkspaceBuildOrchestration
+	// Valid Actions
+	//  - "ActionCreate" :: create a workspace build orchestration
+	//  - "ActionDelete" :: delete a workspace build orchestration
+	//  - "ActionRead" :: read a workspace build orchestration
+	//  - "ActionUpdate" :: update a workspace build orchestration
+	ResourceWorkspaceBuildOrchestration = Object{
+		Type: "workspace_build_orchestration",
+	}
+
 	// ResourceWorkspaceDormant
 	// Valid Actions
 	//  - "ActionApplicationConnect" :: connect to workspace apps via browser
@@ -460,6 +499,7 @@ var (
 func AllResources() []Objecter {
 	return []Objecter{
 		ResourceWildcard,
+		ResourceAIGatewayKey,
 		ResourceAiModelPrice,
 		ResourceAIProvider,
 		ResourceAiSeat,
@@ -468,6 +508,7 @@ func AllResources() []Objecter {
 		ResourceAssignOrgRole,
 		ResourceAssignRole,
 		ResourceAuditLog,
+		ResourceBoundaryLog,
 		ResourceBoundaryUsage,
 		ResourceChat,
 		ResourceConnectionLog,
@@ -500,10 +541,12 @@ func AllResources() []Objecter {
 		ResourceUsageEvent,
 		ResourceUser,
 		ResourceUserSecret,
+		ResourceUserSkill,
 		ResourceWebpushSubscription,
 		ResourceWorkspace,
 		ResourceWorkspaceAgentDevcontainers,
 		ResourceWorkspaceAgentResourceMonitor,
+		ResourceWorkspaceBuildOrchestration,
 		ResourceWorkspaceDormant,
 		ResourceWorkspaceProxy,
 	}

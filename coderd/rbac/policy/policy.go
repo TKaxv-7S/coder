@@ -140,6 +140,14 @@ var RBACPermissions = map[string]PermissionDefinition{
 			ActionRead:   "read and use a workspace proxy",
 		},
 	},
+	"workspace_build_orchestration": {
+		Actions: map[Action]ActionDefinition{
+			ActionCreate: "create a workspace build orchestration",
+			ActionRead:   "read a workspace build orchestration",
+			ActionUpdate: "update a workspace build orchestration",
+			ActionDelete: "delete a workspace build orchestration",
+		},
+	},
 	"license": {
 		Actions: map[Action]ActionDefinition{
 			ActionCreate: "create a license",
@@ -379,6 +387,14 @@ var RBACPermissions = map[string]PermissionDefinition{
 			ActionDelete: "delete a user secret",
 		},
 	},
+	"user_skill": {
+		Actions: map[Action]ActionDefinition{
+			ActionCreate: "create a user skill",
+			ActionRead:   "read user skill metadata and content",
+			ActionUpdate: "update user skill metadata and content",
+			ActionDelete: "delete a user skill",
+		},
+	},
 	"usage_event": {
 		Actions: map[Action]ActionDefinition{
 			ActionCreate: "create a usage event",
@@ -412,6 +428,22 @@ var RBACPermissions = map[string]PermissionDefinition{
 		Actions: map[Action]ActionDefinition{
 			ActionCreate: "record AI seat usage",
 			ActionRead:   "read AI seat state",
+		},
+	},
+	"boundary_log": {
+		Actions: map[Action]ActionDefinition{
+			ActionCreate: "create boundary log records",
+			ActionRead:   "read boundary logs and session metadata",
+			ActionDelete: "delete boundary logs",
+		},
+	},
+	"ai_gateway_key": {
+		Name: "AIGatewayKey",
+		Actions: map[Action]ActionDefinition{
+			ActionCreate: "create an AI Gateway key",
+			ActionRead:   "read AI Gateway keys",
+			ActionUpdate: "update an AI Gateway key",
+			ActionDelete: "delete an AI Gateway key",
 		},
 	},
 	"boundary_usage": {

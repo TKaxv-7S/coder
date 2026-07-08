@@ -8,6 +8,7 @@ import {
 	reactRouterParameters,
 } from "storybook-addon-remix-react-router";
 import { API } from "#/api/api";
+import { getAuthorizationKey } from "#/api/queries/authCheck";
 import {
 	chatDiffContentsKey,
 	chatKey,
@@ -20,8 +21,11 @@ import {
 } from "#/api/queries/chats";
 import { workspaceByIdKey } from "#/api/queries/workspaces";
 import type * as TypesGen from "#/api/typesGenerated";
+import { MockChatModelConfig } from "#/testHelpers/chatModels";
 import {
-	MockUserMember,
+	MockGroup,
+	MockOrganizationMember,
+	MockOrganizationMember2,
 	MockUserOwner,
 	MockWorkspace,
 } from "#/testHelpers/entities";
@@ -56,8 +60,8 @@ const AgentChatPageLayout: FC = () => {
 							requestUnarchiveAgent: () => {},
 							requestPinAgent: () => {},
 							requestUnpinAgent: () => {},
-							onRegenerateTitle: () => {},
-							regeneratingTitleChatIds: [],
+							isArchiving: false,
+							archivingChatId: undefined,
 							isSidebarCollapsed: false,
 							onToggleSidebarCollapsed: () => {},
 							onExpandSidebar: () => {},
@@ -108,18 +112,16 @@ const mockModelCatalog: TypesGen.ChatModelsResponse = {
 			],
 		},
 	],
+	unsupported_providers: [],
 };
 
 const mockModelConfigs: TypesGen.ChatModelConfig[] = [
 	{
+		...MockChatModelConfig,
 		id: MODEL_CONFIG_ID,
-		provider: "openai",
 		model: "gpt-4o",
 		display_name: "GPT-4o",
-		enabled: true,
 		is_default: true,
-		context_limit: 200000,
-		compression_threshold: 70,
 		created_at: "2026-02-18T00:00:00.000Z",
 		updated_at: "2026-02-18T00:00:00.000Z",
 	},
@@ -128,6 +130,8 @@ const mockModelConfigs: TypesGen.ChatModelConfig[] = [
 const baseChatFields = {
 	organization_id: "test-org-id",
 	owner_id: MockUserOwner.id,
+	owner_username: MockUserOwner.username,
+	owner_name: MockUserOwner.name,
 	workspace_id: mockWorkspace.id,
 	last_model_config_id: MODEL_CONFIG_ID,
 	mcp_server_ids: [],
@@ -135,6 +139,7 @@ const baseChatFields = {
 	created_at: "2026-02-18T00:00:00.000Z",
 	updated_at: "2026-02-18T00:00:00.000Z",
 	archived: false,
+	shared: false,
 	pin_order: 0,
 	has_unread: false,
 	client_type: "ui",
@@ -183,6 +188,39 @@ const extractPromptsFromMessages = (
 		}
 	}
 	return prompts;
+};
+type ChatAuthorizationFixture = {
+	action: "share";
+	allowed: boolean;
+};
+
+const buildChatAuthorizationQuery = (
+	chat: Pick<TypesGen.Chat, "owner_id" | "organization_id">,
+	checks: Partial<Record<"canShareChat", ChatAuthorizationFixture>>,
+) => {
+	const authorizationChecks: TypesGen.AuthorizationRequest["checks"] = {};
+	const authorizationResponse: TypesGen.AuthorizationResponse = {};
+
+	for (const [key, check] of Object.entries(checks)) {
+		if (check === undefined) {
+			continue;
+		}
+
+		authorizationChecks[key] = {
+			object: {
+				resource_type: "chat",
+				owner_id: chat.owner_id,
+				organization_id: chat.organization_id,
+			},
+			action: check.action,
+		};
+		authorizationResponse[key] = check.allowed;
+	}
+
+	return {
+		key: getAuthorizationKey({ checks: authorizationChecks }),
+		data: authorizationResponse,
+	};
 };
 
 /** Build `parameters.queries` entries for a given chat and messages. */
@@ -233,6 +271,12 @@ const buildQueries = (
 		{ key: chatModelsKey, data: mockModelCatalog },
 		{ key: chatModelConfigs().queryKey, data: mockModelConfigs },
 		{ key: mcpServerConfigsKey, data: [] },
+		buildChatAuthorizationQuery(chat, {
+			canShareChat: {
+				action: "share",
+				allowed: chat.owner_id === MockUserOwner.id && !chat.parent_chat_id,
+			},
+		}),
 	];
 };
 
@@ -712,21 +756,22 @@ const EVERY_TOOL_ASSISTANT_TURN = {
 			},
 		},
 
-		// close_agent -- terminate a subagent
+		// interrupt_agent: interrupt a subagent
 		{
 			type: "tool-call",
-			tool_call_id: "every-close-agent",
-			tool_name: "close_agent",
+			tool_call_id: "every-interrupt-agent",
+			tool_name: "interrupt_agent",
 			args: { chat_id: "every-explore-child" },
 		},
 		{
 			type: "tool-result",
-			tool_call_id: "every-close-agent",
-			tool_name: "close_agent",
+			tool_call_id: "every-interrupt-agent",
+			tool_name: "interrupt_agent",
 			result: {
 				chat_id: "every-explore-child",
 				type: "explore",
 				status: "completed",
+				interrupted: true,
 			},
 		},
 
@@ -769,6 +814,22 @@ const meta: Meta<typeof AgentChatPageLayout> = {
 		spyOn(API, "getApiKey").mockRejectedValue(new Error("missing API key"));
 		spyOn(API.experimental, "updateChat").mockResolvedValue();
 		spyOn(API.experimental, "getMCPServerConfigs").mockResolvedValue([]);
+		spyOn(API.experimental, "getUserAIProviderKeyConfigs").mockResolvedValue([
+			{
+				provider: {
+					id: "provider-1",
+					type: "openai",
+					name: "openai",
+					display_name: "OpenAI",
+					icon: "",
+					enabled: true,
+					deleted: false,
+				},
+				has_user_api_key: false,
+				has_provider_api_key: true,
+				byok_enabled: true,
+			},
+		]);
 		return () => localStorage.removeItem(RIGHT_PANEL_OPEN_KEY);
 	},
 };
@@ -1133,11 +1194,49 @@ export const WithMessageHistory: Story = {
 		expect(
 			await canvas.findByText("Markdown rendering showcase"),
 		).toBeVisible();
-		await waitFor(() =>
+		await waitFor(() => {
 			expect(
-				canvas.queryByText(/^This is not your chat/),
-			).not.toBeInTheDocument(),
-		);
+				canvas.queryByText(/^This chat is owned by/),
+			).not.toBeInTheDocument();
+		});
+	},
+};
+
+export const RootChatShareActionAvailable: Story = {
+	parameters: {
+		queries: buildQueries(
+			{
+				id: CHAT_ID,
+				...baseChatFields,
+				title: "Shareable root chat",
+				status: "completed",
+			},
+			{ messages: [], queued_messages: [], has_more: false },
+			{ diffUrl: undefined },
+		),
+	},
+	beforeEach: () => {
+		spyOn(API.experimental, "getChatACL").mockResolvedValue({
+			users: [],
+			groups: [],
+		});
+		spyOn(API.experimental, "updateChatACL").mockResolvedValue(undefined);
+		spyOn(API, "getOrganizationPaginatedMembers").mockResolvedValue({
+			members: [MockOrganizationMember, MockOrganizationMember2],
+			count: 2,
+		});
+		spyOn(API, "getGroupsByOrganization").mockResolvedValue([MockGroup]);
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await userEvent.click(canvas.getByLabelText("Share chat"));
+		const body = within(document.body);
+		await waitFor(() => {
+			expect(body.getByText("Chat sharing")).toBeVisible();
+		});
+		await waitFor(() => {
+			expect(body.getByText("No shared members or groups yet")).toBeVisible();
+		});
 	},
 };
 
@@ -1159,37 +1258,106 @@ export const Loading: Story = {
 	},
 };
 
-export const AdminViewingOtherUserChat: Story = {
+export const OtherUserChatReadOnly: Story = {
 	parameters: {
-		queries: [
-			...buildQueries(
-				{
-					id: CHAT_ID,
-					...baseChatFields,
-					owner_id: "other-user-id",
-					title: "Other user's chat",
-					status: "completed",
-				},
-				{ messages: [], queued_messages: [], has_more: false },
-				{ diffUrl: undefined },
-			),
+		queries: buildQueries(
 			{
-				key: ["user", "other-user-id"],
-				data: {
-					...MockUserMember,
-					id: "other-user-id",
-					username: "OtherUser",
-				},
+				id: CHAT_ID,
+				...baseChatFields,
+				owner_id: "other-user-id",
+				owner_username: "OtherUser",
+				owner_name: "Other User",
+				title: "Other user's chat",
+				status: "completed",
 			},
-		],
+			{ messages: [], queued_messages: [], has_more: false },
+			{ diffUrl: undefined },
+		),
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		const banner = await canvas.findByText(
-			"This is not your chat. Prompting here will use @OtherUser's identity.",
+			"This chat is owned by Other User. It is read-only.",
 		);
 		expect(banner).toBeVisible();
 		expect(banner).toHaveAttribute("role", "status");
+		expect(canvas.getByRole("textbox")).toHaveAttribute(
+			"aria-disabled",
+			"true",
+		);
+	},
+};
+
+export const OtherUserChatWithMessages: Story = {
+	parameters: {
+		queries: buildQueries(
+			{
+				id: CHAT_ID,
+				...baseChatFields,
+				owner_id: "other-user-id",
+				owner_username: "OtherUser",
+				owner_name: "Other User",
+				title: "Other user's chat with messages",
+				status: "completed",
+			},
+			{
+				messages: [
+					{
+						id: 1,
+						chat_id: CHAT_ID,
+						created_at: "2026-02-18T00:00:01.000Z",
+						role: "user",
+						content: [{ type: "text", text: "Please review this plan." }],
+					},
+					{
+						id: 2,
+						chat_id: CHAT_ID,
+						created_at: "2026-02-18T00:00:02.000Z",
+						role: "assistant",
+						content: [
+							{ type: "text", text: "I prepared a plan." },
+							{
+								type: "tool-call",
+								tool_call_id: "other-user-plan",
+								tool_name: "propose_plan",
+								args: { path: "/home/coder/PLAN.md" },
+							},
+							{
+								type: "tool-result",
+								tool_call_id: "other-user-plan",
+								tool_name: "propose_plan",
+								result: {
+									file_id: "other-user-plan-file",
+									content: "# Plan\n\n1. Keep this chat read-only.",
+								},
+							},
+						],
+					},
+				] as TypesGen.ChatMessage[],
+				queued_messages: [],
+				has_more: false,
+			},
+			{ diffUrl: undefined },
+		),
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		expect(
+			await canvas.findByText(
+				"This chat is owned by Other User. It is read-only.",
+			),
+		).toBeVisible();
+		expect(await canvas.findByText("Please review this plan.")).toBeVisible();
+		expect(canvas.getByRole("textbox")).toHaveAttribute(
+			"aria-disabled",
+			"true",
+		);
+		expect(
+			canvas.queryByRole("button", { name: "Edit message" }),
+		).not.toBeInTheDocument();
+		expect(
+			canvas.queryByRole("button", { name: "Implement plan" }),
+		).not.toBeInTheDocument();
 	},
 };
 
@@ -1201,6 +1369,8 @@ export const ArchivedOtherUserChat: Story = {
 				...baseChatFields,
 				archived: true,
 				owner_id: "other-user-id",
+				owner_username: "OtherUser",
+				owner_name: "Other User",
 				title: "Archived other user's chat",
 				status: "completed",
 			},
@@ -1214,7 +1384,7 @@ export const ArchivedOtherUserChat: Story = {
 			await canvas.findByText("This agent has been archived and is read-only."),
 		).toBeVisible();
 		expect(
-			canvas.queryByText(/^This is not your chat/),
+			canvas.queryByText(/^This chat is owned by/),
 		).not.toBeInTheDocument();
 	},
 };
@@ -1325,7 +1495,7 @@ export const CompletedWithDiffPanel: Story = {
 		// Verify menu items are rendered.
 		const body = within(document.body);
 		await waitFor(() => {
-			expect(body.getByText("Archive Agent")).toBeInTheDocument();
+			expect(body.getByText("Archive agent")).toBeInTheDocument();
 		});
 		// Workspace items moved to the workspace pill popover.
 		expect(body.queryByText("Open in Cursor")).not.toBeInTheDocument();
@@ -1392,6 +1562,7 @@ export const WithSubagentCards: Story = {
  *  that opens the right sidebar panel and switches to the Desktop tab. */
 export const WithComputerUseAgent: Story = {
 	parameters: {
+		experiments: ["chat-virtual-desktop"],
 		queries: [
 			...buildQueries(
 				{
@@ -1457,11 +1628,6 @@ export const WithComputerUseAgent: Story = {
 				},
 				{ diffUrl: undefined },
 			),
-			// Enable the desktop feature so the Desktop tab appears in the sidebar.
-			{
-				key: ["chat-desktop-enabled"],
-				data: { enable_desktop: true },
-			},
 		],
 	},
 	play: async ({ canvasElement }) => {
@@ -1541,18 +1707,19 @@ export const WithMixedSubagentTranscript: Story = {
 							},
 							{
 								type: "tool-call",
-								tool_call_id: "legacy-close",
-								tool_name: "close_agent",
+								tool_call_id: "legacy-interrupt",
+								tool_name: "interrupt_agent",
 								args: { chat_id: "legacy-child" },
 							},
 							{
 								type: "tool-result",
-								tool_call_id: "legacy-close",
-								tool_name: "close_agent",
+								tool_call_id: "legacy-interrupt",
+								tool_name: "interrupt_agent",
 								result: {
 									chat_id: "legacy-child",
 									type: "general",
 									status: "completed",
+									interrupted: "true",
 								},
 							},
 						],
@@ -2291,7 +2458,27 @@ export const WithEveryTool: Story = {
 			expect(canvas.getByText(/Editing 2 files/)).toBeInTheDocument();
 			expect(canvas.getByText(/Reading CHANGELOG\.md/)).toBeInTheDocument();
 			expect(canvas.getByText(/Writing CHANGELOG\.md/)).toBeInTheDocument();
+			expect(canvas.getByText(/Attached auth-split\.md/)).toBeInTheDocument();
+			expect(
+				canvas.getByRole("button", { name: /Spawned Workspace diagnostics/i }),
+			).toBeInTheDocument();
+			expect(
+				canvas.getByRole("button", { name: /Read skill deep-review/i }),
+			).toBeInTheDocument();
 		});
+
+		const rowHeights = [
+			canvas.getByText(/Attached auth-split\.md/),
+			canvas.getByRole("button", {
+				name: /Spawned Workspace diagnostics/i,
+			}),
+			canvas.getByRole("button", { name: /Read skill deep-review/i }),
+		].map((label) => {
+			const row = label.closest("[data-transcript-row]");
+			expect(row).toBeInstanceOf(HTMLElement);
+			return Math.round((row as HTMLElement).getBoundingClientRect().height);
+		});
+		expect(new Set(rowHeights)).toEqual(new Set([24]));
 	},
 };
 
@@ -2299,6 +2486,7 @@ export const WithEveryTool: Story = {
  *  (SubagentTool with computer-use variant) instead of the plain SubagentTool card. */
 export const WithWaitAgentComputerUseVNC: Story = {
 	parameters: {
+		experiments: ["chat-virtual-desktop"],
 		queries: [
 			...buildQueries(
 				{
@@ -2342,10 +2530,6 @@ export const WithWaitAgentComputerUseVNC: Story = {
 				},
 				{ diffUrl: undefined },
 			),
-			{
-				key: ["chat-desktop-enabled"],
-				data: { enable_desktop: true },
-			},
 		],
 		// The wait_agent arrives via WebSocket so it renders in
 		// the streaming/running state (no tool-result yet).

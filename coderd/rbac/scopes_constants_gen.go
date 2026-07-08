@@ -7,6 +7,10 @@ package rbac
 // declared in code, not here, to avoid duplication.
 
 const (
+	ScopeAiGatewayKeyCreate                  ScopeName = "ai_gateway_key:create"
+	ScopeAiGatewayKeyDelete                  ScopeName = "ai_gateway_key:delete"
+	ScopeAiGatewayKeyRead                    ScopeName = "ai_gateway_key:read"
+	ScopeAiGatewayKeyUpdate                  ScopeName = "ai_gateway_key:update"
 	ScopeAiModelPriceRead                    ScopeName = "ai_model_price:read"
 	ScopeAiModelPriceUpdate                  ScopeName = "ai_model_price:update"
 	ScopeAiProviderCreate                    ScopeName = "ai_provider:create"
@@ -33,6 +37,9 @@ const (
 	ScopeAssignRoleUnassign                  ScopeName = "assign_role:unassign"
 	ScopeAuditLogCreate                      ScopeName = "audit_log:create"
 	ScopeAuditLogRead                        ScopeName = "audit_log:read"
+	ScopeBoundaryLogCreate                   ScopeName = "boundary_log:create"
+	ScopeBoundaryLogDelete                   ScopeName = "boundary_log:delete"
+	ScopeBoundaryLogRead                     ScopeName = "boundary_log:read"
 	ScopeBoundaryUsageDelete                 ScopeName = "boundary_usage:delete"
 	ScopeBoundaryUsageRead                   ScopeName = "boundary_usage:read"
 	ScopeBoundaryUsageUpdate                 ScopeName = "boundary_usage:update"
@@ -134,6 +141,10 @@ const (
 	ScopeUserSecretDelete                    ScopeName = "user_secret:delete"
 	ScopeUserSecretRead                      ScopeName = "user_secret:read"
 	ScopeUserSecretUpdate                    ScopeName = "user_secret:update"
+	ScopeUserSkillCreate                     ScopeName = "user_skill:create"
+	ScopeUserSkillDelete                     ScopeName = "user_skill:delete"
+	ScopeUserSkillRead                       ScopeName = "user_skill:read"
+	ScopeUserSkillUpdate                     ScopeName = "user_skill:update"
 	ScopeWebpushSubscriptionCreate           ScopeName = "webpush_subscription:create"
 	ScopeWebpushSubscriptionDelete           ScopeName = "webpush_subscription:delete"
 	ScopeWebpushSubscriptionRead             ScopeName = "webpush_subscription:read"
@@ -153,6 +164,10 @@ const (
 	ScopeWorkspaceAgentResourceMonitorCreate ScopeName = "workspace_agent_resource_monitor:create"
 	ScopeWorkspaceAgentResourceMonitorRead   ScopeName = "workspace_agent_resource_monitor:read"
 	ScopeWorkspaceAgentResourceMonitorUpdate ScopeName = "workspace_agent_resource_monitor:update"
+	ScopeWorkspaceBuildOrchestrationCreate   ScopeName = "workspace_build_orchestration:create"
+	ScopeWorkspaceBuildOrchestrationDelete   ScopeName = "workspace_build_orchestration:delete"
+	ScopeWorkspaceBuildOrchestrationRead     ScopeName = "workspace_build_orchestration:read"
+	ScopeWorkspaceBuildOrchestrationUpdate   ScopeName = "workspace_build_orchestration:update"
 	ScopeWorkspaceDormantApplicationConnect  ScopeName = "workspace_dormant:application_connect"
 	ScopeWorkspaceDormantCreate              ScopeName = "workspace_dormant:create"
 	ScopeWorkspaceDormantCreateAgent         ScopeName = "workspace_dormant:create_agent"
@@ -180,6 +195,10 @@ func (e ScopeName) Valid() bool {
 	case ScopeName("coder:all"),
 		ScopeName("coder:application_connect"),
 		ScopeName("no_user_data"),
+		ScopeAiGatewayKeyCreate,
+		ScopeAiGatewayKeyDelete,
+		ScopeAiGatewayKeyRead,
+		ScopeAiGatewayKeyUpdate,
 		ScopeAiModelPriceRead,
 		ScopeAiModelPriceUpdate,
 		ScopeAiProviderCreate,
@@ -206,6 +225,9 @@ func (e ScopeName) Valid() bool {
 		ScopeAssignRoleUnassign,
 		ScopeAuditLogCreate,
 		ScopeAuditLogRead,
+		ScopeBoundaryLogCreate,
+		ScopeBoundaryLogDelete,
+		ScopeBoundaryLogRead,
 		ScopeBoundaryUsageDelete,
 		ScopeBoundaryUsageRead,
 		ScopeBoundaryUsageUpdate,
@@ -307,6 +329,10 @@ func (e ScopeName) Valid() bool {
 		ScopeUserSecretDelete,
 		ScopeUserSecretRead,
 		ScopeUserSecretUpdate,
+		ScopeUserSkillCreate,
+		ScopeUserSkillDelete,
+		ScopeUserSkillRead,
+		ScopeUserSkillUpdate,
 		ScopeWebpushSubscriptionCreate,
 		ScopeWebpushSubscriptionDelete,
 		ScopeWebpushSubscriptionRead,
@@ -326,6 +352,10 @@ func (e ScopeName) Valid() bool {
 		ScopeWorkspaceAgentResourceMonitorCreate,
 		ScopeWorkspaceAgentResourceMonitorRead,
 		ScopeWorkspaceAgentResourceMonitorUpdate,
+		ScopeWorkspaceBuildOrchestrationCreate,
+		ScopeWorkspaceBuildOrchestrationDelete,
+		ScopeWorkspaceBuildOrchestrationRead,
+		ScopeWorkspaceBuildOrchestrationUpdate,
 		ScopeWorkspaceDormantApplicationConnect,
 		ScopeWorkspaceDormantCreate,
 		ScopeWorkspaceDormantCreateAgent,
@@ -354,6 +384,10 @@ func AllScopeNameValues() []ScopeName {
 		ScopeName("coder:all"),
 		ScopeName("coder:application_connect"),
 		ScopeName("no_user_data"),
+		ScopeAiGatewayKeyCreate,
+		ScopeAiGatewayKeyDelete,
+		ScopeAiGatewayKeyRead,
+		ScopeAiGatewayKeyUpdate,
 		ScopeAiModelPriceRead,
 		ScopeAiModelPriceUpdate,
 		ScopeAiProviderCreate,
@@ -380,6 +414,9 @@ func AllScopeNameValues() []ScopeName {
 		ScopeAssignRoleUnassign,
 		ScopeAuditLogCreate,
 		ScopeAuditLogRead,
+		ScopeBoundaryLogCreate,
+		ScopeBoundaryLogDelete,
+		ScopeBoundaryLogRead,
 		ScopeBoundaryUsageDelete,
 		ScopeBoundaryUsageRead,
 		ScopeBoundaryUsageUpdate,
@@ -481,6 +518,10 @@ func AllScopeNameValues() []ScopeName {
 		ScopeUserSecretDelete,
 		ScopeUserSecretRead,
 		ScopeUserSecretUpdate,
+		ScopeUserSkillCreate,
+		ScopeUserSkillDelete,
+		ScopeUserSkillRead,
+		ScopeUserSkillUpdate,
 		ScopeWebpushSubscriptionCreate,
 		ScopeWebpushSubscriptionDelete,
 		ScopeWebpushSubscriptionRead,
@@ -500,6 +541,10 @@ func AllScopeNameValues() []ScopeName {
 		ScopeWorkspaceAgentResourceMonitorCreate,
 		ScopeWorkspaceAgentResourceMonitorRead,
 		ScopeWorkspaceAgentResourceMonitorUpdate,
+		ScopeWorkspaceBuildOrchestrationCreate,
+		ScopeWorkspaceBuildOrchestrationDelete,
+		ScopeWorkspaceBuildOrchestrationRead,
+		ScopeWorkspaceBuildOrchestrationUpdate,
 		ScopeWorkspaceDormantApplicationConnect,
 		ScopeWorkspaceDormantCreate,
 		ScopeWorkspaceDormantCreateAgent,

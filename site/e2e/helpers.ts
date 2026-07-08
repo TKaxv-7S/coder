@@ -1,5 +1,6 @@
 import { type ChildProcess, exec, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import type { Server } from "node:http";
 import net from "node:net";
 import path from "node:path";
 import { Duplex } from "node:stream";
@@ -432,7 +433,7 @@ export const startWorkspaceWithEphemeralParameters = async (
 
 	await fillParameters(page, richParameters, buildParameters);
 
-	await page.getByRole("button", { name: /update and start/i }).click();
+	await clickWorkspaceUpdateSubmit(page, /update and start/i);
 
 	await page.waitForSelector("text=Workspace status: Running", {
 		state: "visible",
@@ -865,17 +866,32 @@ export class Awaiter {
 	}
 }
 
-export const createServer = async (
-	port: number,
-): Promise<ReturnType<typeof express>> => {
+type MockServer = {
+	app: ReturnType<typeof express>;
+	/** Stops the server and drops keep-alive connections. */
+	close: () => Promise<void>;
+};
+
+export const createServer = async (port: number): Promise<MockServer> => {
 	await waitForPort(port); // Wait until the port is available
 
-	const e = express();
+	const app = express();
 	// We need to specify the local IP address as the web server
 	// tends to fail with IPv6 related error:
 	// listen EADDRINUSE: address already in use :::50516
-	await new Promise<void>((r) => e.listen(port, "0.0.0.0", r));
-	return e;
+	const server = await new Promise<Server>((resolve) => {
+		const s = app.listen(port, "0.0.0.0", () => resolve(s));
+	});
+
+	return {
+		app,
+		close: () =>
+			new Promise<void>((resolve, reject) => {
+				// Order matters: stop accepting, then drop keep-alives.
+				server.close((err) => (err ? reject(err) : resolve()));
+				server.closeAllConnections?.();
+			}),
+	};
 };
 
 async function waitForPort(
@@ -1107,6 +1123,12 @@ const fillParameters = async (
 	}
 };
 
+const clickWorkspaceUpdateSubmit = async (page: Page, name: RegExp) => {
+	const submitButton = page.getByRole("button", { name });
+	await expect(submitButton).toBeEnabled({ timeout: 30_000 });
+	await submitButton.click();
+};
+
 export const updateTemplate = async (
 	page: Page,
 	organization: string,
@@ -1205,11 +1227,11 @@ export const updateWorkspace = async (
 	await fillParameters(page, richParameters, buildParameters);
 
 	if (workspaceStatus === "running") {
-		await page.getByRole("button", { name: /update and restart/i }).click();
+		await clickWorkspaceUpdateSubmit(page, /update and restart/i);
 		// Confirmation dialog.
 		await page.getByRole("button", { name: /restart/i }).click();
 	} else {
-		await page.getByRole("button", { name: /update and start/i }).click();
+		await clickWorkspaceUpdateSubmit(page, /update and start/i);
 	}
 };
 
@@ -1228,11 +1250,11 @@ export const updateWorkspaceParameters = async (
 	await fillParameters(page, richParameters, buildParameters);
 
 	if (workspaceStatus === "running") {
-		await page.getByRole("button", { name: /update and restart/i }).click();
+		await clickWorkspaceUpdateSubmit(page, /update and restart/i);
 		// Confirmation dialog.
 		await page.getByRole("button", { name: /restart/i }).click();
 	} else {
-		await page.getByRole("button", { name: /update and start/i }).click();
+		await clickWorkspaceUpdateSubmit(page, /update and start/i);
 	}
 
 	await page.waitForSelector("text=Workspace status: Running", {
