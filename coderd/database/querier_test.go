@@ -15414,36 +15414,25 @@ func TestGetChatsSearch(t *testing.T) {
 		params database.GetChatsParams
 		want   []uuid.UUID
 	}{
-		// 1. Chat title FTS: multi-word AND semantics, case-insensitive.
 		{"Title/Match", database.GetChatsParams{Search: "pipeline alpha"}, []uuid.UUID{titleChat.ID}},
 		{"Title/CaseInsensitiveMultiWord", database.GetChatsParams{Search: "ALPHA DEPLOY"}, []uuid.UUID{titleChat.ID}},
 		{"Title/AndSemantics", database.GetChatsParams{Search: "deploy nonexistent"}, nil},
-		// 2. PR title FTS.
 		{"PRTitle/Match", database.GetChatsParams{Search: "authentication"}, []uuid.UUID{prTitleChat.ID, mergedChat.ID}},
-		// 3. Message body FTS.
 		{"Message/Match", database.GetChatsParams{Search: "kubernetes restart"}, []uuid.UUID{msgChat.ID}},
-		// 4. PR number for all-digit searches.
 		{"PRNumber/Match", database.GetChatsParams{Search: "42"}, []uuid.UUID{prTitleChat.ID}},
 		{"PRNumber/NonNumericNoMatch", database.GetChatsParams{Search: "42abc"}, nil},
 		{"PRNumber/OversizedDigitsNoError", database.GetChatsParams{Search: "1111111111111111111111111"}, nil},
-		// 5. No match anywhere.
 		{"NoMatch", database.GetChatsParams{Search: "zzzqqq"}, nil},
-		// 6. Pending backfill (search_tsv IS NULL) matches nothing.
 		{"Message/PendingBackfillNoMatch", database.GetChatsParams{Search: "elasticsearch"}, nil},
-		// 7. Deleted messages excluded even when backfilled.
 		{"Message/DeletedNoMatch", database.GetChatsParams{Search: "terraform"}, nil},
-		// 8. Matching message in a child chat surfaces neither the child
-		// (root-only pagination) nor the parent (EXISTS is per-chat).
+		// Parent also excluded: EXISTS is per-chat, not per-tree.
 		{"Message/ChildNotSurfaced", database.GetChatsParams{Search: "orchestrator saga"}, nil},
-		// 9. Tool-role and model-only rows never match, even with a vector.
 		{"Message/IneligibleRolesNoMatch", database.GetChatsParams{Search: "forbidden secret"}, nil},
-		// 10. Composition with other filters.
 		{"Composed/ArchivedDefaultIncludesAll", database.GetChatsParams{Search: "deploy pipeline"}, []uuid.UUID{titleChat.ID, archivedChat.ID}},
 		{"Composed/ArchivedFalseExcludes", database.GetChatsParams{Search: "deploy pipeline", Archived: sql.NullBool{Bool: false, Valid: true}}, []uuid.UUID{titleChat.ID}},
 		{"Composed/ArchivedTrueOnly", database.GetChatsParams{Search: "deploy pipeline", Archived: sql.NullBool{Bool: true, Valid: true}}, []uuid.UUID{archivedChat.ID}},
 		{"Composed/SearchAndRepo", database.GetChatsParams{Search: "authentication", RepoQuery: "acme/widget"}, []uuid.UUID{prTitleChat.ID}},
 		{"Composed/SearchAndPRStatus", database.GetChatsParams{Search: "authentication", PullRequestStatuses: []string{"merged"}}, []uuid.UUID{mergedChat.ID}},
-		// 11. Regression: empty search leaves existing filters untouched.
 		{"EmptySearch/ReturnsAll", database.GetChatsParams{Search: ""}, allRootIDs},
 		{"EmptySearch/TitleQueryStillWorks", database.GetChatsParams{Search: "", TitleQuery: "pipeline alpha"}, []uuid.UUID{titleChat.ID}},
 		{"EmptySearch/PRTitleQueryStillWorks", database.GetChatsParams{Search: "", PrTitleQuery: "authentication bug"}, []uuid.UUID{prTitleChat.ID}},
