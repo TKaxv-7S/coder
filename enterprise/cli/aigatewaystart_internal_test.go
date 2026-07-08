@@ -212,6 +212,7 @@ func TestAIGatewayStart_DeploymentOptions(t *testing.T) {
 		"CODER_AI_GATEWAY_MAX_CONCURRENCY",
 		"CODER_AI_GATEWAY_RATE_LIMIT",
 		"CODER_AI_GATEWAY_SEND_ACTOR_HEADERS",
+		"CODER_AI_GATEWAY_WIF_ALLOWED_IDENTITY_TOKEN_FILES",
 	}
 	require.ElementsMatch(t, want, got)
 }
