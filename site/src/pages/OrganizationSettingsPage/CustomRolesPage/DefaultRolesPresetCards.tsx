@@ -1,3 +1,4 @@
+import { CircleDollarSignIcon } from "lucide-react";
 import type { FC } from "react";
 import { useId } from "react";
 import type { AssignableRoles } from "#/api/typesGenerated";
@@ -41,26 +42,32 @@ export const DefaultRolesPresetCards: FC<DefaultRolesPresetCardsProps> = ({
 			className="grid grid-cols-1 gap-4 md:grid-cols-3"
 		>
 			<PresetCard
-				name="Workspace"
-				description="Members receive full workspace permissions: create, connect to, start, and stop workspaces."
-				note="Every user added to this organization counts as a license seat."
-				selected={preset === "workspace"}
-				disabled={disabled}
-				onSelect={() => {
-					if (preset !== "workspace") {
-						onSelectRoles([workspaceAccessRoleName]);
-					}
-				}}
-			/>
-			<PresetCard
 				name="Gateway"
 				description="Members can only route AI traffic through the AI Gateway, with their requests recorded under their own identity."
-				note="Gateway members do not cost license seats."
+				note={{
+					text: "Gateway members do not cost license seats.",
+					tone: "free",
+				}}
 				selected={preset === "gateway"}
 				disabled={disabled}
 				onSelect={() => {
 					if (preset !== "gateway") {
 						onSelectRoles([]);
+					}
+				}}
+			/>
+			<PresetCard
+				name="Workspace"
+				description="Members receive full workspace permissions: create, connect to, start, and stop workspaces."
+				note={{
+					text: "Every user added to this organization counts as a license seat.",
+					tone: "cost",
+				}}
+				selected={preset === "workspace"}
+				disabled={disabled}
+				onSelect={() => {
+					if (preset !== "workspace") {
+						onSelectRoles([workspaceAccessRoleName]);
 					}
 				}}
 			/>
@@ -86,10 +93,16 @@ export const DefaultRolesPresetCards: FC<DefaultRolesPresetCardsProps> = ({
 	);
 };
 
+interface PresetCardNote {
+	text: string;
+	// cost renders with warning emphasis, free with success emphasis.
+	tone: "cost" | "free";
+}
+
 interface PresetCardProps {
 	name: string;
 	description: string;
-	note?: string;
+	note?: PresetCardNote;
 	selected: boolean;
 	disabled: boolean;
 	onSelect: () => void;
@@ -156,8 +169,19 @@ const PresetCard: FC<PresetCardProps> = ({
 				{description}
 			</p>
 			{note && (
-				<p className="m-0 mt-2 text-xs font-medium text-content-secondary">
-					{note}
+				<p
+					className={cn(
+						"m-0 mt-2 flex items-start gap-1.5 text-sm font-semibold",
+						note.tone === "cost"
+							? "text-content-warning"
+							: "text-content-success",
+					)}
+				>
+					<CircleDollarSignIcon
+						aria-hidden="true"
+						className="size-4 shrink-0 mt-0.5"
+					/>
+					{note.text}
 				</p>
 			)}
 			{children}
