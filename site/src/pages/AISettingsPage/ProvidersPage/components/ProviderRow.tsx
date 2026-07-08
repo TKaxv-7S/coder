@@ -7,6 +7,7 @@ import { Avatar } from "#/components/Avatar/Avatar";
 import { AvatarData } from "#/components/Avatar/AvatarData";
 import { Badge } from "#/components/Badge/Badge";
 import { TableCell, TableRow } from "#/components/Table/Table";
+import { Truncate } from "#/components/Truncate/Truncate";
 import { useClickableTableRow } from "#/hooks/useClickableTableRow";
 import { ProviderIcon } from "./ProviderIcon";
 import { getProviderDisplayType } from "./providerFormApiMap";
@@ -44,12 +45,9 @@ export const ProviderRow: React.FC<ProviderRowProps> = ({
 				/>
 			</TableCell>
 			<TableCell className="min-w-0">
-				<span
-					className="block truncate text-content-secondary"
-					title={provider.base_url}
-				>
+				<Truncate position="middle" className="text-content-secondary">
 					{provider.base_url}
-				</span>
+				</Truncate>
 			</TableCell>
 			<TableCell>
 				<div className="flex flex-wrap items-center gap-1">

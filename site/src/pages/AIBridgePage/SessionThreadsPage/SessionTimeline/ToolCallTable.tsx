@@ -1,5 +1,6 @@
 import type { FC } from "react";
 import { CopyButton } from "#/components/CopyButton/CopyButton";
+import { Truncate } from "#/components/Truncate/Truncate";
 import { cn } from "#/utils/cn";
 import { formatDate } from "#/utils/time";
 import { TokenBadges } from "../../TokenBadges";
@@ -46,9 +47,11 @@ export const ToolCallTable: FC<ToolCallTableProps> = ({
 				</span>
 			</div>
 			{serverURL && (
-				<div className="flex items-center justify-between">
-					<span className="pr-4 whitespace-nowrap">MCP server</span>
-					<span className="font-mono truncate">{serverURL}</span>
+				<div className="flex items-center justify-between gap-2">
+					<span className="whitespace-nowrap">MCP server</span>
+					<Truncate position="middle" className="font-mono">
+						{serverURL}
+					</Truncate>
 					<CopyButton text={serverURL} label="Copy MCP server URL" />
 				</div>
 			)}

@@ -18,6 +18,7 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "#/components/DropdownMenu/DropdownMenu";
+import { Truncate } from "#/components/Truncate/Truncate";
 import { cn } from "#/utils/cn";
 import type { FileTree } from "#/utils/filetree";
 import { getTemplateFileIcon } from "./TemplateFileIcon";
@@ -165,6 +166,19 @@ const nodeClasses =
 	"border-none bg-transparent px-4 text-[13px] text-left " +
 	"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-content-link focus-visible:ring-inset";
 
+// A `Label` prop can render arbitrary JSX (e.g. a decorated label with a
+// modified marker), which the measured Truncate component cannot handle.
+// Only string labels get middle-truncated; JSX labels fall back to CSS
+// end-truncation so their internal layout is preserved.
+const TreeNodeLabel: FC<{ label: React.ReactNode }> = ({ label }) =>
+	typeof label === "string" ? (
+		<Truncate position="middle" className="text-inherit">
+			{label}
+		</Truncate>
+	) : (
+		<span className="truncate">{label}</span>
+	);
+
 const FileNode: FC<TreeNodeProps> = ({
 	label,
 	icon,
@@ -194,7 +208,7 @@ const FileNode: FC<TreeNodeProps> = ({
 				onClick={onClick}
 			>
 				{icon}
-				<span className="truncate">{label}</span>
+				<TreeNodeLabel label={label} />
 			</button>
 			<MoreMenu onRename={onRename} onDelete={onDelete} />
 		</div>
@@ -243,7 +257,7 @@ const FolderNode: FC<FolderNodeProps> = ({
 						) : (
 							<FolderIcon className="size-3 shrink-0 text-current" />
 						)}
-						<span className="truncate">{label}</span>
+						<TreeNodeLabel label={label} />
 					</button>
 				</CollapsibleTrigger>
 				<MoreMenu onRename={onRename} onDelete={onDelete} />

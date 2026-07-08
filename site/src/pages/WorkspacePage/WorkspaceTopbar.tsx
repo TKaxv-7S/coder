@@ -26,6 +26,7 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "#/components/Tooltip/Tooltip";
+import { Truncate } from "#/components/Truncate/Truncate";
 import { useDashboard } from "#/modules/dashboard/useDashboard";
 import { linkToTemplate, useLinks } from "#/modules/navigation";
 import { WorkspaceStatusIndicator } from "#/modules/workspaces/WorkspaceStatusIndicator/WorkspaceStatusIndicator";
@@ -41,7 +42,6 @@ const BREADCRUMB_SEGMENT_CLASS = cn(
 	"flex items-center flex-row flex-nowrap gap-2",
 	"max-w-40 whitespace-nowrap cursor-default",
 );
-const BREADCRUMB_TEXT_CLASS = "overflow-x-hidden text-ellipsis";
 
 interface WorkspaceTopbarProps {
 	isUpdating: boolean;
@@ -271,7 +271,7 @@ const OwnerBreadcrumb: FC<OwnerBreadcrumbProps> = ({
 			<HelpPopoverTrigger asChild>
 				<span className={BREADCRUMB_SEGMENT_CLASS}>
 					<Avatar size="sm" fallback={ownerName} src={ownerAvatarUrl} />
-					<span className={BREADCRUMB_TEXT_CLASS}>{ownerName}</span>
+					<Truncate position="middle">{ownerName}</Truncate>
 				</span>
 			</HelpPopoverTrigger>
 
@@ -303,7 +303,7 @@ const OrganizationBreadcrumb: FC<OrganizationBreadcrumbProps> = ({
 						src={orgIconUrl}
 						fallback={orgName}
 					/>
-					<span className={BREADCRUMB_TEXT_CLASS}>{orgName}</span>
+					<Truncate position="middle">{orgName}</Truncate>
 				</span>
 			</HelpPopoverTrigger>
 
@@ -367,9 +367,9 @@ const WorkspaceBreadcrumb: FC<WorkspaceBreadcrumbProps> = ({
 							fallback={templateDisplayName}
 						/>
 
-						<span className={cn(BREADCRUMB_TEXT_CLASS, "font-medium")}>
+						<Truncate position="middle" className="font-medium">
 							{workspaceName}
-						</span>
+						</Truncate>
 					</span>
 				</HelpPopoverTrigger>
 

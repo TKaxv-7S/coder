@@ -22,6 +22,7 @@ import {
 } from "react";
 import { ErrorAlert } from "#/components/Alert/ErrorAlert";
 import { Skeleton } from "#/components/Skeleton/Skeleton";
+import { Truncate } from "#/components/Truncate/Truncate";
 import { cn } from "#/utils/cn";
 import { countChangedLines } from "../../utils/countChangedLines";
 import { changeColor, changeLabel } from "../../utils/diffColors";
@@ -218,13 +219,19 @@ function HeaderContent({ fileDiff }: { fileDiff: FileDiffMetadata }) {
 					{changeLabel(fileDiff.type)}
 				</span>
 				{fileDiff.prevName && fileDiff.prevName !== fileDiff.name && (
-					<span className="truncate text-xs text-content-secondary">
+					<Truncate
+						position="middle"
+						className="text-xs text-content-secondary"
+					>
 						{fileDiff.prevName}
-					</span>
+					</Truncate>
 				)}
-				<span className="truncate text-xs font-medium text-content-primary">
+				<Truncate
+					position="middle"
+					className="text-xs font-medium text-content-primary"
+				>
 					{fileDiff.name}
-				</span>
+				</Truncate>
 			</div>
 			{(additions > 0 || deletions > 0) && (
 				<span className="inline-flex shrink-0 flex-row-reverse items-stretch overflow-hidden rounded-[3px] border border-solid border-border-default font-mono text-xs font-medium leading-5">

@@ -9,6 +9,7 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "#/components/Tooltip/Tooltip";
+import { Truncate } from "#/components/Truncate/Truncate";
 import { ResourceAvatar } from "./ResourceAvatar";
 import { SensitiveValue } from "./SensitiveValue";
 
@@ -88,9 +89,10 @@ export const ResourceCard: FC<ResourceCardProps> = ({ resource, agentRow }) => {
 															(child) => typeof child === "string",
 														)
 													) {
+														const value = childrens.join("");
 														return (
-															<CopyableValue value={childrens.join("")}>
-																{children}
+															<CopyableValue value={value} className="block">
+																<Truncate position="middle">{value}</Truncate>
 															</CopyableValue>
 														);
 													}

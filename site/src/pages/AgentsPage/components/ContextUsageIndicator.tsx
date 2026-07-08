@@ -27,6 +27,7 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from "#/components/Tooltip/Tooltip";
+import { Truncate } from "#/components/Truncate/Truncate";
 import { cn } from "#/utils/cn";
 import { formatKiB } from "#/utils/fileSize";
 import { isMobileViewport } from "#/utils/mobile";
@@ -441,20 +442,16 @@ export const ContextUsageIndicator: FC<{
 									<div
 										key={config.source}
 										className="flex items-center gap-1.5"
-										title={config.source}
 									>
 										<FileIcon className="size-3 shrink-0" />
-										<span className="truncate">{config.source}</span>
+										<Truncate position="middle">{config.source}</Truncate>
 									</div>
 								))}
 								{mcpServerItems.map((mcp) => (
 									<div key={mcp.source} className="flex flex-col gap-0.5">
-										<div
-											className="flex items-center gap-1.5"
-											title={mcp.source}
-										>
+										<div className="flex items-center gap-1.5">
 											<PlugIcon className="size-3 shrink-0" />
-											<span className="truncate">{mcp.name}</span>
+											<Truncate position="middle">{mcp.name}</Truncate>
 										</div>
 										{mcp.tools.length > 0 && (
 											<div className="ml-4 flex flex-col gap-0.5">

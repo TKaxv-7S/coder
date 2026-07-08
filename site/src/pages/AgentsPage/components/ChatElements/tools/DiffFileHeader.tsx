@@ -1,4 +1,5 @@
 import type { FileContents, FileDiffMetadata } from "@pierre/diffs";
+import { Truncate } from "#/components/Truncate/Truncate";
 import { cn } from "#/utils/cn";
 import { countChangedLines } from "../../../utils/countChangedLines";
 import { changeColor, changeLabel } from "../../../utils/diffColors";
@@ -25,13 +26,19 @@ export function DiffFileHeader({
 					</span>
 				)}
 				{isDiff && file.prevName && file.prevName !== file.name && (
-					<span className="truncate text-xs text-content-secondary">
+					<Truncate
+						position="middle"
+						className="text-xs text-content-secondary"
+					>
 						{file.prevName}
-					</span>
+					</Truncate>
 				)}
-				<span className="truncate text-xs font-medium text-content-primary">
+				<Truncate
+					position="middle"
+					className="text-xs font-medium text-content-primary"
+				>
 					{file.name}
-				</span>
+				</Truncate>
 			</div>
 			{stats && (stats.additions > 0 || stats.deletions > 0) && (
 				<span className="inline-flex shrink-0 flex-row-reverse items-stretch overflow-hidden rounded-[3px] border border-solid border-border-default font-mono text-xs font-medium leading-5">
