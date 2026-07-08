@@ -111,8 +111,27 @@ Error: Error pinging Docker server: Cannot connect to the Docker daemon at unix:
 
 Docker is not installed or not running on the host. Install Docker and start the
 daemon before creating a workspace from a Docker-based template. Refer to the
-[quickstart troubleshooting](../tutorials/quickstart.md#cannot-connect-to-the-docker-daemon)
+[Troubleshooting section of the get started guide](../get-started/index.md#cannot-connect-to-the-docker-daemon)
 for platform-specific steps.
+
+If Docker is installed and running but Coder still cannot connect, the daemon may expose its socket at a path other than `/var/run/docker.sock`.
+This can happen on any operating system when Docker runs through a tool that uses a per-user socket, such as rootless Docker on Linux, or Colima, Podman, or Rancher Desktop on macOS.
+Point Coder at the right socket with `DOCKER_HOST`.
+
+Find the socket path first.
+For example, run `colima status` for Colima, or `docker context inspect` to read the endpoint of the active Docker context.
+Default socket paths vary by tool, so consult your tool's documentation and treat the following as examples only:
+
+```sh
+# rootless Docker (Linux)
+export DOCKER_HOST="unix://${XDG_RUNTIME_DIR}/docker.sock"
+
+# Colima (macOS)
+export DOCKER_HOST="unix://${HOME}/.colima/default/docker.sock"
+```
+
+To persist the setting, add the `export` line to your shell's startup file, such as `~/.bashrc`, `~/.zshrc`, or `~/.config/fish/config.fish`.
+Then restart the Coder server.
 
 ### Docker-based workspace is stuck in "Connecting..."
 

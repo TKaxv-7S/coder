@@ -48,6 +48,32 @@ const (
 	AIProviderTypeCopilot AIProviderType = "copilot"
 )
 
+// AgentsUnsupportedProviderType is an AIProviderType the Coder Agents harness
+// cannot use. Declaring these as an enum exposes the generated
+// AgentsUnsupportedProviderTypes list to the frontend, which labels these
+// providers without a per-provider field on the AIProvider response.
+type AgentsUnsupportedProviderType string
+
+const (
+	// AgentsUnsupportedProviderTypeCopilot is GitHub Copilot: it authenticates
+	// with a per-request token only an official Copilot client can mint, which
+	// the server-side harness is not.
+	AgentsUnsupportedProviderTypeCopilot AgentsUnsupportedProviderType = AgentsUnsupportedProviderType(AIProviderTypeCopilot)
+)
+
+// IsAgentsUnsupportedProviderType reports whether the Coder Agents harness
+// cannot use the provider type. It is the single source of truth, shared by
+// the chatd catalog predicate and, via the generated
+// AgentsUnsupportedProviderTypes list, the frontend.
+func IsAgentsUnsupportedProviderType(t AIProviderType) bool {
+	switch AgentsUnsupportedProviderType(t) {
+	case AgentsUnsupportedProviderTypeCopilot:
+		return true
+	default:
+		return false
+	}
+}
+
 // AIProviderSettings is the discriminated container for type-specific
 // provider settings stored in ai_providers.settings. Providers that
 // need no type-specific configuration (current OpenAI and standard
@@ -169,6 +195,7 @@ type AIProvider struct {
 	Type        AIProviderType     `json:"type"`
 	Name        string             `json:"name"`
 	DisplayName string             `json:"display_name"`
+	Icon        string             `json:"icon"`
 	Enabled     bool               `json:"enabled"`
 	BaseURL     string             `json:"base_url"`
 	APIKeys     []AIProviderKey    `json:"api_keys"`
@@ -196,6 +223,7 @@ type CreateAIProviderRequest struct {
 	Type        AIProviderType     `json:"type"`
 	Name        string             `json:"name"`
 	DisplayName string             `json:"display_name,omitempty"`
+	Icon        string             `json:"icon,omitempty"`
 	Enabled     bool               `json:"enabled"`
 	BaseURL     string             `json:"base_url"`
 	APIKeys     []string           `json:"api_keys,omitempty"`
@@ -249,6 +277,12 @@ func (req CreateAIProviderRequest) Validate() []ValidationError {
 	}
 	if req.Settings.Bedrock != nil {
 		validations = append(validations, validateAIProviderRoleARN(req.Settings.Bedrock.RoleARN)...)
+		if req.Settings.Bedrock.ExternalID != "" {
+			validations = append(validations, ValidationError{
+				Field:  "settings.external_id",
+				Detail: "external_id is server-generated and cannot be set",
+			})
+		}
 	}
 	if req.Type == AIProviderTypeCopilot && len(req.APIKeys) > 0 {
 		validations = append(validations, ValidationError{
@@ -268,6 +302,7 @@ func (req CreateAIProviderRequest) Validate() []ValidationError {
 // clears all keys.
 type UpdateAIProviderRequest struct {
 	DisplayName *string                  `json:"display_name,omitempty"`
+	Icon        *string                  `json:"icon,omitempty"`
 	Enabled     *bool                    `json:"enabled,omitempty"`
 	BaseURL     *string                  `json:"base_url,omitempty"`
 	APIKeys     *[]AIProviderKeyMutation `json:"api_keys,omitempty"`
@@ -306,7 +341,7 @@ func (req UpdateAIProviderRequest) Validate() []ValidationError {
 
 // IsEmpty reports whether the patch carries no fields.
 func (req UpdateAIProviderRequest) IsEmpty() bool {
-	return req.DisplayName == nil && req.Enabled == nil && req.BaseURL == nil && req.APIKeys == nil && req.Settings == nil
+	return req.DisplayName == nil && req.Icon == nil && req.Enabled == nil && req.BaseURL == nil && req.APIKeys == nil && req.Settings == nil
 }
 
 func validateAIProviderName(name string) []ValidationError {

@@ -201,7 +201,7 @@ curl -X GET http://coder-server:8080/api/v2/ai-gateway/keys \
     "created_at": "2019-08-24T14:15:22Z",
     "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
     "key_prefix": "string",
-    "last_used_at": "2019-08-24T14:15:22Z",
+    "last_heartbeat_at": "2019-08-24T14:15:22Z",
     "name": "string"
   }
 ]
@@ -217,14 +217,14 @@ curl -X GET http://coder-server:8080/api/v2/ai-gateway/keys \
 
 Status Code **200**
 
-| Name             | Type              | Required | Restrictions | Description |
-|------------------|-------------------|----------|--------------|-------------|
-| `[array item]`   | array             | false    |              |             |
-| `» created_at`   | string(date-time) | false    |              |             |
-| `» id`           | string(uuid)      | false    |              |             |
-| `» key_prefix`   | string            | false    |              |             |
-| `» last_used_at` | string(date-time) | false    |              |             |
-| `» name`         | string            | false    |              |             |
+| Name                  | Type              | Required | Restrictions | Description |
+|-----------------------|-------------------|----------|--------------|-------------|
+| `[array item]`        | array             | false    |              |             |
+| `» created_at`        | string(date-time) | false    |              |             |
+| `» id`                | string(uuid)      | false    |              |             |
+| `» key_prefix`        | string            | false    |              |             |
+| `» last_heartbeat_at` | string(date-time) | false    |              |             |
+| `» name`              | string            | false    |              |             |
 
 To perform this operation, you must be authenticated. [Learn more](authentication.md).
 
@@ -301,6 +301,26 @@ curl -X DELETE http://coder-server:8080/api/v2/ai-gateway/keys/{key} \
 | Status | Meaning                                                         | Description | Schema |
 |--------|-----------------------------------------------------------------|-------------|--------|
 | 204    | [No Content](https://tools.ietf.org/html/rfc7231#section-6.3.5) | No Content  |        |
+
+To perform this operation, you must be authenticated. [Learn more](authentication.md).
+
+## AI Gateway serve
+
+### Code samples
+
+```shell
+# Example request using curl
+curl -X GET http://coder-server:8080/api/v2/ai-gateway/serve \
+  -H 'X-AI-Governance-Gateway-Key: API_KEY'
+```
+
+`GET /api/v2/ai-gateway/serve`
+
+### Responses
+
+| Status | Meaning                                                                  | Description         | Schema |
+|--------|--------------------------------------------------------------------------|---------------------|--------|
+| 101    | [Switching Protocols](https://tools.ietf.org/html/rfc7231#section-6.2.2) | Switching Protocols |        |
 
 To perform this operation, you must be authenticated. [Learn more](authentication.md).
 
@@ -3754,6 +3774,49 @@ curl -X DELETE http://coder-server:8080/api/v2/users/{user}/ai/budget \
 | Status | Meaning                                                         | Description | Schema |
 |--------|-----------------------------------------------------------------|-------------|--------|
 | 204    | [No Content](https://tools.ietf.org/html/rfc7231#section-6.3.5) | No Content  |        |
+
+To perform this operation, you must be authenticated. [Learn more](authentication.md).
+
+## Get user AI spend
+
+### Code samples
+
+```shell
+# Example request using curl
+curl -X GET http://coder-server:8080/api/v2/users/{user}/ai/spend \
+  -H 'Accept: application/json' \
+  -H 'Coder-Session-Token: API_KEY'
+```
+
+`GET /api/v2/users/{user}/ai/spend`
+
+### Parameters
+
+| Name   | In   | Type   | Required | Description              |
+|--------|------|--------|----------|--------------------------|
+| `user` | path | string | true     | User ID, username, or me |
+
+### Example responses
+
+> 200 Response
+
+```json
+{
+  "current_spend_micros": 0,
+  "effective_group_id": "85e2b926-ddfb-4c66-b68e-b66e5acec6c0",
+  "limit_source": "user_override",
+  "period_end": "2019-08-24T14:15:22Z",
+  "period_start": "2019-08-24T14:15:22Z",
+  "spend_limit_micros": 0,
+  "user_id": "a169451c-8525-4352-b8ca-070dd449a1a5"
+}
+```
+
+### Responses
+
+| Status | Meaning                                                 | Description | Schema                                                             |
+|--------|---------------------------------------------------------|-------------|--------------------------------------------------------------------|
+| 200    | [OK](https://tools.ietf.org/html/rfc7231#section-6.3.1) | OK          | [codersdk.UserAISpendStatus](schemas.md#codersdkuseraispendstatus) |
 
 To perform this operation, you must be authenticated. [Learn more](authentication.md).
 

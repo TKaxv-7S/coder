@@ -386,6 +386,12 @@ const (
 	ApiKeyScopeAIGatewayKeyCreate                  APIKeyScope = "ai_gateway_key:create"
 	ApiKeyScopeAIGatewayKeyDelete                  APIKeyScope = "ai_gateway_key:delete"
 	ApiKeyScopeAIGatewayKeyRead                    APIKeyScope = "ai_gateway_key:read"
+	ApiKeyScopeAIGatewayKeyUpdate                  APIKeyScope = "ai_gateway_key:update"
+	ApiKeyScopeWorkspaceBuildOrchestration         APIKeyScope = "workspace_build_orchestration:*"
+	ApiKeyScopeWorkspaceBuildOrchestrationCreate   APIKeyScope = "workspace_build_orchestration:create"
+	ApiKeyScopeWorkspaceBuildOrchestrationDelete   APIKeyScope = "workspace_build_orchestration:delete"
+	ApiKeyScopeWorkspaceBuildOrchestrationRead     APIKeyScope = "workspace_build_orchestration:read"
+	ApiKeyScopeWorkspaceBuildOrchestrationUpdate   APIKeyScope = "workspace_build_orchestration:update"
 )
 
 func (e *APIKeyScope) Scan(src interface{}) error {
@@ -654,7 +660,13 @@ func (e APIKeyScope) Valid() bool {
 		ApiKeyScopeAIGatewayKey,
 		ApiKeyScopeAIGatewayKeyCreate,
 		ApiKeyScopeAIGatewayKeyDelete,
-		ApiKeyScopeAIGatewayKeyRead:
+		ApiKeyScopeAIGatewayKeyRead,
+		ApiKeyScopeAIGatewayKeyUpdate,
+		ApiKeyScopeWorkspaceBuildOrchestration,
+		ApiKeyScopeWorkspaceBuildOrchestrationCreate,
+		ApiKeyScopeWorkspaceBuildOrchestrationDelete,
+		ApiKeyScopeWorkspaceBuildOrchestrationRead,
+		ApiKeyScopeWorkspaceBuildOrchestrationUpdate:
 		return true
 	}
 	return false
@@ -892,6 +904,12 @@ func AllAPIKeyScopeValues() []APIKeyScope {
 		ApiKeyScopeAIGatewayKeyCreate,
 		ApiKeyScopeAIGatewayKeyDelete,
 		ApiKeyScopeAIGatewayKeyRead,
+		ApiKeyScopeAIGatewayKeyUpdate,
+		ApiKeyScopeWorkspaceBuildOrchestration,
+		ApiKeyScopeWorkspaceBuildOrchestrationCreate,
+		ApiKeyScopeWorkspaceBuildOrchestrationDelete,
+		ApiKeyScopeWorkspaceBuildOrchestrationRead,
+		ApiKeyScopeWorkspaceBuildOrchestrationUpdate,
 	}
 }
 
@@ -1884,6 +1902,7 @@ const (
 	CryptoKeyFeatureWorkspaceAppsAPIKey CryptoKeyFeature = "workspace_apps_api_key"
 	CryptoKeyFeatureOIDCConvert         CryptoKeyFeature = "oidc_convert"
 	CryptoKeyFeatureTailnetResume       CryptoKeyFeature = "tailnet_resume"
+	CryptoKeyFeatureNATSCA              CryptoKeyFeature = "nats_ca"
 )
 
 func (e *CryptoKeyFeature) Scan(src interface{}) error {
@@ -1926,7 +1945,8 @@ func (e CryptoKeyFeature) Valid() bool {
 	case CryptoKeyFeatureWorkspaceAppsToken,
 		CryptoKeyFeatureWorkspaceAppsAPIKey,
 		CryptoKeyFeatureOIDCConvert,
-		CryptoKeyFeatureTailnetResume:
+		CryptoKeyFeatureTailnetResume,
+		CryptoKeyFeatureNATSCA:
 		return true
 	}
 	return false
@@ -1938,6 +1958,7 @@ func AllCryptoKeyFeatureValues() []CryptoKeyFeature {
 		CryptoKeyFeatureWorkspaceAppsAPIKey,
 		CryptoKeyFeatureOIDCConvert,
 		CryptoKeyFeatureTailnetResume,
+		CryptoKeyFeatureNATSCA,
 	}
 }
 
@@ -4596,6 +4617,8 @@ type AIBridgeToolUsage struct {
 	Metadata           pqtype.NullRawMessage `db:"metadata" json:"metadata"`
 	CreatedAt          time.Time             `db:"created_at" json:"created_at"`
 	ProviderToolCallID sql.NullString        `db:"provider_tool_call_id" json:"provider_tool_call_id"`
+	// Specific to the OpenAI Responses API: the unique id of the output item that carried the tool call. Distinct from provider_tool_call_id (the call_id correlation key), which is empty for hosted tools. Empty for the chat completions and Anthropic messages APIs, which have no separate item id.
+	ProviderItemID sql.NullString `db:"provider_item_id" json:"provider_item_id"`
 }
 
 // Audit log of prompts used by intercepted requests in AI Bridge
@@ -4615,9 +4638,9 @@ type AIGatewayKey struct {
 	CreatedAt time.Time `db:"created_at" json:"created_at"`
 	Name      string    `db:"name" json:"name"`
 	// Public token prefix for display and audit correlation. Auth uses hashed_secret.
-	SecretPrefix string       `db:"secret_prefix" json:"secret_prefix"`
-	HashedSecret []byte       `db:"hashed_secret" json:"hashed_secret"`
-	LastUsedAt   sql.NullTime `db:"last_used_at" json:"last_used_at"`
+	SecretPrefix    string       `db:"secret_prefix" json:"secret_prefix"`
+	HashedSecret    []byte       `db:"hashed_secret" json:"hashed_secret"`
+	LastHeartbeatAt sql.NullTime `db:"last_heartbeat_at" json:"last_heartbeat_at"`
 }
 
 // Per-model token prices used by AI Bridge to compute interception cost.
@@ -4649,6 +4672,7 @@ type AIProvider struct {
 	SettingsKeyID sql.NullString `db:"settings_key_id" json:"settings_key_id"`
 	CreatedAt     time.Time      `db:"created_at" json:"created_at"`
 	UpdatedAt     time.Time      `db:"updated_at" json:"updated_at"`
+	Icon          string         `db:"icon" json:"icon"`
 }
 
 // API keys associated with AI providers. Bedrock providers have zero keys (they authenticate via settings). OpenAI and Anthropic providers have one or more keys for failover.
@@ -4670,6 +4694,18 @@ type AISeatState struct {
 	LastEventType        AISeatUsageReason `db:"last_event_type" json:"last_event_type"`
 	LastEventDescription string            `db:"last_event_description" json:"last_event_description"`
 	UpdatedAt            time.Time         `db:"updated_at" json:"updated_at"`
+}
+
+// Daily AI spend per user and effective group.
+type AIUserDailySpend struct {
+	// The user who incurred the spend.
+	UserID uuid.UUID `db:"user_id" json:"user_id"`
+	// The group this spend is attributed to for budget purposes.
+	EffectiveGroupID uuid.UUID `db:"effective_group_id" json:"effective_group_id"`
+	// UTC calendar day the spend was incurred.
+	Day time.Time `db:"day" json:"day"`
+	// Accumulated spend in micro-units (1 unit = 1,000,000).
+	SpendMicros int64 `db:"spend_micros" json:"spend_micros"`
 }
 
 type APIKey struct {
@@ -4943,11 +4979,11 @@ type ChatMessage struct {
 	ProviderResponseID  sql.NullString        `db:"provider_response_id" json:"provider_response_id"`
 	APIKeyID            sql.NullString        `db:"api_key_id" json:"api_key_id"`
 	Revision            int64                 `db:"revision" json:"revision"`
+	SearchTsv           interface{}           `db:"search_tsv" json:"search_tsv"`
 }
 
 type ChatModelConfig struct {
 	ID                   uuid.UUID       `db:"id" json:"id"`
-	Provider             string          `db:"provider" json:"provider"`
 	Model                string          `db:"model" json:"model"`
 	DisplayName          string          `db:"display_name" json:"display_name"`
 	CreatedBy            uuid.NullUUID   `db:"created_by" json:"created_by"`
@@ -6439,6 +6475,31 @@ type WorkspaceBuild struct {
 	InitiatorByAvatarUrl     string              `db:"initiator_by_avatar_url" json:"initiator_by_avatar_url"`
 	InitiatorByUsername      string              `db:"initiator_by_username" json:"initiator_by_username"`
 	InitiatorByName          string              `db:"initiator_by_name" json:"initiator_by_name"`
+}
+
+// Tracks durable follow-up workspace build operations, such as server-side restart, where one child build is created after a parent build completes successfully.
+type WorkspaceBuildOrchestration struct {
+	ID        uuid.UUID `db:"id" json:"id"`
+	CreatedAt time.Time `db:"created_at" json:"created_at"`
+	UpdatedAt time.Time `db:"updated_at" json:"updated_at"`
+	// Copied from the parent build so the database can enforce that parent and child builds belong to the same workspace.
+	WorkspaceID uuid.UUID `db:"workspace_id" json:"workspace_id"`
+	// Unique because we only support sequences with one child build per parent build.
+	ParentBuildID uuid.UUID `db:"parent_build_id" json:"parent_build_id"`
+	// Nullable because the child build is created only after the parent build completes successfully.
+	ChildBuildID                 uuid.NullUUID       `db:"child_build_id" json:"child_build_id"`
+	ChildTransition              WorkspaceTransition `db:"child_transition" json:"child_transition"`
+	ChildTemplateVersionID       uuid.NullUUID       `db:"child_template_version_id" json:"child_template_version_id"`
+	ChildTemplateVersionPresetID uuid.NullUUID       `db:"child_template_version_preset_id" json:"child_template_version_preset_id"`
+	ChildRichParameterValues     json.RawMessage     `db:"child_rich_parameter_values" json:"child_rich_parameter_values"`
+	ChildLogLevel                string              `db:"child_log_level" json:"child_log_level"`
+	ChildReason                  NullBuildReason     `db:"child_reason" json:"child_reason"`
+	// Counts retryable child build creation failures for this orchestration row.
+	AttemptCount int32 `db:"attempt_count" json:"attempt_count"`
+	// When set, the orchestrator skips this pending row until the timestamp has passed.
+	NextRetryAfter sql.NullTime   `db:"next_retry_after" json:"next_retry_after"`
+	Status         string         `db:"status" json:"status"`
+	Error          sql.NullString `db:"error" json:"error"`
 }
 
 type WorkspaceBuildParameter struct {

@@ -223,6 +223,15 @@ export type GroupMembersResponseWithAICostControl = Omit<
 > &
 	Readonly<{ users: readonly GroupMemberWithAICostControl[] }>;
 
+// TODO(AIGOV-473): drop once generated from codersdk.
+export type UserAISpend = Readonly<{
+	user_id: string;
+	spend_limit_micros: number | null;
+	effective_group_id: string | null;
+	limit_source: "group" | "override" | null;
+	current_spend_micros: number;
+}>;
+
 export function watchInboxNotifications(
 	params?: WatchInboxNotificationsParams,
 ): OneWayWebSocket<TypesGen.GetInboxNotificationResponse> {
@@ -572,6 +581,13 @@ class ApiMethods {
 
 	getAuthenticatedUser = async () => {
 		const response = await this.axios.get<TypesGen.User>("/api/v2/users/me");
+		return response.data;
+	};
+
+	getUserAISpend = async (): Promise<UserAISpend> => {
+		const response = await this.axios.get<UserAISpend>(
+			"/api/v2/users/me/ai/spend",
+		);
 		return response.data;
 	};
 
@@ -3421,13 +3437,6 @@ class ExperimentalApiMethods {
 		await this.axios.patch(`/api/experimental/chats/${chatId}`, req);
 	};
 
-	regenerateChatTitle = async (chatId: string): Promise<TypesGen.Chat> => {
-		const response = await this.axios.post<TypesGen.Chat>(
-			`/api/experimental/chats/${chatId}/title/regenerate`,
-		);
-		return response.data;
-	};
-
 	proposeChatTitle = async (chatId: string): Promise<{ title: string }> => {
 		const response = await this.axios.post<{ title: string }>(
 			`/api/experimental/chats/${chatId}/title/propose`,
@@ -3707,20 +3716,6 @@ class ExperimentalApiMethods {
 			`/api/experimental/chats/${chatId}/debug/runs/${runId}`,
 		);
 		return response.data;
-	};
-	getChatDesktopEnabled =
-		async (): Promise<TypesGen.ChatDesktopEnabledResponse> => {
-			const response =
-				await this.axios.get<TypesGen.ChatDesktopEnabledResponse>(
-					"/api/experimental/chats/config/desktop-enabled",
-				);
-			return response.data;
-		};
-
-	updateChatDesktopEnabled = async (
-		req: TypesGen.UpdateChatDesktopEnabledRequest,
-	): Promise<void> => {
-		await this.axios.put("/api/experimental/chats/config/desktop-enabled", req);
 	};
 
 	getChatAdvisorConfig = async (): Promise<AdvisorConfig> => {

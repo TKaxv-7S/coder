@@ -236,6 +236,14 @@ export interface AIBridgeToolCall {
 	readonly created_at: string;
 }
 
+// From codersdk/aibridge.go
+export type AIBudgetLimitSource = "group" | "user_override";
+
+export const AIBudgetLimitSources: AIBudgetLimitSource[] = [
+	"group",
+	"user_override",
+];
+
 // From codersdk/deployment.go
 export type AIBudgetPeriod = "month";
 
@@ -263,8 +271,14 @@ export interface AIGatewayKey {
 	readonly name: string;
 	readonly key_prefix: string;
 	readonly created_at: string;
-	readonly last_used_at?: string;
+	readonly last_heartbeat_at?: string;
 }
+
+// From codersdk/client.go
+/**
+ * AIGatewayKeyHeader contains the authentication key for a standalone AI Gateway replica.
+ */
+export const AIGatewayKeyHeader = "X-Coder-AI-Governance-Gateway-Key";
 
 // From codersdk/aiproviders.go
 /**
@@ -279,6 +293,7 @@ export interface AIProvider {
 	readonly type: AIProviderType;
 	readonly name: string;
 	readonly display_name: string;
+	readonly icon: string;
 	readonly enabled: boolean;
 	readonly base_url: string;
 	readonly api_keys: readonly AIProviderKey[];
@@ -329,6 +344,13 @@ export interface AIProviderBedrockSettings {
 	 * call, and the resulting temporary credentials sign Bedrock requests.
 	 */
 	readonly role_arn?: string;
+	/**
+	 * ExternalID is the STS external ID sent on the AssumeRole call when
+	 * RoleARN is set. The server generates and owns it: create and update
+	 * reject any client-supplied value that differs from the stored one (an
+	 * update may echo the stored value back).
+	 */
+	readonly external_id?: string;
 }
 
 // From codersdk/aiproviders_bedrock.go
@@ -427,6 +449,7 @@ export interface AIProviderSummary {
 	readonly type: AIProviderType;
 	readonly name: string;
 	readonly display_name: string;
+	readonly icon: string;
 	readonly enabled: boolean;
 	readonly deleted: boolean;
 }
@@ -491,6 +514,7 @@ export type APIKeyScope =
 	| "ai_gateway_key:create"
 	| "ai_gateway_key:delete"
 	| "ai_gateway_key:read"
+	| "ai_gateway_key:update"
 	| "ai_model_price:*"
 	| "ai_model_price:read"
 	| "ai_model_price:update"
@@ -690,6 +714,11 @@ export type APIKeyScope =
 	| "workspace_agent_resource_monitor:update"
 	| "workspace:*"
 	| "workspace:application_connect"
+	| "workspace_build_orchestration:*"
+	| "workspace_build_orchestration:create"
+	| "workspace_build_orchestration:delete"
+	| "workspace_build_orchestration:read"
+	| "workspace_build_orchestration:update"
 	| "workspace:create"
 	| "workspace:create_agent"
 	| "workspace:delete"
@@ -725,6 +754,7 @@ export const APIKeyScopes: APIKeyScope[] = [
 	"ai_gateway_key:create",
 	"ai_gateway_key:delete",
 	"ai_gateway_key:read",
+	"ai_gateway_key:update",
 	"ai_model_price:*",
 	"ai_model_price:read",
 	"ai_model_price:update",
@@ -924,6 +954,11 @@ export const APIKeyScopes: APIKeyScope[] = [
 	"workspace_agent_resource_monitor:update",
 	"workspace:*",
 	"workspace:application_connect",
+	"workspace_build_orchestration:*",
+	"workspace_build_orchestration:create",
+	"workspace_build_orchestration:delete",
+	"workspace_build_orchestration:read",
+	"workspace_build_orchestration:update",
 	"workspace:create",
 	"workspace:create_agent",
 	"workspace:delete",
@@ -994,8 +1029,9 @@ export const Addons: Addon[] = ["ai_governance"];
  */
 export interface AdvisorConfig {
 	/**
-	 * Enabled toggles the advisor runtime. When false, advisor is not
-	 * attached to new chats.
+	 * Enabled reflects whether the chat-advisor experiment is active.
+	 * The experiment flag is the sole gate; this field is read-only and
+	 * always matches the experiment state regardless of the stored DB value.
 	 */
 	readonly enabled: boolean;
 	/**
@@ -1140,6 +1176,13 @@ export const AgentSubsystems: AgentSubsystem[] = [
 	"envbox",
 	"envbuilder",
 	"exectrace",
+];
+
+// From codersdk/aiproviders.go
+export type AgentsUnsupportedProviderType = "copilot";
+
+export const AgentsUnsupportedProviderTypes: AgentsUnsupportedProviderType[] = [
+	"copilot",
 ];
 
 // From codersdk/chats.go
@@ -1663,6 +1706,10 @@ export interface ChatComputerUseProviderResponse {
 export interface ChatConfig {
 	readonly acquire_batch_size: number;
 	readonly debug_logging_enabled: boolean;
+	/**
+	 * @deprecated AI Gateway routing is now the only routing path. Setting this
+	 * value has no effect. This option will be removed in a future release.
+	 */
 	readonly ai_gateway_routing_enabled: boolean;
 }
 
@@ -2038,14 +2085,6 @@ export const ChatDebugStepOperations: ChatDebugStepOperation[] = [
 	"generate",
 	"stream",
 ];
-
-// From codersdk/chats.go
-/**
- * ChatDesktopEnabledResponse is the response for getting the desktop setting.
- */
-export interface ChatDesktopEnabledResponse {
-	readonly enable_desktop: boolean;
-}
 
 // From codersdk/chats.go
 /**
@@ -2477,8 +2516,7 @@ export interface ChatModelCallConfig {
  */
 export interface ChatModelConfig {
 	readonly id: string;
-	readonly provider: string;
-	readonly ai_provider_id?: string;
+	readonly ai_provider_id: string;
 	readonly model: string;
 	readonly display_name: string;
 	readonly enabled: boolean;
@@ -2694,6 +2732,11 @@ export interface ChatModelVercelProviderOptions {
  */
 export interface ChatModelsResponse {
 	readonly providers: readonly ChatModelProvider[];
+	/**
+	 * UnsupportedProviders lists configured providers the Agents harness
+	 * cannot use, so the UI can explain the empty state.
+	 */
+	readonly unsupported_providers: readonly ChatUnsupportedProvider[];
 }
 
 // From codersdk/chats.go
@@ -2803,6 +2846,7 @@ export interface ChatProviderConfig {
 	readonly id: string;
 	readonly provider: string;
 	readonly display_name: string;
+	readonly icon: string;
 	readonly enabled: boolean;
 	readonly has_api_key: boolean;
 	readonly central_api_key_enabled: boolean;
@@ -3117,6 +3161,19 @@ export interface ChatToolResultPart {
 	 * reasoning started streaming.
 	 */
 	readonly created_at?: string;
+}
+
+// From codersdk/chats.go
+/**
+ * ChatUnsupportedProvider is a configured provider the Agents harness cannot
+ * use.
+ */
+export interface ChatUnsupportedProvider {
+	/**
+	 * Provider is the provider type, e.g. "copilot".
+	 */
+	readonly provider: string;
+	readonly display_name: string;
 }
 
 // From codersdk/chats.go
@@ -3453,6 +3510,7 @@ export interface CreateAIProviderRequest {
 	readonly type: AIProviderType;
 	readonly name: string;
 	readonly display_name?: string;
+	readonly icon?: string;
 	readonly enabled: boolean;
 	readonly base_url: string;
 	readonly api_keys?: readonly string[];
@@ -3491,7 +3549,6 @@ export interface CreateChatMessageResponse {
  * CreateChatModelConfigRequest creates a chat model config.
  */
 export interface CreateChatModelConfigRequest {
-	readonly provider?: string;
 	readonly ai_provider_id?: string;
 	readonly model: string;
 	readonly display_name?: string;
@@ -3509,6 +3566,7 @@ export interface CreateChatModelConfigRequest {
 export interface CreateChatProviderConfigRequest {
 	readonly provider: string;
 	readonly display_name?: string;
+	readonly icon?: string;
 	readonly api_key?: string;
 	readonly base_url?: string;
 	readonly enabled?: boolean;
@@ -3903,6 +3961,41 @@ export interface CreateUserSkillRequest {
 }
 
 // From codersdk/workspaces.go
+/**
+ * CreateWorkspaceBuildOnSuccessRequest queues a follow-up build that
+ * runs after the parent build succeeds. It currently supports
+ * restarting a workspace: the parent build must be a "stop" and this
+ * child build a "start". The child build inherits LogLevel and Reason
+ * from the parent CreateWorkspaceBuildRequest.
+ */
+export interface CreateWorkspaceBuildOnSuccessRequest {
+	/**
+	 * TemplateVersionID pins the child build to a specific template
+	 * version. Pinning requires permission to update the template,
+	 * since the active version may change before the child build
+	 * runs. When empty, the child build uses the template's active
+	 * version at the time it runs.
+	 */
+	readonly template_version_id?: string;
+	/**
+	 * Transition must be "start". The parent build's transition must
+	 * be "stop".
+	 */
+	readonly transition: WorkspaceTransition;
+	/**
+	 * RichParameterValues are applied to the child build. Parameters
+	 * not listed here fall back to their values from the previous
+	 * build, matching normal build behavior.
+	 */
+	readonly rich_parameter_values?: readonly WorkspaceBuildParameter[];
+	/**
+	 * TemplateVersionPresetID selects a preset for the child build.
+	 * It requires TemplateVersionID to also be set.
+	 */
+	readonly template_version_preset_id?: string;
+}
+
+// From codersdk/workspaces.go
 export type CreateWorkspaceBuildReason =
 	| "cli"
 	| "dashboard"
@@ -3953,6 +4046,12 @@ export interface CreateWorkspaceBuildRequest {
 	 * Reason sets the reason for the workspace build.
 	 */
 	readonly reason?: CreateWorkspaceBuildReason;
+	/**
+	 * OnSuccess queues a follow-up workspace build after this build succeeds.
+	 * It currently supports restarting a workspace by starting it after a
+	 * successful stop build.
+	 */
+	readonly on_success?: CreateWorkspaceBuildOnSuccessRequest;
 }
 
 // From codersdk/workspaceproxy.go
@@ -4560,8 +4659,9 @@ export const EntitlementsWarningHeader = "X-Coder-Entitlements-Warning";
 // From codersdk/deployment.go
 export type Experiment =
 	| "ai-gateway-cost-control"
-	| "agent-app-tabs"
 	| "auto-fill-parameters"
+	| "chat-advisor"
+	| "chat-virtual-desktop"
 	| "example"
 	| "mcp-server-http"
 	| "minimum-implicit-member"
@@ -4573,8 +4673,9 @@ export type Experiment =
 
 export const Experiments: Experiment[] = [
 	"ai-gateway-cost-control",
-	"agent-app-tabs",
 	"auto-fill-parameters",
+	"chat-advisor",
+	"chat-virtual-desktop",
 	"example",
 	"mcp-server-http",
 	"minimum-implicit-member",
@@ -6103,6 +6204,15 @@ export const OAuth2ProviderResponseTypes: OAuth2ProviderResponseType[] = [
  */
 export const OAuth2RedirectCookie = "oauth_redirect";
 
+// From codersdk/client.go
+/**
+ * OAuth2RedirectURICookie stores the dynamically computed OIDC redirect_uri
+ * when CODER_OIDC_REDIRECT_ALLOWED_HOSTS is enabled. The same value must be
+ * used for both the authorization request and the token exchange (RFC 6749
+ * section 4.1.3).
+ */
+export const OAuth2RedirectURICookie = "oauth_redirect_uri";
+
 // From codersdk/oauth2.go
 export type OAuth2RevocationTokenTypeHint = "access_token" | "refresh_token";
 
@@ -6262,6 +6372,24 @@ export interface OIDCConfig {
 	 */
 	readonly redirect_url: string;
 	readonly auto_repair_links: boolean;
+	/**
+	 * EmailFallback allows OIDC logins to fall back to email-based matching
+	 * when the `linked_id` (issuer+subject) does not match an existing user
+	 * link. INSECURE: weakens the linked_id check. It exists for IdP
+	 * brokers that do not issue a stable `sub` for the same user across
+	 * connections.
+	 */
+	readonly email_fallback: boolean;
+	/**
+	 * RedirectAllowedHosts is an allowlist of hostnames that may be used as
+	 * the host of the OIDC redirect_uri. When non-empty, the redirect_uri is
+	 * constructed from the incoming request's Host header (validated against
+	 * this list) instead of from AccessURL. Every listed host must also be
+	 * registered as a valid redirect URI in the OIDC provider. This setting
+	 * is mutually exclusive with RedirectURL: if RedirectURL is set, this
+	 * allowlist is ignored.
+	 */
+	readonly redirect_allowed_hosts: string;
 }
 
 // From codersdk/parameters.go
@@ -7069,6 +7197,7 @@ export type RBACResource =
 	| "workspace"
 	| "workspace_agent_devcontainers"
 	| "workspace_agent_resource_monitor"
+	| "workspace_build_orchestration"
 	| "workspace_dormant"
 	| "workspace_proxy";
 
@@ -7121,6 +7250,7 @@ export const RBACResources: RBACResource[] = [
 	"workspace",
 	"workspace_agent_devcontainers",
 	"workspace_agent_resource_monitor",
+	"workspace_build_orchestration",
 	"workspace_dormant",
 	"workspace_proxy",
 ];
@@ -8762,6 +8892,7 @@ export interface TransitionStats {
  */
 export interface UpdateAIProviderRequest {
 	readonly display_name?: string;
+	readonly icon?: string;
 	readonly enabled?: boolean;
 	readonly base_url?: string;
 	readonly api_keys?: AIProviderKeyMutation[];
@@ -8781,8 +8912,9 @@ export interface UpdateActiveTemplateVersion {
  */
 export interface UpdateAdvisorConfigRequest {
 	/**
-	 * Enabled toggles the advisor runtime. When false, advisor is not
-	 * attached to new chats.
+	 * Enabled reflects whether the chat-advisor experiment is active.
+	 * The experiment flag is the sole gate; this field is read-only and
+	 * always matches the experiment state regardless of the stored DB value.
 	 */
 	readonly enabled: boolean;
 	/**
@@ -8860,18 +8992,9 @@ export interface UpdateChatDebugRetentionDaysRequest {
 
 // From codersdk/chats.go
 /**
- * UpdateChatDesktopEnabledRequest is the request to update the desktop setting.
- */
-export interface UpdateChatDesktopEnabledRequest {
-	readonly enable_desktop: boolean;
-}
-
-// From codersdk/chats.go
-/**
  * UpdateChatModelConfigRequest updates a chat model config.
  */
 export interface UpdateChatModelConfigRequest {
-	readonly provider?: string;
 	readonly ai_provider_id?: string;
 	readonly model?: string;
 	readonly display_name?: string;
@@ -8915,6 +9038,7 @@ export interface UpdateChatPlanModeInstructionsRequest {
  */
 export interface UpdateChatProviderConfigRequest {
 	readonly display_name?: string;
+	readonly icon?: string;
 	readonly api_key?: string;
 	readonly base_url?: string;
 	readonly enabled?: boolean;
@@ -9283,6 +9407,12 @@ export interface UpdateUserPreferenceSettingsRequest {
 export interface UpdateUserProfileRequest {
 	readonly username: string;
 	readonly name: string;
+	/**
+	 * AvatarURL is only applied for users whose login type is password or
+	 * none. For other login types the avatar is synced from the identity
+	 * provider on login, so a submitted value is ignored.
+	 */
+	readonly avatar_url: string;
 }
 
 // From codersdk/users.go
@@ -9525,6 +9655,30 @@ export interface UserAIBudgetOverride {
 	readonly updated_at: string;
 }
 
+// From codersdk/aibridge.go
+/**
+ * UserAIBudgetSummary is the effective AI budget for a user. When no
+ * budget applies, all fields except UserID are null.
+ */
+export interface UserAIBudgetSummary {
+	readonly user_id: string;
+	/**
+	 * EffectiveGroupID is the group the spend is attributed to. Null when
+	 * no budget applies.
+	 */
+	readonly effective_group_id: string | null;
+	/**
+	 * SpendLimitMicros is the effective spend limit in micro-units.
+	 * Null when no budget applies to the user (unlimited).
+	 */
+	readonly spend_limit_micros: number | null;
+	/**
+	 * LimitSource identifies which tier produced the limit. Null when no
+	 * budget applies.
+	 */
+	readonly limit_source: AIBudgetLimitSource | null;
+}
+
 // From codersdk/chats.go
 /**
  * UserAIProviderKeyConfig is a provider summary from the current user's
@@ -9535,6 +9689,29 @@ export interface UserAIProviderKeyConfig {
 	readonly has_user_api_key: boolean;
 	readonly has_provider_api_key: boolean;
 	readonly byok_enabled: boolean;
+}
+
+// From codersdk/aibridge.go
+/**
+ * UserAISpendStatus is the current AI spend snapshot for a user within
+ * the active budget period.
+ */
+export interface UserAISpendStatus extends UserAIBudgetSummary {
+	/**
+	 * CurrentSpendMicros is the user's spend on their effective group over
+	 * the current budget period.
+	 */
+	readonly current_spend_micros: number;
+	/**
+	 * PeriodStart is the inclusive lower bound of the current budget
+	 * period.
+	 */
+	readonly period_start: string;
+	/**
+	 * PeriodEnd is the exclusive upper bound of the current budget
+	 * period.
+	 */
+	readonly period_end: string;
 }
 
 // From codersdk/insights.go
@@ -9661,6 +9838,7 @@ export interface UserChatProviderConfig {
 	readonly provider_id: string;
 	readonly provider: string;
 	readonly display_name: string;
+	readonly icon: string;
 	readonly has_user_api_key: boolean;
 	readonly has_central_api_key_fallback: boolean;
 	readonly byok_enabled: boolean;

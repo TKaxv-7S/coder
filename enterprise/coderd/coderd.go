@@ -322,6 +322,17 @@ func New(ctx context.Context, options *Options) (_ *API, err error) {
 		})
 	})
 
+	// /ai-gateway/serve provides the DRPC-over-WebSocket that standalone AI Gateway
+	// replicas connect to. It authenticates with a gateway key instead of a user session.
+	api.AGPL.APIHandler.Group(func(r chi.Router) {
+		r.Route("/ai-gateway/serve", func(r chi.Router) {
+			r.Use(
+				api.RequireFeatureMW(codersdk.FeatureAIBridge),
+			)
+			r.Get("/", api.aiGatewayServe)
+		})
+	})
+
 	api.AGPL.APIHandler.Group(func(r chi.Router) {
 		r.Get("/entitlements", api.serveEntitlements)
 		// /regions overrides the AGPL /regions endpoint
@@ -630,7 +641,7 @@ func New(ctx context.Context, options *Options) (_ *API, err error) {
 			r.Get("/", api.userQuietHoursSchedule)
 			r.Put("/", api.putUserQuietHoursSchedule)
 		})
-		r.Route("/users/{user}/ai/budget", func(r chi.Router) {
+		r.Route("/users/{user}/ai", func(r chi.Router) {
 			// AI cost controls are a paid feature (AI Governance add-on).
 			r.Use(
 				// TODO(AIGOV-443): remove once AI Gateway cost control functionality is stable.
@@ -639,9 +650,14 @@ func New(ctx context.Context, options *Options) (_ *API, err error) {
 				apiKeyMiddleware,
 				httpmw.ExtractUserParam(options.Database),
 			)
-			r.Get("/", api.userAIBudgetOverride)
-			r.Put("/", api.upsertUserAIBudgetOverride)
-			r.Delete("/", api.deleteUserAIBudgetOverride)
+			r.Route("/budget", func(r chi.Router) {
+				r.Get("/", api.userAIBudgetOverride)
+				r.Put("/", api.upsertUserAIBudgetOverride)
+				r.Delete("/", api.deleteUserAIBudgetOverride)
+			})
+			r.Route("/spend", func(r chi.Router) {
+				r.Get("/", api.userAISpendStatus)
+			})
 		})
 		r.Route("/prebuilds", func(r chi.Router) {
 			r.Use(
