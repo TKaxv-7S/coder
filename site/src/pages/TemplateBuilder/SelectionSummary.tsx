@@ -1,6 +1,7 @@
 import { cva } from "class-variance-authority";
 import { XIcon } from "lucide-react";
 import { createContext, type PropsWithChildren, useContext } from "react";
+import { Avatar } from "#/components/Avatar/Avatar";
 import { Button } from "#/components/Button/Button";
 import { cn } from "#/utils/cn";
 
@@ -107,7 +108,7 @@ const StepIndicator: React.FC<StepIndicatorProps> = ({ step, children }) => {
 };
 
 const stepDividerVariants = cva(
-	"border-0 border-l border-solid mx-4 -translate-x-px",
+	"border-0 border-l border-solid mx-3 -translate-x-px",
 	{
 		variants: {
 			variant: {
@@ -148,12 +149,10 @@ const BaseTemplateSelection: React.FC<BaseTemplateSelectionProps> = ({
 }) => {
 	return (
 		<StepDivider>
-			<div className="flex items-center p-1">
-				<img
-					src={template.iconUrl}
-					alt={`${template.name} icon`}
-					className="w-6 h-6 p-1 rounded-sm border border-border border-solid bg-surface-secondary"
-				/>
+			<div className="flex items-start p-1">
+				<div className="h-[1lh] content-center">
+					<Avatar src={template.iconUrl} size="sm" variant="icon" />
+				</div>
 				<span className="ml-2 text-content-secondary">{template.name}</span>
 			</div>
 		</StepDivider>
@@ -174,14 +173,10 @@ const ModuleSelection: React.FC<ModuleSelectionProps> = ({
 			{modules.map((module) => (
 				<div
 					key={module.id}
-					className="group flex items-start justify-between p-1 mb-1 hover:bg-surface-secondary"
+					className="group flex items-start justify-between p-1 mb-1 rounded-sm hover:bg-surface-secondary"
 				>
 					<div className="h-[1lh] content-center">
-						<img
-							src={module.iconUrl}
-							alt={`${module.name} icon`}
-							className="block w-6 h-6 p-1 rounded-sm border border-border border-solid bg-surface-secondary"
-						/>
+						<Avatar src={module.iconUrl} size="sm" variant="icon" />
 					</div>
 					<span className="flex-1 ml-2 text-content-secondary">
 						{module.name}
@@ -194,7 +189,7 @@ const ModuleSelection: React.FC<ModuleSelectionProps> = ({
 							onClick={() => onDeselectModule(module.id)}
 							aria-label="Deselect module"
 						>
-							<XIcon className="w-4 h-4" />
+							<XIcon className="size-4" />
 						</Button>
 					</div>
 				</div>

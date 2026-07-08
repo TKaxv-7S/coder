@@ -37,5 +37,7 @@ ignorePatterns:
   # AWS Bedrock base URL appears as an illustrative <region> placeholder in
   # the generated configuration reference, not as a live link.
   - pattern: "bedrock-runtime"
+  # merriam-webster.com returns 403 from GitHub runner IPs
+  - pattern: "merriam-webster.com"
 aliveStatusCodes:
   - 200

@@ -9652,6 +9652,40 @@ const docTemplate = `{
                 ]
             }
         },
+        "/api/v2/users/{user}/ai/spend": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Enterprise"
+                ],
+                "summary": "Get user AI spend",
+                "operationId": "get-user-ai-spend",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User ID, username, or me",
+                        "name": "user",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/codersdk.UserAISpendStatus"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "CoderSessionToken": []
+                    }
+                ]
+            }
+        },
         "/api/v2/users/{user}/appearance": {
             "get": {
                 "produces": [
@@ -14631,6 +14665,10 @@ const docTemplate = `{
                 "access_token": {
                     "type": "string"
                 },
+                "expires_at": {
+                    "description": "ExpiresAt is the time the token expires, normalized to UTC (for\nexample, \"2024-06-01T15:04:05Z\"). Zero value means no expiry.",
+                    "type": "string"
+                },
                 "password": {
                     "type": "string"
                 },
@@ -15247,6 +15285,17 @@ const docTemplate = `{
                 }
             }
         },
+        "codersdk.AIBudgetLimitSource": {
+            "type": "string",
+            "enum": [
+                "user_override",
+                "group"
+            ],
+            "x-enum-varnames": [
+                "AIBudgetLimitSourceUserOverride",
+                "AIBudgetLimitSourceGroup"
+            ]
+        },
         "codersdk.AIConfig": {
             "type": "object",
             "properties": {
@@ -15305,6 +15354,9 @@ const docTemplate = `{
                 },
                 "enabled": {
                     "type": "boolean"
+                },
+                "icon": {
+                    "type": "string"
                 },
                 "id": {
                     "type": "string",
@@ -15718,6 +15770,11 @@ const docTemplate = `{
                 "workspace_agent_resource_monitor:create",
                 "workspace_agent_resource_monitor:read",
                 "workspace_agent_resource_monitor:update",
+                "workspace_build_orchestration:*",
+                "workspace_build_orchestration:create",
+                "workspace_build_orchestration:delete",
+                "workspace_build_orchestration:read",
+                "workspace_build_orchestration:update",
                 "workspace_dormant:*",
                 "workspace_dormant:application_connect",
                 "workspace_dormant:create",
@@ -15953,6 +16010,11 @@ const docTemplate = `{
                 "APIKeyScopeWorkspaceAgentResourceMonitorCreate",
                 "APIKeyScopeWorkspaceAgentResourceMonitorRead",
                 "APIKeyScopeWorkspaceAgentResourceMonitorUpdate",
+                "APIKeyScopeWorkspaceBuildOrchestrationAll",
+                "APIKeyScopeWorkspaceBuildOrchestrationCreate",
+                "APIKeyScopeWorkspaceBuildOrchestrationDelete",
+                "APIKeyScopeWorkspaceBuildOrchestrationRead",
+                "APIKeyScopeWorkspaceBuildOrchestrationUpdate",
                 "APIKeyScopeWorkspaceDormantAll",
                 "APIKeyScopeWorkspaceDormantApplicationConnect",
                 "APIKeyScopeWorkspaceDormantCreate",
@@ -17532,6 +17594,13 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/codersdk.ChatModelProvider"
                     }
+                },
+                "unsupported_providers": {
+                    "description": "UnsupportedProviders lists configured providers the Agents harness\ncannot use, so the UI can explain the empty state.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/codersdk.ChatUnsupportedProvider"
+                    }
                 }
             }
         },
@@ -17782,6 +17851,18 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "tool_name": {
+                    "type": "string"
+                }
+            }
+        },
+        "codersdk.ChatUnsupportedProvider": {
+            "type": "object",
+            "properties": {
+                "display_name": {
+                    "type": "string"
+                },
+                "provider": {
+                    "description": "Provider is the provider type, e.g. \"copilot\".",
                     "type": "string"
                 }
             }
@@ -18086,6 +18167,9 @@ const docTemplate = `{
                 },
                 "enabled": {
                     "type": "boolean"
+                },
+                "icon": {
+                    "type": "string"
                 },
                 "name": {
                     "type": "string"
@@ -18734,6 +18818,42 @@ const docTemplate = `{
                 }
             }
         },
+        "codersdk.CreateWorkspaceBuildOnSuccessRequest": {
+            "type": "object",
+            "required": [
+                "transition"
+            ],
+            "properties": {
+                "rich_parameter_values": {
+                    "description": "RichParameterValues are applied to the child build. Parameters\nnot listed here fall back to their values from the previous\nbuild, matching normal build behavior.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/codersdk.WorkspaceBuildParameter"
+                    }
+                },
+                "template_version_id": {
+                    "description": "TemplateVersionID pins the child build to a specific template\nversion. Pinning requires permission to update the template,\nsince the active version may change before the child build\nruns. When empty, the child build uses the template's active\nversion at the time it runs.",
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "template_version_preset_id": {
+                    "description": "TemplateVersionPresetID selects a preset for the child build.\nIt requires TemplateVersionID to also be set.",
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "transition": {
+                    "description": "Transition must be \"start\". The parent build's transition must\nbe \"stop\".",
+                    "enum": [
+                        "start"
+                    ],
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/codersdk.WorkspaceTransition"
+                        }
+                    ]
+                }
+            }
+        },
         "codersdk.CreateWorkspaceBuildReason": {
             "type": "string",
             "enum": [
@@ -18772,6 +18892,14 @@ const docTemplate = `{
                     "allOf": [
                         {
                             "$ref": "#/definitions/codersdk.ProvisionerLogLevel"
+                        }
+                    ]
+                },
+                "on_success": {
+                    "description": "OnSuccess queues a follow-up workspace build after this build succeeds.\nIt currently supports restarting a workspace by starting it after a\nsuccessful stop build.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/codersdk.CreateWorkspaceBuildOnSuccessRequest"
                         }
                     ]
                 },
@@ -19599,12 +19727,14 @@ const docTemplate = `{
                 "nats_pubsub",
                 "minimum-implicit-member",
                 "ai-gateway-cost-control",
-                "agent-app-tabs"
+                "chat-advisor",
+                "chat-virtual-desktop"
             ],
             "x-enum-comments": {
                 "ExperimentAIGatewayCostControl": "Enables AI Gateway cost control functionality.",
-                "ExperimentAgentAppTabs": "Enables workspace-app and port preview tabs in the Coder Agents right panel.",
                 "ExperimentAutoFillParameters": "This should not be taken out of experiments until we have redesigned the feature.",
+                "ExperimentChatAdvisor": "Enables the advisor tool for root agent chats.",
+                "ExperimentChatVirtualDesktop": "Enables virtual desktop and computer use provider for agents.",
                 "ExperimentExample": "This isn't used for anything.",
                 "ExperimentMCPServerHTTP": "Enables the MCP HTTP server functionality.",
                 "ExperimentMinimumImplicitMember": "Allows organizations to deviate from the default organization-member roles, in support of Gateway Accounts.",
@@ -19625,7 +19755,8 @@ const docTemplate = `{
                 "Enables embedded NATS pubsub.",
                 "Allows organizations to deviate from the default organization-member roles, in support of Gateway Accounts.",
                 "Enables AI Gateway cost control functionality.",
-                "Enables workspace-app and port preview tabs in the Coder Agents right panel."
+                "Enables the advisor tool for root agent chats.",
+                "Enables virtual desktop and computer use provider for agents."
             ],
             "x-enum-varnames": [
                 "ExperimentExample",
@@ -19638,7 +19769,8 @@ const docTemplate = `{
                 "ExperimentNATSPubsub",
                 "ExperimentMinimumImplicitMember",
                 "ExperimentAIGatewayCostControl",
-                "ExperimentAgentAppTabs"
+                "ExperimentChatAdvisor",
+                "ExperimentChatVirtualDesktop"
             ]
         },
         "codersdk.ExternalAPIKeyScopes": {
@@ -21354,6 +21486,13 @@ const docTemplate = `{
                 "organization_mapping": {
                     "type": "object"
                 },
+                "redirect_allowed_hosts": {
+                    "description": "RedirectAllowedHosts is an allowlist of hostnames that may be used as\nthe host of the OIDC redirect_uri. When non-empty, the redirect_uri is\nconstructed from the incoming request's Host header (validated against\nthis list) instead of from AccessURL. Every listed host must also be\nregistered as a valid redirect URI in the OIDC provider. This setting\nis mutually exclusive with RedirectURL: if RedirectURL is set, this\nallowlist is ignored.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "redirect_url": {
                     "description": "RedirectURL is optional, defaulting to 'ACCESS_URL'. Only useful in niche\nsituations where the OIDC callback domain is different from the ACCESS_URL\ndomain.",
                     "allOf": [
@@ -22723,6 +22862,7 @@ const docTemplate = `{
                 "workspace",
                 "workspace_agent_devcontainers",
                 "workspace_agent_resource_monitor",
+                "workspace_build_orchestration",
                 "workspace_dormant",
                 "workspace_proxy"
             ],
@@ -22775,6 +22915,7 @@ const docTemplate = `{
                 "ResourceWorkspace",
                 "ResourceWorkspaceAgentDevcontainers",
                 "ResourceWorkspaceAgentResourceMonitor",
+                "ResourceWorkspaceBuildOrchestration",
                 "ResourceWorkspaceDormant",
                 "ResourceWorkspaceProxy"
             ]
@@ -24812,6 +24953,9 @@ const docTemplate = `{
                 "enabled": {
                     "type": "boolean"
                 },
+                "icon": {
+                    "type": "string"
+                },
                 "settings": {
                     "$ref": "#/definitions/codersdk.AIProviderSettings"
                 }
@@ -25551,6 +25695,46 @@ const docTemplate = `{
                 "updated_at": {
                     "type": "string",
                     "format": "date-time"
+                },
+                "user_id": {
+                    "type": "string",
+                    "format": "uuid"
+                }
+            }
+        },
+        "codersdk.UserAISpendStatus": {
+            "type": "object",
+            "properties": {
+                "current_spend_micros": {
+                    "description": "CurrentSpendMicros is the user's spend on their effective group over\nthe current budget period.",
+                    "type": "integer"
+                },
+                "effective_group_id": {
+                    "description": "EffectiveGroupID is the group the spend is attributed to. Null when\nno budget applies.",
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "limit_source": {
+                    "description": "LimitSource identifies which tier produced the limit. Null when no\nbudget applies.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/codersdk.AIBudgetLimitSource"
+                        }
+                    ]
+                },
+                "period_end": {
+                    "description": "PeriodEnd is the exclusive upper bound of the current budget\nperiod.",
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "period_start": {
+                    "description": "PeriodStart is the inclusive lower bound of the current budget\nperiod.",
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "spend_limit_micros": {
+                    "description": "SpendLimitMicros is the effective spend limit in micro-units.\nNull when no budget applies to the user (unlimited).",
+                    "type": "integer"
                 },
                 "user_id": {
                     "type": "string",
