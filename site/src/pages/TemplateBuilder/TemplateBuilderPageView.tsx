@@ -91,15 +91,14 @@ export const TemplateBuilderPageView: FC<TemplateBuilderPageViewProps> = ({
 		state.modules.map((m) => [m.id, m.variables ?? {}]),
 	);
 
-	// Derive current step from the URL query param. When a base was
-	// consumed from the URL and no explicit step is present, skip past
-	// base-infra so the user lands on the next meaningful step.
-	const explicitStep = searchParams.get("step");
-	const defaultStepId =
-		baseConsumed.current && !explicitStep
-			? (WIZARD_STEPS[findNextVisibleIndex(0, state)]?.id ?? WIZARD_STEPS[0].id)
-			: WIZARD_STEPS[0].id;
-	const stepParam = explicitStep ?? defaultStepId;
+	// Derive the current step from the URL query param. When a base was
+	// consumed and no explicit step is present, start after base-infra.
+	const firstStepId = WIZARD_STEPS[0].id;
+	const stepAfterBase =
+		WIZARD_STEPS[findNextVisibleIndex(0, state)]?.id ?? firstStepId;
+	const stepParam =
+		searchParams.get("step") ??
+		(baseConsumed.current ? stepAfterBase : firstStepId);
 	const rawIndex = WIZARD_STEPS.findIndex((s) => s.id === stepParam);
 	const resolvedIndex = rawIndex >= 0 ? rawIndex : 0;
 	const clampedIndex = Math.min(resolvedIndex, furthestAllowedIndex(state));
