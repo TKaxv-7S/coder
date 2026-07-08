@@ -4765,12 +4765,14 @@ func (p *Server) updateLastTurnSummary(
 }
 
 const (
-	summaryFirstTurnThreshold   = 1
-	summaryRefreshTurnThreshold = 3
-	summaryMinTranscriptRunes   = 200
-	chatSummaryWorkTimeout      = 120 * time.Second
-	chatSummaryGenerateTimeout  = 60 * time.Second
-	chatSummaryWriteTimeout     = 5 * time.Second
+	// Completed user turns before the first summary is generated.
+	summaryInitialTurnThreshold = 1
+	// New completed user turns before the summary is regenerated (since the last summary).
+	summaryStaleTurnThreshold  = 3
+	summaryMinTranscriptRunes  = 200
+	chatSummaryWorkTimeout     = 120 * time.Second
+	chatSummaryGenerateTimeout = 60 * time.Second
+	chatSummaryWriteTimeout    = 5 * time.Second
 
 	// Subagent summaries reuse the final report instead of generating
 	// text, so their work timeout only covers two database round trips.
@@ -4887,13 +4889,13 @@ func (p *Server) resolveChatSummaryModel(
 
 func shouldGenerateChatSummary(chat database.Chat, messages []database.ChatMessage) bool {
 	if !chat.Summary.Valid {
-		return countCompletedTurnsSince(messages, time.Time{}) >= summaryFirstTurnThreshold
+		return countCompletedTurnsSince(messages, time.Time{}) >= summaryInitialTurnThreshold
 	}
 	var marker time.Time
 	if chat.SummaryGeneratedAt.Valid {
 		marker = chat.SummaryGeneratedAt.Time
 	}
-	return countCompletedTurnsSince(messages, marker) >= summaryRefreshTurnThreshold
+	return countCompletedTurnsSince(messages, marker) >= summaryStaleTurnThreshold
 }
 
 // countCompletedTurnsSince counts visible user messages (one per turn) created
