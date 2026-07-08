@@ -2668,12 +2668,6 @@ func (api *API) applyChatTitleUpdate(
 
 	updatedChat, wrote, err := api.chatDaemon.RenameChatTitle(ctx, chat, trimmedTitle)
 	if err != nil {
-		if errors.Is(err, chatd.ErrManualTitleRegenerationInProgress) {
-			httpapi.Write(ctx, rw, http.StatusConflict, codersdk.Response{
-				Message: "Title regeneration already in progress for this chat.",
-			})
-			return chat, true
-		}
 		if errors.Is(err, sql.ErrNoRows) {
 			httpapi.ResourceNotFound(rw)
 			return chat, true
@@ -3881,9 +3875,9 @@ func (api *API) regenerateChatTitle(rw http.ResponseWriter, r *http.Request) {
 	ctx = aibridge.WithDelegatedAPIKeyID(ctx, apiKey.ID)
 	updatedChat, err := api.chatDaemon.RegenerateChatTitle(ctx, chat)
 	if err != nil {
-		if errors.Is(err, chatd.ErrManualTitleRegenerationInProgress) {
-			httpapi.Write(ctx, rw, http.StatusConflict, codersdk.Response{
-				Message: "Title regeneration already in progress for this chat.",
+		if errors.Is(err, chatd.ErrNoDefaultChatModelConfig) {
+			httpapi.Write(ctx, rw, http.StatusBadRequest, codersdk.Response{
+				Message: "No default chat model config is configured.",
 			})
 			return
 		}
@@ -3931,9 +3925,9 @@ func (api *API) proposeChatTitle(rw http.ResponseWriter, r *http.Request) {
 	ctx = aibridge.WithDelegatedAPIKeyID(ctx, apiKey.ID)
 	title, err := api.chatDaemon.ProposeChatTitle(ctx, chat)
 	if err != nil {
-		if errors.Is(err, chatd.ErrManualTitleRegenerationInProgress) {
-			httpapi.Write(ctx, rw, http.StatusConflict, codersdk.Response{
-				Message: "Title regeneration already in progress for this chat.",
+		if errors.Is(err, chatd.ErrNoDefaultChatModelConfig) {
+			httpapi.Write(ctx, rw, http.StatusBadRequest, codersdk.Response{
+				Message: "No default chat model config is configured.",
 			})
 			return
 		}
@@ -6674,6 +6668,7 @@ func convertAIProviderSummary(provider database.AIProvider) codersdk.AIProviderS
 		Type:        codersdk.AIProviderType(provider.Type),
 		Name:        provider.Name,
 		DisplayName: displayName,
+		Icon:        provider.Icon,
 		Enabled:     provider.Enabled,
 		Deleted:     provider.Deleted,
 	}

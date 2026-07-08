@@ -72,7 +72,7 @@ import {
 import { maybePlayChime } from "./utils/chime";
 import {
 	getModelOptionsFromConfigs,
-	providerTypeByIDFromUserConfigs,
+	providerInfoByIDFromUserConfigs,
 } from "./utils/modelOptions";
 import { clearPersistedRightPanelState } from "./utils/rightPanelTabStorage";
 import { clearPersistedSidebarTabId } from "./utils/sidebarTabStorage";
@@ -355,7 +355,7 @@ const AgentsPage: FC = () => {
 	const catalogModelOptions = getModelOptionsFromConfigs(
 		chatModelConfigsQuery.data,
 		chatModelsQuery.data,
-		providerTypeByIDFromUserConfigs(chatProviderConfigsQuery.data),
+		providerInfoByIDFromUserConfigs(chatProviderConfigsQuery.data),
 	);
 	const chatList = chatsQuery.data?.pages.flat() ?? [];
 	const isArchiving =
