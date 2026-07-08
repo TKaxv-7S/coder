@@ -98,7 +98,7 @@ I don't recommend reading the rest of section thoroughly if this is your first t
 
 ### Transitions used by the HTTP endpoints
 
-- `Create(initialMessages)` creates a new chat, initializes `snapshot_version` to 1, inserts its initial history, and lands in `running`. The inserted initial history sets `history_version` to 1. Since the queue has not changed, `queue_version` remains 0. This transition is a special case: since the chat does not exist at the time it's run, the chat row cannot be locked before the transition is applied.
+- `Create(initialMessages)` creates a new chat, initializes `snapshot_version` to 1, and inserts its initial history. It lands in `running` when the initial history ends with a user message, or in `waiting` when the chat is created without one (system messages only); a `waiting` chat enters `running` later via its first `SendMessage`. The inserted initial history sets `history_version` to 1. Since the queue has not changed, `queue_version` remains 0. This transition is a special case: since the chat does not exist at the time it's run, the chat row cannot be locked before the transition is applied.
 - `SetArchived(archived)` sets or clears the archived marker for one chat.
 - `SendMessage(m, busy_behavior)` inserts a user message directly when the chat is idle, or queues it when the chat is busy. `busy_behavior` must be either `queue` or `interrupt`. With `busy_behavior=interrupt`, it also requests interruption or cancels a pending dynamic-tool action as needed.
 - `EditMessage(k, replacement)` clears queued messages, cancels or obsoletes active work, marks the truncated active-history suffix as deleted, inserts the replacement turn, and lands in `running`.
@@ -134,6 +134,7 @@ stateDiagram-v2
     [*] --> N
 
     N --> R0: Create
+    N --> W: Create
 
     W --> R0: SendMessage
     W --> R0: EditMessage
@@ -407,7 +408,8 @@ This section maps the public endpoints that mutate chat state to the transitions
 
 This endpoint uses `Create(initialMessages)`:
 
-- `N -> Create(initialMessages) -> R0`
+- `N -> Create(initialMessages) -> R0`: the request carries initial user content, so the initial history ends with a user turn and a worker picks the chat up immediately.
+- `N -> Create(initialMessages) -> W`: the request carries no content. The chat is created idle with system messages only, and no worker processes it. This lets clients perform work that requires the chat ID before the first turn (for example workspace file uploads), then start generation with `POST /api/experimental/chats/{chat}/messages`.
 
 No other input states are supported.
 

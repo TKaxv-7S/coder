@@ -155,6 +155,20 @@ func (p *Server) GenerateChatTitleAsync(ctx context.Context, chat database.Chat)
 		)
 		return
 	}
+	p.GenerateChatTitleForMessagesAsync(ctx, chat, messages)
+}
+
+// GenerateChatTitleForMessagesAsync is GenerateChatTitleAsync for
+// callers that already hold a message snapshot taken before any worker
+// could reply. The first-message endpoint publishes the ownership hint
+// during the send, before it can schedule title generation, so a fresh
+// history read there may already contain the assistant reply and would
+// wrongly disqualify the first-user-turn eligibility check.
+func (p *Server) GenerateChatTitleForMessagesAsync(ctx context.Context, chat database.Chat, messages []database.ChatMessage) {
+	logger := p.logger.With(
+		slog.F("chat_id", chat.ID),
+		slog.F("owner_id", chat.OwnerID),
+	)
 	if _, ok := titleInput(chat, messages); !ok {
 		return
 	}
@@ -553,6 +567,12 @@ func validateGeneratedTitle(title string) error {
 	return nil
 }
 
+// DefaultChatTitle is the placeholder title for chats created without
+// any text to derive a title from (for example chats created with no
+// initial user message). It is always considered replaceable by
+// automatic title generation.
+const DefaultChatTitle = "New Chat"
+
 // titleInput returns the first user message text and whether title
 // generation should proceed. It returns false when the chat already
 // has assistant/tool replies, has more than one visible user message,
@@ -591,7 +611,7 @@ func titleInput(
 	}
 
 	currentTitle := strings.TrimSpace(chat.Title)
-	if currentTitle == "" {
+	if currentTitle == "" || currentTitle == DefaultChatTitle {
 		return firstUserText, true
 	}
 
@@ -616,7 +636,7 @@ func fallbackChatTitle(message string) string {
 
 	words := strings.Fields(message)
 	if len(words) == 0 {
-		return "New Chat"
+		return DefaultChatTitle
 	}
 
 	truncated := false

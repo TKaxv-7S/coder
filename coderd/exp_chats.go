@@ -3184,6 +3184,24 @@ func (api *API) postChatMessages(rw http.ResponseWriter, r *http.Request) {
 		modelConfigID = *req.ModelConfigID
 	}
 
+	// Chats created without an initial message carry the placeholder
+	// title until their first message lands here. Snapshot the history
+	// before the send: SendMessage publishes the ownership hint, so a
+	// fast worker reply could land before an async history read and
+	// wrongly disqualify the first-user-turn check inside title
+	// generation, leaving the placeholder title forever.
+	var titleMessages []database.ChatMessage
+	titleSnapshotOK := false
+	if chat.Title == chatd.DefaultChatTitle {
+		var titleErr error
+		titleMessages, titleErr = api.Database.GetChatMessagesForPromptByChatID(ctx, chatID)
+		titleSnapshotOK = titleErr == nil
+		if titleErr != nil {
+			api.Logger.Debug(ctx, "failed to snapshot messages for automatic title generation",
+				slog.F("chat_id", chatID), slog.Error(titleErr))
+		}
+	}
+
 	sendResult, sendErr := api.chatDaemon.SendMessage(
 		ctx,
 		chatd.SendMessageOptions{
@@ -3249,6 +3267,17 @@ func (api *API) postChatMessages(rw http.ResponseWriter, r *http.Request) {
 	// Link any user-uploaded files referenced in this message
 	// to the chat (best-effort; cap enforced in SQL).
 	unlinked, capExceeded := api.linkFilesToChat(ctx, chatID, fileIDs)
+
+	// The first-user-turn check against the pre-send snapshot keeps
+	// this a no-op for chats that already had their first turn.
+	if !sendResult.Queued && titleSnapshotOK {
+		api.chatDaemon.GenerateChatTitleForMessagesAsync(
+			ctx,
+			sendResult.Chat,
+			append(titleMessages, sendResult.Message),
+		)
+	}
+
 	response := codersdk.CreateChatMessageResponse{Queued: sendResult.Queued}
 	if sendResult.Queued {
 		if sendResult.QueuedMessage != nil {
@@ -6613,6 +6642,14 @@ func createChatInputFromRequest(ctx context.Context, db database.Store, req code
 	[]uuid.UUID,
 	*codersdk.Response,
 ) {
+	// Empty content creates an idle chat with no initial user
+	// message. Generation starts with the first message POSTed to
+	// /chats/{chat}/messages. This lets clients sequence work that
+	// needs the chat ID before the first turn, such as workspace
+	// file uploads.
+	if len(req.Content) == 0 {
+		return nil, "", nil, nil
+	}
 	// Chat creation has no chat ID yet, so workspace-file-reference
 	// parts are rejected (they require an existing chat's uploads).
 	return createChatInputFromParts(ctx, db, uuid.Nil, uuid.NullUUID{}, req.Content, "content")
@@ -6785,7 +6822,7 @@ func chatTitleFromMessage(message string) string {
 	const maxRunes = 80
 	words := strings.Fields(message)
 	if len(words) == 0 {
-		return "New Chat"
+		return chatd.DefaultChatTitle
 	}
 	truncated := false
 	if len(words) > maxWords {
