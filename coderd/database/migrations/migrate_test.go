@@ -1806,8 +1806,8 @@ func TestMigration000541ChatMessageSearchText(t *testing.T) {
 
 	cases := []struct {
 		name    string
-		content sql.NullString // JSONB input; invalid means SQL NULL.
-		want    sql.NullString // expected text; invalid means SQL NULL.
+		content sql.NullString
+		want    sql.NullString
 	}{
 		{
 			name:    "SingleTextPart",
