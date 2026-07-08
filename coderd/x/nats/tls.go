@@ -23,16 +23,6 @@ import (
 )
 
 const (
-	// leafCertValidity is the desired lifetime of an ephemeral cluster leaf
-	// certificate. The actual NotAfter is clamped to expire before the signing
-	// CA's own NotAfter (see mintLeaf), so near a CA's end a leaf is shorter.
-	leafCertValidity = 24 * time.Hour
-	// leafRenewBefore re-mints the cached leaf this long before it expires so an
-	// in-flight handshake never races expiry. It is unrelated to the CA clamp.
-	leafRenewBefore = time.Hour
-	// leafClampBuffer is how far before the signing CA's NotAfter a leaf is
-	// forced to expire, so a leaf never outlives the CA that signed it.
-	leafClampBuffer = time.Minute
 	// clusterTLSTimeout is the route TLS handshake timeout. NATS defaults to a
 	// tight 2s, which is flaky under load and in CI.
 	clusterTLSTimeout = 10 * time.Second
@@ -42,13 +32,6 @@ const (
 	// mildly skewed clock still accepts a freshly minted leaf.
 	clockSkewToleranceTLS = time.Hour
 )
-
-// Sanity check that a CA's active-signing window comfortably exceeds a leaf's
-// lifetime; otherwise a freshly minted leaf would always be clamped short.
-// Converting a negative duration to an unsigned type fails to compile. uint64
-// (not uint) is required because the positive difference exceeds 32-bit uint on
-// 32-bit build targets.
-const _ = uint64(cryptokeys.DefaultKeyDuration - leafCertValidity)
 
 // ClusterCAKeycache is the read-only view of the nats_ca signing key cache that
 // the cluster TLS layer needs. cryptokeys.SigningKeycache satisfies it, so the
@@ -217,15 +200,17 @@ func (t *clusterTLS) configForClient(chi *tls.ClientHelloInfo) (*tls.Config, err
 	return cfg, nil
 }
 
-// currentLeaf returns the cached leaf, re-minting it when it is missing, near
-// expiry, or signed by a CA that is no longer the active one (a rotation).
+// currentLeaf returns the cached leaf, re-minting it when it is missing or
+// signed by a CA that is no longer the active, still-valid one (a rotation).
+// A leaf carries no independent lifetime: it is valid exactly as long as its
+// signing CA (see mintLeaf), so re-minting is driven purely by CA rotation.
 //
 // The whole method holds t.mu so the CA cache, IP, and cached leaf are read as
 // a consistent set: a concurrent setClusterCA cannot swap the CA out from under
 // the IP we mint with. The lock is therefore held across the SigningKey lookup
-// and the (rare) mint. Mints happen only at startup, when the leaf nears expiry
-// (~daily), and on CA rotation, so the keygen+sign cost on the lock is
-// acceptable; the SigningKey lookup is normally an in-memory cache hit.
+// and the (rare) mint. Mints happen only at startup and on CA rotation, so the
+// keygen+sign cost on the lock is acceptable; the SigningKey lookup is normally
+// an in-memory cache hit.
 func (t *clusterTLS) currentLeaf() (*tls.Certificate, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -240,7 +225,10 @@ func (t *clusterTLS) currentLeaf() (*tls.Certificate, error) {
 	}
 
 	now := t.clock.Now()
-	if t.leaf != nil && t.leafSeq == id && now.Before(t.leaf.Leaf.NotAfter.Add(-leafRenewBefore)) {
+	// Reuse the cached leaf while it was signed by the still-active, still-valid
+	// CA. A CA rotation (sequence change) or the active CA expiring forces a
+	// re-mint; there is no separate leaf lifetime to track.
+	if t.leaf != nil && t.leafSeq == id && now.Before(ca.Cert.NotAfter) {
 		return t.leaf, nil
 	}
 
@@ -276,19 +264,16 @@ func mintLeaf(ca *cryptokeys.NATSCA, ip net.IP, now time.Time) (*tls.Certificate
 		return nil, xerrors.Errorf("generate serial: %w", err)
 	}
 
-	// Clamp the leaf's expiry to just before the signing CA's own NotAfter so a
-	// leaf never outlives the CA that signed it (which would fail chain
-	// verification once the CA expires). Near a CA's end the leaf is simply
-	// shorter; the cache switches to the newer CA before then under healthy
-	// rotation.
-	notAfter := now.Add(leafCertValidity)
-	if caLimit := ca.Cert.NotAfter.Add(-leafClampBuffer); notAfter.After(caLimit) {
-		notAfter = caLimit
-	}
-	if !notAfter.After(now) {
-		return nil, xerrors.Errorf("signing CA (seq %d) expires too soon to mint a leaf: CA NotAfter %s",
+	// A leaf is only ever used to authenticate a handshake, so it need only be
+	// valid as long as the CA that signed it. Tie the leaf's NotAfter to the
+	// CA's so a leaf never outlives its CA and carries no independent lifetime.
+	// An expired active CA means a fully-dead rotator; fail loud rather than
+	// mint a dead leaf.
+	if !ca.Cert.NotAfter.After(now) {
+		return nil, xerrors.Errorf("signing CA (seq %d) is expired: NotAfter %s",
 			ca.Sequence, ca.Cert.NotAfter)
 	}
+	notAfter := ca.Cert.NotAfter
 
 	template := &x509.Certificate{
 		SerialNumber: serial,
