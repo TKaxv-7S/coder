@@ -142,6 +142,8 @@ export const DefaultRolesEnabled: Story = {
 		expect(body.getByRole("radio", { name: "Custom" })).not.toBeChecked();
 		await body.findByText(/counts as a license seat/i);
 		await body.findByText(/do not cost license seats/i);
+		await body.findByText(/affects existing members/i);
+		await body.findByText(/may result in a loss of access/i);
 	},
 };
 

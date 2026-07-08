@@ -2,6 +2,7 @@ import { EllipsisVerticalIcon, PlusIcon } from "lucide-react";
 import { type FC, useState } from "react";
 import { Link as RouterLink, useNavigate } from "react-router";
 import type { AssignableRoles, Organization, Role } from "#/api/typesGenerated";
+import { Alert, AlertDescription, AlertTitle } from "#/components/Alert/Alert";
 import { PremiumBadge } from "#/components/Badges/Badges";
 import { Button, Button as ShadcnButton } from "#/components/Button/Button";
 import {
@@ -156,6 +157,15 @@ const DefaultRolesSection: FC<DefaultRolesSectionProps> = ({
 					Roles attached to every member of this organization.
 				</span>
 			</span>
+			<Alert severity="warning" prominent>
+				<AlertTitle>Changing the default affects existing members</AlertTitle>
+				<AlertDescription>
+					Default roles apply to every current and future member of this
+					organization, not just new accounts. Changing the selection
+					immediately changes every member's permissions and may result in a
+					loss of access, including access to existing workspaces.
+				</AlertDescription>
+			</Alert>
 			<DefaultRolesPresetCards
 				roles={organization.default_org_member_roles}
 				availableRoles={availableOrgRoles}
