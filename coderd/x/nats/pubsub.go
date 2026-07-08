@@ -17,6 +17,7 @@ import (
 	"golang.org/x/xerrors"
 
 	"cdr.dev/slog/v3"
+	"github.com/coder/coder/v2/coderd/cryptokeys"
 	"github.com/coder/coder/v2/coderd/database/pubsub"
 	"github.com/coder/quartz"
 )
@@ -129,7 +130,7 @@ type Options struct {
 	// certificate from the active nats_ca CA and verifies peers against the
 	// CA fetched from this cache on each handshake. Nil keeps routes
 	// plaintext (token auth only). cryptokeys.SigningKeycache satisfies this.
-	ClusterCA ClusterCAKeycache
+	ClusterCA cryptokeys.SigningKeycache
 
 	// ClusterTLSIP is this replica's relay IP, embedded as an IP SAN in the
 	// leaf certificate and matched against the dialed host when verifying a

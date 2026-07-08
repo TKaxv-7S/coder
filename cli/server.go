@@ -852,6 +852,13 @@ func (r *RootCmd) Server(newAPI func(context.Context, *coderd.Options) (*coderd.
 					// dependency and forms no routes. Enterprise HA swaps in the
 					// real nats_ca cache plus the relay IP via Pubsub.SetClusterCA
 					// once clustering is licensed.
+					//
+					// TODO: the real CA cache cannot be built here because
+					// options.Database is not yet fully instantiated (it is
+					// wrapped with metrics/dbauthz downstream). This split boot
+					// (noop here, real cache swapped in by enterprise) wants a
+					// refactor so the CA cache can be constructed once alongside
+					// the database.
 					ClusterCA: cryptokeys.NoopSigningKeycache{},
 				})
 				if err != nil {

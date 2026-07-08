@@ -11,6 +11,7 @@ import (
 	"golang.org/x/xerrors"
 
 	"cdr.dev/slog/v3"
+	"github.com/coder/coder/v2/coderd/cryptokeys"
 )
 
 const defaultClusterTokenUsername = "coder"
@@ -55,7 +56,7 @@ func (p *Pubsub) SetPeerFetcher(fetcher PeerFetcher) {
 // with cluster TLS enabled (Options.ClusterCA set, which installs the TLS
 // callbacks). Passing a noop cache reverts to no mTLS: new route handshakes
 // can no longer mint a leaf and will not form.
-func (p *Pubsub) SetClusterCA(ca ClusterCAKeycache, ip net.IP) {
+func (p *Pubsub) SetClusterCA(ca cryptokeys.SigningKeycache, ip net.IP) {
 	if p.clusterTLS == nil {
 		return
 	}

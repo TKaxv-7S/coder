@@ -33,19 +33,6 @@ const (
 	clockSkewToleranceTLS = time.Hour
 )
 
-// ClusterCAKeycache is the read-only view of the nats_ca signing key cache that
-// the cluster TLS layer needs. cryptokeys.SigningKeycache satisfies it, so the
-// nats_ca cache is passed straight through with no adapter.
-//
-// SigningKey returns the active CA used to mint this replica's leaf;
-// VerifyingKey returns a specific CA by its crypto_keys sequence, used to
-// verify a peer leaf that was minted under that (possibly older) CA during a
-// rotation overlap. Both return a *cryptokeys.NATSCA.
-type ClusterCAKeycache interface {
-	SigningKey(ctx context.Context) (id string, key interface{}, err error)
-	VerifyingKey(ctx context.Context, id string) (key interface{}, err error)
-}
-
 // clusterTLS builds the cluster route *tls.Config. Certificate selection and
 // peer verification are tls.Config callbacks that consult the CA cache on each
 // use, so a CA rotation is tracked without restarting or reloading the server.
@@ -58,7 +45,7 @@ type clusterTLS struct {
 	// ca and ip are swapped together by setClusterCA: under the default noop
 	// cache no leaf can be minted (so no route forms), and the real cache plus
 	// this replica's relay IP are installed once cluster mTLS is enabled.
-	ca ClusterCAKeycache
+	ca cryptokeys.SigningKeycache
 	ip net.IP
 	// leaf is the cached leaf certificate. leafSeq is the active CA sequence it
 	// was minted under; a change means the CA rotated and the leaf is stale.
@@ -85,7 +72,7 @@ type cachedVerifyPool struct {
 	notAfter time.Time
 }
 
-func newClusterTLS(ctx context.Context, logger slog.Logger, clock quartz.Clock, ca ClusterCAKeycache, ip net.IP) *clusterTLS {
+func newClusterTLS(ctx context.Context, logger slog.Logger, clock quartz.Clock, ca cryptokeys.SigningKeycache, ip net.IP) *clusterTLS {
 	if clock == nil {
 		clock = quartz.NewReal()
 	}
@@ -104,7 +91,7 @@ func newClusterTLS(ctx context.Context, logger slog.Logger, clock quartz.Clock, 
 // routes negotiate mTLS, and reverting to a noop cache makes leaf minting fail
 // so no new route can form. A swap clears the cached leaf so the next handshake
 // re-mints under the new CA/IP.
-func (t *clusterTLS) setClusterCA(ca ClusterCAKeycache, ip net.IP) {
+func (t *clusterTLS) setClusterCA(ca cryptokeys.SigningKeycache, ip net.IP) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.ca = ca
@@ -118,7 +105,7 @@ func (t *clusterTLS) setClusterCA(ca ClusterCAKeycache, ip net.IP) {
 
 // caCache returns the current CA cache under lock so callers do not hold the
 // lock across cache I/O.
-func (t *clusterTLS) caCache() ClusterCAKeycache {
+func (t *clusterTLS) caCache() cryptokeys.SigningKeycache {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	return t.ca
