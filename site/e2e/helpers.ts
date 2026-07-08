@@ -80,7 +80,7 @@ export async function login(page: Page, options: LoginOptions = users.owner) {
 	await page.getByLabel("Email").fill(options.email);
 	await page.getByLabel("Password").fill(options.password);
 	await page.getByRole("button", { name: "Sign In" }).click();
-	await page.waitForLoadState("domcontentloaded");
+	await page.waitForURL(/\/workspaces/);
 	// biome-ignore lint/suspicious/noExplicitAny: update once logged in
 	(ctx as any)[Symbol.for("currentUser")] = options;
 }
