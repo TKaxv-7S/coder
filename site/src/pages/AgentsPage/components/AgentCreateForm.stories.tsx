@@ -867,6 +867,26 @@ export const ClaudeCodeRuntimeSubmission: Story = {
 };
 
 /**
+ * Runtime chats still require the AI gateway (chatd only exists when
+ * it is enabled), so a disabled gateway keeps the composer disabled
+ * even when a Claude Code runtime is configured.
+ */
+export const ClaudeCodeStillGatedWithoutGateway: Story = {
+	args: {
+		...defaultArgs,
+		aiGatewayDisabled: true,
+		claudeCodeOrgIds: new Set([MockDefaultOrganization.id]),
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByRole("textbox")).toHaveAttribute(
+			"aria-disabled",
+			"true",
+		);
+	},
+};
+
+/**
  * Orgs without an enabled claude_code runtime config never offer the
  * menu item.
  */

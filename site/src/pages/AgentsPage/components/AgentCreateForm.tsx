@@ -546,10 +546,11 @@ export const AgentCreateForm: FC<AgentCreateFormProps> = ({
 							isCreating ||
 							isForbidden ||
 							isPersonalModelOverridesLoading ||
-							// Runtime chats need neither the model catalog nor
-							// the AI gateway.
-							(!claudeCodeEnabled &&
-								(!hasModelOptions || Boolean(aiGatewayDisabled)))
+							// Runtime chats skip the model catalog but still
+							// require the AI gateway: chatd only exists when
+							// the gateway is enabled, so creates would 503.
+							Boolean(aiGatewayDisabled) ||
+							(!claudeCodeEnabled && !hasModelOptions)
 						}
 						isLoading={isCreating}
 						initialValue={initialInputValue}

@@ -1061,7 +1061,10 @@ const AgentChatPage: FC = () => {
 		void trackedSync.catch(() => undefined);
 	};
 
-	const aiGatewayDisabled = !useAIGatewayEnabled() && !isClaudeCodeChat;
+	// Runtime chats skip the model catalog but still require the AI
+	// gateway: chatd (which processes every runtime) only exists when
+	// the gateway is enabled, so sends would 503 without it.
+	const aiGatewayDisabled = !useAIGatewayEnabled();
 	const { store, clearStreamError, upsertCacheMessages } = useChatStore({
 		chatID: agentId,
 		chatMessages: chatMessagesList,
