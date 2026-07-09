@@ -615,6 +615,7 @@ func TestRecordingTransport_CloseAfterDecoderConsumesUnknownLengthJSONSucceeds(t
 	require.Len(t, attempts, 1)
 	require.Equal(t, attemptStatusCompleted, attempts[0].Status)
 	require.Empty(t, attempts[0].Error)
+	require.JSONEq(t, `{"token":"[REDACTED]","safe":"ok"}`, string(attempts[0].ResponseBody))
 }
 
 func TestRecordingTransport_CloseAfterDecoderConsumesUnknownLengthJSONWithTrailingDocumentMarksFailed(t *testing.T) {
@@ -649,6 +650,9 @@ func TestRecordingTransport_CloseAfterDecoderConsumesUnknownLengthJSONWithTraili
 	require.Len(t, attempts, 1)
 	require.Equal(t, attemptStatusFailed, attempts[0].Status)
 	require.Equal(t, io.ErrUnexpectedEOF.Error(), attempts[0].Error)
+	require.JSONEq(t,
+		`{"error":"chatdebug: body contains extra JSON values, redacted for safety"}`,
+		string(attempts[0].ResponseBody))
 }
 
 func TestRecordingTransport_CloseAfterDecoderConsumesUnknownLengthNDJSONMarksFailed(t *testing.T) {
