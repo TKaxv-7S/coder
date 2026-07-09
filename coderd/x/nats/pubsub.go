@@ -135,8 +135,8 @@ type Options struct {
 	// ClusterHost, so ClusterHost must be an IP for mTLS to activate.
 	ClusterCA cryptokeys.SigningKeycache
 
-	// clusterTLSClock overrides the cluster TLS clock, for tests.
-	clusterTLSClock quartz.Clock
+	// clock overrides the cluster TLS clock, for tests.
+	clock quartz.Clock
 
 	// PeerFetcher provides the current set of peer route addresses.
 	// RefreshPeers uses it to update the configured cluster routes.
@@ -338,7 +338,7 @@ func New(ctx context.Context, logger slog.Logger, opts Options) (pubSub *Pubsub,
 	var ct *clusterTLS
 	if !opts.disableCluster && opts.ClusterCA != nil {
 		selfIP := net.ParseIP(opts.ClusterHost)
-		ct = newClusterTLS(ctx, logger, opts.clusterTLSClock, opts.ClusterCA, selfIP)
+		ct = newClusterTLS(ctx, logger, opts.clock, opts.ClusterCA, selfIP)
 		sopts.Cluster.TLSConfig = ct.tlsConfig()
 		sopts.Cluster.TLSTimeout = clusterTLSTimeout.Seconds()
 	}
