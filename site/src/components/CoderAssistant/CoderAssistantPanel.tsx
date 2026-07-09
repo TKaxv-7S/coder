@@ -243,7 +243,9 @@ export const CoderAssistantPanel: FC<CoderAssistantPanelProps> = ({
 											<button
 												key={prompt}
 												type="button"
-												disabled={!hasModelOptions}
+												disabled={
+													!hasModelOptions || isSendPending || isThinking
+												}
 												onClick={() => onSendMessage(prompt)}
 												className={cn(
 													"cursor-pointer rounded-full border border-solid border-border",

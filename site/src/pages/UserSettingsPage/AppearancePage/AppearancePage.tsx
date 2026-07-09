@@ -69,6 +69,11 @@ const CoderAssistantSection: FC = () => {
 		setAssistantEnabled(checked);
 		try {
 			localStorage.setItem(CODER_AGENT_ENABLED_KEY, String(checked));
+			if (checked) {
+				// Enabling from settings implies the user is past the intro,
+				// so skip the onboarding flow on future visits.
+				localStorage.setItem("coder_agent_intro_completed", "true");
+			}
 		} catch {
 			// Storage may be unavailable in some contexts.
 		}

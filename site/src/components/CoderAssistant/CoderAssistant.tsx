@@ -36,14 +36,21 @@ export const CoderAssistant: FC = () => {
 	const messageCount = orderedMessageIDs.length;
 
 	// Track how many messages the user has seen so the unread
-	// indicator only pulses for genuinely new messages.
-	const [seenCount, setSeenCount] = useState(0);
+	// indicator only pulses for genuinely new messages. Starts as
+	// null so the initial hydration of an existing chat's history
+	// counts as "seen" instead of triggering the indicator.
+	const [seenCount, setSeenCount] = useState<number | null>(null);
 
 	useEffect(() => {
 		if (open) {
 			setSeenCount(messageCount);
+			return;
 		}
-	}, [open, messageCount]);
+		// First hydration while closed: treat existing history as seen.
+		if (seenCount === null && messageCount > 0) {
+			setSeenCount(messageCount);
+		}
+	}, [open, messageCount, seenCount]);
 
 	if (!enabled) {
 		return null;
@@ -76,7 +83,7 @@ export const CoderAssistant: FC = () => {
 				open={open}
 				onToggle={toggle}
 				isThinking={isThinking}
-				hasUnread={messageCount > seenCount && !open}
+				hasUnread={seenCount !== null && messageCount > seenCount && !open}
 			/>
 		</>
 	);

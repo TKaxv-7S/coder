@@ -1,9 +1,9 @@
-import { type CSSProperties, type FC, useState } from "react";
+import { type FC, useState } from "react";
 import { useMutation, useQueryClient } from "react-query";
 import { getErrorMessage } from "#/api/errors";
 import { createAIProviderMutation } from "#/api/queries/aiProviders";
 import { createChatModelConfig } from "#/api/queries/chats";
-import type { AIProviderType } from "#/api/typesGenerated";
+import type { AIProvider, AIProviderType } from "#/api/typesGenerated";
 import { Button } from "#/components/Button/Button";
 import { Input } from "#/components/Input/Input";
 import { Label } from "#/components/Label/Label";
@@ -90,6 +90,11 @@ export const CoderAssistantProviderSetup: FC<
 	const [apiKey, setApiKey] = useState("");
 	const [baseUrl, setBaseUrl] = useState("");
 	const [selectedModel, setSelectedModel] = useState<ModelOption | null>(null);
+	// Provider created by a previous save attempt. Kept so a retry
+	// after a model-config failure doesn't create a duplicate provider.
+	const [createdProvider, setCreatedProvider] = useState<AIProvider | null>(
+		null,
+	);
 
 	const models = selectedProvider ? modelsForProvider(selectedProvider) : [];
 	const isPending = createProvider.isPending || createModelConfig.isPending;
@@ -108,6 +113,27 @@ export const CoderAssistantProviderSetup: FC<
 		if (!selectedProvider || !trimmedKey || !selectedModel) {
 			return;
 		}
+		const saveModelConfig = (provider: AIProvider) => {
+			createModelConfig.mutate(
+				{
+					ai_provider_id: provider.id,
+					model: selectedModel.identifier,
+					display_name: selectedModel.displayName,
+					enabled: true,
+					is_default: true,
+					context_limit: selectedModel.contextLimit,
+				},
+				{
+					onSuccess: onComplete,
+				},
+			);
+		};
+		// A previous attempt may have created the provider but failed on
+		// the model config. Reuse it instead of creating a duplicate.
+		if (createdProvider) {
+			saveModelConfig(createdProvider);
+			return;
+		}
 		createProvider.mutate(
 			{
 				type: selectedProvider.type,
@@ -119,19 +145,8 @@ export const CoderAssistantProviderSetup: FC<
 			},
 			{
 				onSuccess: (provider) => {
-					createModelConfig.mutate(
-						{
-							ai_provider_id: provider.id,
-							model: selectedModel.identifier,
-							display_name: selectedModel.displayName,
-							enabled: true,
-							is_default: true,
-							context_limit: selectedModel.contextLimit,
-						},
-						{
-							onSuccess: onComplete,
-						},
-					);
+					setCreatedProvider(provider);
+					saveModelConfig(provider);
 				},
 			},
 		);
@@ -177,11 +192,11 @@ export const CoderAssistantProviderSetup: FC<
 						<Label htmlFor="agent-api-key">API Key</Label>
 						<Input
 							id="agent-api-key"
-							type="text"
+							type="password"
+							autoComplete="off"
 							value={apiKey}
 							onChange={(e) => setApiKey(e.target.value)}
 							placeholder={`Enter your ${selectedProvider.name} API key`}
-							style={{ WebkitTextSecurity: "disc" } as CSSProperties}
 						/>
 					</div>
 

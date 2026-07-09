@@ -14,6 +14,7 @@ import {
 	useQueryClient,
 } from "react-query";
 import { useLocation } from "react-router";
+import { isApiError } from "#/api/errors";
 import {
 	chat,
 	chatMessagesForInfiniteScroll,
@@ -136,6 +137,10 @@ export const CoderAssistantProvider: FC<
 	const { user } = useAuthenticated();
 	const organizationId = user.organization_ids[0];
 
+	// When the assistant is disabled, act as if no chat exists so no
+	// queries, mutations, or WebSocket connections fire.
+	const effectiveChatId = enabled ? chatId : null;
+
 	const setChatId = useCallback((id: string | null) => {
 		setChatIdState(id);
 		writeLocalStorage(CHAT_ID_STORAGE_KEY, id);
@@ -162,26 +167,32 @@ export const CoderAssistantProvider: FC<
 			return next;
 		});
 	}, []);
-	const persistedError = errorReasons[chatId ?? PENDING_CHAT_ERROR_KEY];
+	const persistedError =
+		errorReasons[effectiveChatId ?? PENDING_CHAT_ERROR_KEY];
 
 	const chatQuery = useQuery({
-		...chat(chatId ?? ""),
-		enabled: Boolean(chatId),
+		...chat(effectiveChatId ?? ""),
+		enabled: enabled && Boolean(effectiveChatId),
 		retry: false,
 	});
 	const chatMessagesQuery = useInfiniteQuery({
-		...chatMessagesForInfiniteScroll(chatId ?? ""),
-		enabled: Boolean(chatId),
+		...chatMessagesForInfiniteScroll(effectiveChatId ?? ""),
+		enabled: enabled && Boolean(effectiveChatId),
 	});
 
 	// The stored chat may have been deleted since the last visit.
-	// Drop the stale ID so the next send creates a fresh chat.
-	const chatLoadFailed = chatQuery.isError || chatMessagesQuery.isError;
+	// Drop the stale ID only when the server says the chat is gone
+	// (404); transient errors are left for react-query to retry.
+	const chatLoadError = chatQuery.error ?? chatMessagesQuery.error;
 	useEffect(() => {
-		if (chatId && chatLoadFailed) {
+		if (
+			chatId &&
+			isApiError(chatLoadError) &&
+			chatLoadError.response.status === 404
+		) {
 			setChatId(null);
 		}
-	}, [chatId, chatLoadFailed, setChatId]);
+	}, [chatId, chatLoadError, setChatId]);
 
 	// Flatten the infinite pages into a single chronological list,
 	// deduplicated by ID. Mirrors the wiring in AgentChatPage.
@@ -212,7 +223,7 @@ export const CoderAssistantProvider: FC<
 			: undefined;
 
 	const { store } = useChatStore({
-		chatID: chatId ?? undefined,
+		chatID: effectiveChatId ?? undefined,
 		chatMessages: chatMessagesList,
 		chatRecord: chatQuery.data,
 		chatMessagesData,
@@ -224,9 +235,9 @@ export const CoderAssistantProvider: FC<
 	const { isPending: isCreatePending, mutateAsync: createChatAsync } =
 		useMutation(createChat(queryClient));
 	const { isPending: isSendPending, mutateAsync: createMessageAsync } =
-		useMutation(createChatMessage(queryClient, chatId ?? ""));
+		useMutation(createChatMessage(queryClient, effectiveChatId ?? ""));
 	const { isPending: isInterruptPending, mutateAsync: interruptAsync } =
-		useMutation(interruptChat(queryClient, chatId ?? ""));
+		useMutation(interruptChat(queryClient, effectiveChatId ?? ""));
 	const { mutate: updateLabels } = useMutation(updateChatLabels(queryClient));
 
 	// Keep the chat's page label in sync with the current route so the
@@ -236,7 +247,7 @@ export const CoderAssistantProvider: FC<
 	const { pathname } = useLocation();
 	const chatLabels = chatQuery.data?.labels;
 	useEffect(() => {
-		if (!chatId || !chatLabels) {
+		if (!enabled || !effectiveChatId || !chatLabels) {
 			return;
 		}
 		const page = pageLabelValue(pathname);
@@ -245,17 +256,20 @@ export const CoderAssistantProvider: FC<
 		}
 		const timeout = window.setTimeout(() => {
 			updateLabels({
-				chatId,
+				chatId: effectiveChatId,
 				labels: { ...chatLabels, [PAGE_LABEL_KEY]: page },
 			});
 		}, 1000);
 		return () => window.clearTimeout(timeout);
-	}, [chatId, chatLabels, pathname, updateLabels]);
+	}, [enabled, effectiveChatId, chatLabels, pathname, updateLabels]);
 
 	// Model selector, wired the same way as the agents chat page.
-	const chatModelsQuery = useQuery(chatModels());
-	const chatModelConfigsQuery = useQuery(chatModelConfigs());
-	const userProviderConfigsQuery = useQuery(userChatProviderConfigs());
+	const chatModelsQuery = useQuery({ ...chatModels(), enabled });
+	const chatModelConfigsQuery = useQuery({ ...chatModelConfigs(), enabled });
+	const userProviderConfigsQuery = useQuery({
+		...userChatProviderConfigs(),
+		enabled,
+	});
 	const {
 		options: modelOptions,
 		isModelCatalogLoading,
@@ -322,22 +336,30 @@ export const CoderAssistantProvider: FC<
 		writeLocalStorage("coder_agent_enabled", "false");
 		setEnabled(false);
 		setOpen(false);
-	}, []);
+		// Clear the stored chat so re-enabling starts clean and no
+		// orphaned queries fire against a stale chat ID.
+		setChatId(null);
+	}, [setChatId]);
 
 	const interrupt = useCallback(() => {
-		if (!chatId || isInterruptPending) {
+		if (!effectiveChatId || isInterruptPending) {
 			return;
 		}
 		void interruptAsync();
-	}, [chatId, isInterruptPending, interruptAsync]);
+	}, [effectiveChatId, isInterruptPending, interruptAsync]);
 
 	const sendMessage = useCallback(
 		(text: string) => {
+			// Ignore sends while a create or send is already in flight to
+			// avoid duplicate chats or messages from rapid submissions.
+			if (isCreatePending || isSendPending) {
+				return;
+			}
 			const content: TypesGen.ChatInputPart[] = [{ type: "text", text }];
 			const modelConfigId = effectiveSelectedModel || undefined;
 			void (async () => {
 				try {
-					if (chatId) {
+					if (effectiveChatId) {
 						await createMessageAsync({
 							content,
 							model_config_id: modelConfigId,
@@ -361,7 +383,7 @@ export const CoderAssistantProvider: FC<
 						writeLocalStorage(LAST_MODEL_CONFIG_ID_STORAGE_KEY, modelConfigId);
 					}
 				} catch (error) {
-					const target = chatId ?? PENDING_CHAT_ERROR_KEY;
+					const target = effectiveChatId ?? PENDING_CHAT_ERROR_KEY;
 					setChatErrorReason(target, {
 						kind: "generic",
 						message:
@@ -373,11 +395,13 @@ export const CoderAssistantProvider: FC<
 			})();
 		},
 		[
-			chatId,
+			effectiveChatId,
 			clearChatErrorReason,
 			createChatAsync,
 			createMessageAsync,
 			effectiveSelectedModel,
+			isCreatePending,
+			isSendPending,
 			organizationId,
 			setChatErrorReason,
 			setChatId,
@@ -385,9 +409,14 @@ export const CoderAssistantProvider: FC<
 	);
 
 	const startNewChat = useCallback(() => {
+		// Stop any in-flight generation before abandoning the chat so
+		// the server doesn't keep streaming into an orphaned chat.
+		if (isStreaming) {
+			interrupt();
+		}
 		clearChatErrorReason(PENDING_CHAT_ERROR_KEY);
 		setChatId(null);
-	}, [clearChatErrorReason, setChatId]);
+	}, [clearChatErrorReason, interrupt, isStreaming, setChatId]);
 
 	return (
 		<CoderAssistantContext.Provider
@@ -397,7 +426,7 @@ export const CoderAssistantProvider: FC<
 				toggle,
 				close,
 				disable,
-				chatId,
+				chatId: effectiveChatId,
 				chatTitle: chatQuery.data?.title,
 				store,
 				persistedError,
