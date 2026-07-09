@@ -178,14 +178,15 @@ func (t *clusterTLS) tlsConfig() *tls.Config {
 // this on each inbound handshake, so a fresh config is allocated per accepted
 // connection; that is fine at cluster-route cardinality (a handful of peers).
 func (t *clusterTLS) configForClient(chi *tls.ClientHelloInfo) (*tls.Config, error) {
-	var sourceIP net.IP
-	if chi.Conn != nil {
-		if remote := chi.Conn.RemoteAddr(); remote != nil {
-			if host, _, err := net.SplitHostPort(remote.String()); err == nil {
-				sourceIP = net.ParseIP(host)
-			}
-		}
+	// The accept side must bind the peer leaf to the address it connected from,
+	// so a source IP is required. Fail closed if it cannot be determined rather
+	// than silently skipping the binding in verify.
+	sourceIP, err := clientSourceIP(chi)
+	if err != nil {
+		t.logger.Warn(t.ctx, "reject nats cluster route: no source IP", slog.Error(err))
+		return nil, err
 	}
+
 	cfg := &tls.Config{
 		MinVersion: tls.VersionTLS13,
 		GetCertificate: func(*tls.ClientHelloInfo) (*tls.Certificate, error) {
@@ -207,6 +208,28 @@ func (t *clusterTLS) configForClient(chi *tls.ClientHelloInfo) (*tls.Config, err
 		},
 	}
 	return cfg, nil
+}
+
+// clientSourceIP extracts the dialing peer's source IP from the accepted
+// connection. The accept side requires it, so every failure is an error rather
+// than a nil that would bypass source binding in verify.
+func clientSourceIP(chi *tls.ClientHelloInfo) (net.IP, error) {
+	if chi.Conn == nil {
+		return nil, xerrors.New("no underlying connection")
+	}
+	remote := chi.Conn.RemoteAddr()
+	if remote == nil {
+		return nil, xerrors.New("no remote address")
+	}
+	host, _, err := net.SplitHostPort(remote.String())
+	if err != nil {
+		return nil, xerrors.Errorf("split remote address %q: %w", remote.String(), err)
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return nil, xerrors.Errorf("remote host %q is not an IP", host)
+	}
+	return ip, nil
 }
 
 // currentLeaf returns the cached leaf, re-minting it when it is missing or

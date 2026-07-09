@@ -304,6 +304,23 @@ func TestPubsub_ClusterTLS_CacheSwap(t *testing.T) {
 	})
 }
 
+// TestClusterTLS_configForClient_RequiresSourceIP asserts the accept side fails
+// closed when it cannot determine the peer's source IP, rather than skipping the
+// source-binding check.
+func TestClusterTLS_configForClient_RequiresSourceIP(t *testing.T) {
+	t.Parallel()
+
+	ctx := testutil.Context(t, testutil.WaitShort)
+	ca := generateTestCA(t, 1)
+	cache := &fakeCACache{active: ca, byID: map[string]*cryptokeys.NATSCA{"1": ca}}
+	ct := newClusterTLS(ctx, slogtest.Make(t, nil), nil, cache, net.IPv4(127, 0, 0, 1))
+
+	// No underlying connection: the source IP cannot be determined, so the
+	// accept-side config is refused and the handshake aborts.
+	_, err := ct.configForClient(&tls.ClientHelloInfo{})
+	require.Error(t, err)
+}
+
 // TestClusterTLS_verify unit-tests the verifier directly, isolating chain
 // verification and source-IP binding that the mesh tests exercise only
 // indirectly.
