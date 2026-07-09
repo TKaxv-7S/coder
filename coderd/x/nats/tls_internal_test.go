@@ -136,9 +136,13 @@ func TestPubsub_ClusterTLS(t *testing.T) {
 		addrC := clusterRouteAddress(t, c)
 		// Full symmetric mesh: every node must know a peer to accept a route
 		// from it (accept-side membership), so each is given the other two.
-		require.NoError(t, a.setPeerAddresses([]string{addrB, addrC}))
-		require.NoError(t, b.setPeerAddresses([]string{addrA, addrC}))
-		require.NoError(t, c.setPeerAddresses([]string{addrA, addrB}))
+		// Drive peers through fetchers, as production does: a fetcher re-applies
+		// the same peers on every refresh, so the startup refresh (which runs
+		// with the boot-time noop fetcher) cannot race a manual call and wipe
+		// the route/known-peer set.
+		a.SetPeerFetcher(&testPeerFetcher{addresses: []string{addrB, addrC}})
+		b.SetPeerFetcher(&testPeerFetcher{addresses: []string{addrA, addrC}})
+		c.SetPeerFetcher(&testPeerFetcher{addresses: []string{addrA, addrB}})
 
 		event := "tls-mesh"
 		got := make(chan []byte, 8)
@@ -191,9 +195,11 @@ func TestPubsub_ClusterTLS(t *testing.T) {
 		a := newTLSPubsub(t, &fakeCACache{active: ca1, byID: bundle}, net.IPv4(127, 0, 0, 1))
 		b := newTLSPubsub(t, &fakeCACache{active: ca2, byID: bundle}, net.IPv4(127, 0, 0, 1))
 
-		// Symmetric peers so each side accepts a route from the other.
-		require.NoError(t, a.setPeerAddresses([]string{clusterRouteAddress(t, b)}))
-		require.NoError(t, b.setPeerAddresses([]string{clusterRouteAddress(t, a)}))
+		// Symmetric peers so each side accepts a route from the other, driven
+		// through fetchers (see Mesh) so the startup noop refresh cannot race a
+		// manual call and wipe the route/known-peer set.
+		a.SetPeerFetcher(&testPeerFetcher{addresses: []string{clusterRouteAddress(t, b)}})
+		b.SetPeerFetcher(&testPeerFetcher{addresses: []string{clusterRouteAddress(t, a)}})
 
 		require.Eventually(t, func() bool {
 			return numRoutes(t, a) > 0 && numRoutes(t, b) > 0
@@ -527,9 +533,11 @@ func TestPubsub_ClusterTLS_RealCA(t *testing.T) {
 	addrA := clusterRouteAddress(t, a)
 	addrB := clusterRouteAddress(t, b)
 	addrC := clusterRouteAddress(t, c)
-	require.NoError(t, a.setPeerAddresses([]string{addrB, addrC}))
-	require.NoError(t, b.setPeerAddresses([]string{addrA, addrC}))
-	require.NoError(t, c.setPeerAddresses([]string{addrA, addrB}))
+	// Drive peers through fetchers, as production does, so the startup noop
+	// refresh cannot race a manual call and wipe the route/known-peer set.
+	a.SetPeerFetcher(&testPeerFetcher{addresses: []string{addrB, addrC}})
+	b.SetPeerFetcher(&testPeerFetcher{addresses: []string{addrA, addrC}})
+	c.SetPeerFetcher(&testPeerFetcher{addresses: []string{addrA, addrB}})
 
 	received := make(chan string, 4)
 	cancelSub, err := c.Subscribe("tls-realca", func(_ context.Context, msg []byte) {
