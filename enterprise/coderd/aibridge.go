@@ -1024,3 +1024,87 @@ func (api *API) organizationGroupsAISpend(rw http.ResponseWriter, r *http.Reques
 
 	httpapi.Write(ctx, rw, http.StatusOK, resp)
 }
+
+// maxGroupMembersAISpendUserIDs caps the number of user IDs the caller may
+// batch in a single request. Chosen to stay under typical proxy URL length
+// limits and match expected UI batch sizes.
+const maxGroupMembersAISpendUserIDs = 100
+
+// @Summary Get group members AI spend
+// @ID get-group-members-ai-spend
+// @Security CoderSessionToken
+// @Produce json
+// @Tags Enterprise
+// @Param group path string true "Group ID" format(uuid)
+// @Param user_ids query string true "Comma-separated list of user IDs"
+// @Success 200 {object} codersdk.GroupMembersAISpend
+// @Router /api/v2/groups/{group}/members/ai/spend [get]
+func (api *API) groupMembersAISpend(rw http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	group := httpmw.GroupParam(r)
+	logger := api.Logger.With(slog.F("group_id", group.ID))
+
+	parser := httpapi.NewQueryParamParser()
+	parser.RequiredNotEmpty("user_ids")
+	userIDs := parser.UUIDs(r.URL.Query(), nil, "user_ids")
+	if len(parser.Errors) > 0 {
+		httpapi.Write(ctx, rw, http.StatusBadRequest, codersdk.Response{
+			Message:     "Query parameters have invalid values.",
+			Validations: parser.Errors,
+		})
+		return
+	}
+	if len(userIDs) > maxGroupMembersAISpendUserIDs {
+		httpapi.Write(ctx, rw, http.StatusBadRequest, codersdk.Response{
+			Message: fmt.Sprintf(
+				"user_ids has %d entries, maximum is %d.",
+				len(userIDs), maxGroupMembersAISpendUserIDs,
+			),
+		})
+		return
+	}
+
+	period := codersdk.NewAIBudgetPeriodFromString(api.DeploymentValues.AI.BridgeConfig.BudgetPeriod)
+	periodWindow, err := budget.CurrentPeriod(api.Clock.Now(), period)
+	if err != nil {
+		logger.Error(ctx, "failed to compute AI budget period", slog.Error(err))
+		httpapi.InternalServerError(rw, err)
+		return
+	}
+	logger = logger.With(
+		slog.F("period_start", periodWindow.Start),
+		slog.F("period_end", periodWindow.End),
+	)
+
+	rows, err := api.Database.GetGroupMembersAISpend(ctx, database.GetGroupMembersAISpendParams{
+		GroupID:     group.ID,
+		UserIds:     userIDs,
+		PeriodStart: periodWindow.Start,
+	})
+	if err != nil {
+		logger.Error(ctx, "failed to get group members AI spend", slog.Error(err))
+		httpapi.InternalServerError(rw, err)
+		return
+	}
+
+	resp := codersdk.GroupMembersAISpend{
+		AISpendPeriodWindow: codersdk.AISpendPeriodWindow{
+			PeriodStart: periodWindow.Start,
+			PeriodEnd:   periodWindow.End,
+		},
+		Members: make([]codersdk.GroupMemberAISpend, 0, len(rows)),
+	}
+	for _, row := range rows {
+		entry := codersdk.GroupMemberAISpend{
+			UserID:           row.UserID,
+			GroupSpendMicros: row.GroupSpendMicros,
+		}
+		if row.EffectiveGroupID.Valid {
+			uid := row.EffectiveGroupID.UUID
+			entry.EffectiveGroupID = &uid
+		}
+		resp.Members = append(resp.Members, entry)
+	}
+
+	httpapi.Write(ctx, rw, http.StatusOK, resp)
+}

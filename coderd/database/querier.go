@@ -569,6 +569,14 @@ type sqlcQuerier interface {
 	GetGroupByID(ctx context.Context, id uuid.UUID) (Group, error)
 	GetGroupByOrgAndName(ctx context.Context, arg GetGroupByOrgAndNameParams) (Group, error)
 	GetGroupMembers(ctx context.Context, includeSystem bool) ([]GroupMember, error)
+	// Per user in @user_ids, return their effective budget group and spend
+	// attributed to the queried group in the current period.
+	// LEFT JOIN filtered to same-org matches leaves effective_group.id NULL
+	// when the effective group is cross-org (or missing), which naturally masks
+	// it in the response. Aggregate spend attributed to the queried group (not
+	// to the user's effective group). The period_start parameter is normalized
+	// to its UTC calendar day.
+	GetGroupMembersAISpend(ctx context.Context, arg GetGroupMembersAISpendParams) ([]GetGroupMembersAISpendRow, error)
 	GetGroupMembersByGroupID(ctx context.Context, arg GetGroupMembersByGroupIDParams) ([]GroupMember, error)
 	GetGroupMembersByGroupIDPaginated(ctx context.Context, arg GetGroupMembersByGroupIDPaginatedParams) ([]GetGroupMembersByGroupIDPaginatedRow, error)
 	// Returns the total count of members in a group. Shows the total

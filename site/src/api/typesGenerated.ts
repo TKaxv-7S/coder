@@ -5070,6 +5070,35 @@ export interface GroupArguments {
 	readonly GroupIDs: readonly string[];
 }
 
+// From codersdk/aibridge.go
+/**
+ * GroupMemberAISpend is a single member's AI spend attributed to the queried
+ * group in the current budget period.
+ */
+export interface GroupMemberAISpend {
+	readonly user_id: string;
+	/**
+	 * EffectiveGroupID is the user's current effective budget group. Null
+	 * when the user has no budget configured or when the effective group
+	 * belongs to a different organization than the queried group.
+	 */
+	readonly effective_group_id: string | null;
+	/**
+	 * GroupSpendMicros is the user's spend attributed to the queried group
+	 * over the current budget period.
+	 */
+	readonly group_spend_micros: number;
+}
+
+// From codersdk/aibridge.go
+/**
+ * GroupMembersAISpend reports per-member AI spend attributed to a specific
+ * group in the active budget period.
+ */
+export interface GroupMembersAISpend extends AISpendPeriodWindow {
+	readonly members: readonly GroupMemberAISpend[];
+}
+
 // From codersdk/groups.go
 export interface GroupMembersResponse {
 	readonly users: readonly ReducedUser[];

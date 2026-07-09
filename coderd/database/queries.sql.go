@@ -2511,6 +2511,108 @@ func (q *sqlQuerier) GetGroupAIBudget(ctx context.Context, groupID uuid.UUID) (G
 	return i, err
 }
 
+const getGroupMembersAISpend = `-- name: GetGroupMembersAISpend :many
+WITH queried_group AS (
+	-- The queried group's org, used to filter users and to detect
+	-- cross-org effective groups.
+	SELECT id, organization_id
+	FROM groups
+	WHERE id = $1
+),
+filtered_users AS (
+	-- Users from @user_ids that belong to the queried group's org.
+	-- Users outside that org (or nonexistent) are dropped here.
+	SELECT organization_members.user_id
+	FROM organization_members
+	JOIN queried_group ON queried_group.organization_id = organization_members.organization_id
+	WHERE organization_members.user_id = ANY($3::uuid[])
+),
+user_highest_group AS (
+	-- Per user, the highest-limit group they belong to. Uses
+	-- group_members_expanded so the implicit Everyone group counts.
+	SELECT DISTINCT ON (member.user_id)
+		member.user_id,
+		budget.group_id
+	FROM group_ai_budgets budget
+	JOIN group_members_expanded member ON member.group_id = budget.group_id
+	WHERE member.user_id IN (SELECT user_id FROM filtered_users)
+	ORDER BY member.user_id, budget.spend_limit_micros DESC, member.group_name ASC, budget.group_id ASC
+),
+effective AS (
+	-- Effective budget group per user: a per-user override wins over the
+	-- highest-limit group.
+	SELECT
+		filtered_users.user_id,
+		COALESCE(override.group_id, user_highest_group.group_id) AS effective_group_id
+	FROM filtered_users
+	LEFT JOIN user_ai_budget_overrides override ON override.user_id = filtered_users.user_id
+	LEFT JOIN user_highest_group ON user_highest_group.user_id = filtered_users.user_id
+)
+SELECT
+	effective.user_id,
+	queried_group.organization_id,
+	effective_group.id AS effective_group_id,
+	COALESCE(SUM(spend.spend_micros), 0)::BIGINT AS group_spend_micros
+FROM effective
+CROSS JOIN queried_group
+LEFT JOIN groups effective_group
+	ON effective_group.id = effective.effective_group_id
+	AND effective_group.organization_id = queried_group.organization_id
+LEFT JOIN ai_user_daily_spend spend
+	ON spend.user_id = effective.user_id
+	AND spend.effective_group_id = $1
+	AND spend.day >= (($2::timestamptz) AT TIME ZONE 'UTC')::date
+GROUP BY effective.user_id, queried_group.organization_id, effective_group.id
+`
+
+type GetGroupMembersAISpendParams struct {
+	GroupID     uuid.UUID   `db:"group_id" json:"group_id"`
+	PeriodStart time.Time   `db:"period_start" json:"period_start"`
+	UserIds     []uuid.UUID `db:"user_ids" json:"user_ids"`
+}
+
+type GetGroupMembersAISpendRow struct {
+	UserID           uuid.UUID     `db:"user_id" json:"user_id"`
+	OrganizationID   uuid.UUID     `db:"organization_id" json:"organization_id"`
+	EffectiveGroupID uuid.NullUUID `db:"effective_group_id" json:"effective_group_id"`
+	GroupSpendMicros int64         `db:"group_spend_micros" json:"group_spend_micros"`
+}
+
+// Per user in @user_ids, return their effective budget group and spend
+// attributed to the queried group in the current period.
+// LEFT JOIN filtered to same-org matches leaves effective_group.id NULL
+// when the effective group is cross-org (or missing), which naturally masks
+// it in the response. Aggregate spend attributed to the queried group (not
+// to the user's effective group). The period_start parameter is normalized
+// to its UTC calendar day.
+func (q *sqlQuerier) GetGroupMembersAISpend(ctx context.Context, arg GetGroupMembersAISpendParams) ([]GetGroupMembersAISpendRow, error) {
+	rows, err := q.db.QueryContext(ctx, getGroupMembersAISpend, arg.GroupID, arg.PeriodStart, pq.Array(arg.UserIds))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetGroupMembersAISpendRow
+	for rows.Next() {
+		var i GetGroupMembersAISpendRow
+		if err := rows.Scan(
+			&i.UserID,
+			&i.OrganizationID,
+			&i.EffectiveGroupID,
+			&i.GroupSpendMicros,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getHighestGroupAIBudgetByUser = `-- name: GetHighestGroupAIBudgetByUser :one
 SELECT
 	gaib.group_id,
