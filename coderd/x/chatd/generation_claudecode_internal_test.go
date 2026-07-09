@@ -7,8 +7,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"cdr.dev/slog/v3"
+	acp "github.com/coder/acp-go-sdk"
 	"github.com/coder/coder/v2/coderd/database"
 	"github.com/coder/coder/v2/coderd/x/chatd/chatprompt"
+	"github.com/coder/coder/v2/coderd/x/chatd/claudecode"
 	"github.com/coder/coder/v2/codersdk"
 )
 
@@ -96,5 +98,89 @@ func TestClaudeCodeTurnFromHistory(t *testing.T) {
 		})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "no text content")
+	})
+}
+
+func TestClaudeCodeTurnUsage(t *testing.T) {
+	t.Parallel()
+
+	thought := func(v int) *int { return &v }
+
+	t.Run("FreshSessionUsesRawCounts", func(t *testing.T) {
+		t.Parallel()
+		usage, totals := claudeCodeTurnUsage(claudecode.TurnOutcome{
+			SessionID: "s1",
+			Resumed:   false,
+			Usage:     &acp.Usage{InputTokens: 100, OutputTokens: 40, TotalTokens: 140},
+		}, claudecode.RuntimeState{})
+		require.EqualValues(t, 100, usage.InputTokens)
+		require.EqualValues(t, 40, usage.OutputTokens)
+		require.EqualValues(t, 140, usage.TotalTokens)
+		require.NotNil(t, totals)
+		require.EqualValues(t, 140, totals.TotalTokens)
+	})
+
+	t.Run("ResumedSessionSubtractsPriorTotals", func(t *testing.T) {
+		t.Parallel()
+		usage, totals := claudeCodeTurnUsage(claudecode.TurnOutcome{
+			SessionID: "s1",
+			Resumed:   true,
+			Usage:     &acp.Usage{InputTokens: 250, OutputTokens: 90, TotalTokens: 340, ThoughtTokens: thought(30)},
+		}, claudecode.RuntimeState{
+			SessionID: "s1",
+			Usage: &claudecode.UsageTotals{
+				InputTokens: 100, OutputTokens: 40, TotalTokens: 140, ReasoningTokens: 10,
+			},
+		})
+		require.EqualValues(t, 150, usage.InputTokens)
+		require.EqualValues(t, 50, usage.OutputTokens)
+		require.EqualValues(t, 200, usage.TotalTokens)
+		require.EqualValues(t, 20, usage.ReasoningTokens)
+		// Persisted totals stay cumulative for the next turn.
+		require.EqualValues(t, 340, totals.TotalTokens)
+	})
+
+	t.Run("DifferentSessionSkipsSubtraction", func(t *testing.T) {
+		t.Parallel()
+		usage, _ := claudeCodeTurnUsage(claudecode.TurnOutcome{
+			SessionID: "s2",
+			Resumed:   false,
+			Usage:     &acp.Usage{TotalTokens: 50},
+		}, claudecode.RuntimeState{
+			SessionID: "s1",
+			Usage:     &claudecode.UsageTotals{TotalTokens: 140},
+		})
+		require.EqualValues(t, 50, usage.TotalTokens)
+	})
+
+	t.Run("CounterRestartFallsBackToRawCounts", func(t *testing.T) {
+		t.Parallel()
+		usage, totals := claudeCodeTurnUsage(claudecode.TurnOutcome{
+			SessionID: "s1",
+			Resumed:   true,
+			Usage:     &acp.Usage{InputTokens: 20, OutputTokens: 5, TotalTokens: 25},
+		}, claudecode.RuntimeState{
+			SessionID: "s1",
+			Usage:     &claudecode.UsageTotals{InputTokens: 100, OutputTokens: 40, TotalTokens: 140},
+		})
+		require.EqualValues(t, 25, usage.TotalTokens)
+		require.EqualValues(t, 25, totals.TotalTokens)
+	})
+
+	t.Run("NoUsageCarriesPriorTotalsForward", func(t *testing.T) {
+		t.Parallel()
+		prior := &claudecode.UsageTotals{TotalTokens: 140}
+		usage, totals := claudeCodeTurnUsage(claudecode.TurnOutcome{
+			SessionID: "s1",
+			Resumed:   true,
+		}, claudecode.RuntimeState{SessionID: "s1", Usage: prior})
+		require.Zero(t, usage.TotalTokens)
+		require.Equal(t, prior, totals)
+
+		_, totals = claudeCodeTurnUsage(claudecode.TurnOutcome{
+			SessionID: "s2",
+			Resumed:   false,
+		}, claudecode.RuntimeState{SessionID: "s1", Usage: prior})
+		require.Nil(t, totals)
 	})
 }

@@ -16,7 +16,6 @@ import (
 	"golang.org/x/xerrors"
 
 	"cdr.dev/slog/v3"
-	acp "github.com/coder/acp-go-sdk"
 	"github.com/coder/coder/v2/coderd/database"
 	"github.com/coder/coder/v2/coderd/x/chatd/chaterror"
 	"github.com/coder/coder/v2/coderd/x/chatd/chatprompt"
@@ -150,11 +149,13 @@ func (s *taskStarter) startClaudeCodeGeneration(
 	})
 	elapsed := s.opts.Clock.Now("chatworker", "claudecode").Sub(startedAt)
 
+	turnUsage, usageTotals := claudeCodeTurnUsage(outcome, state)
+
 	// Record the session even when the turn was interrupted or the
 	// commit below fails: the workspace-side session advanced either
 	// way, and the next turn should resume it.
 	if outcome.SessionID != "" {
-		s.persistClaudeCodeRuntimeState(ctx, chat.ID, outcome, state, cwd)
+		s.persistClaudeCodeRuntimeState(ctx, chat.ID, outcome, state, cwd, usageTotals)
 	}
 
 	if ctx.Err() != nil {
@@ -174,7 +175,7 @@ func (s *taskStarter) startClaudeCodeGeneration(
 	messages, err := buildCommitStepMessages(buildCommitStepMessagesInput{
 		step: stepData{
 			Content: outcome.Content,
-			Usage:   claudeCodeUsage(outcome.Usage),
+			Usage:   turnUsage,
 			Runtime: elapsed,
 		},
 		logger:         s.opts.Logger,
@@ -575,6 +576,7 @@ func (s *taskStarter) persistClaudeCodeRuntimeState(
 	outcome claudecode.TurnOutcome,
 	prior claudecode.RuntimeState,
 	newCwd string,
+	usageTotals *claudecode.UsageTotals,
 ) {
 	cwd := newCwd
 	if outcome.Resumed && prior.Cwd != "" {
@@ -583,6 +585,7 @@ func (s *taskStarter) persistClaudeCodeRuntimeState(
 	encoded, err := json.Marshal(claudecode.RuntimeState{
 		SessionID: outcome.SessionID,
 		Cwd:       cwd,
+		Usage:     usageTotals,
 		UpdatedAt: s.opts.Clock.Now("chatworker", "claudecode").UTC(),
 	})
 	if err != nil {
@@ -599,26 +602,61 @@ func (s *taskStarter) persistClaudeCodeRuntimeState(
 	}
 }
 
-// claudeCodeUsage maps ACP usage onto the token columns persisted with
-// the assistant message. ACP reports session-cumulative counts, so the
-// values approximate per-turn usage on resumed sessions.
-func claudeCodeUsage(usage *acp.Usage) fantasy.Usage {
-	if usage == nil {
-		return fantasy.Usage{}
+// claudeCodeTurnUsage derives per-turn token usage from ACP's
+// session-cumulative counters: on a resumed session it subtracts the
+// totals persisted after the previous turn, otherwise the session is
+// fresh and the counters already are per-turn. It returns the new
+// cumulative totals to persist alongside the session.
+func claudeCodeTurnUsage(
+	outcome claudecode.TurnOutcome,
+	prior claudecode.RuntimeState,
+) (fantasy.Usage, *claudecode.UsageTotals) {
+	if outcome.Usage == nil {
+		// No usage this turn: carry prior totals forward so a later
+		// turn that does report usage still subtracts them.
+		if outcome.Resumed && outcome.SessionID == prior.SessionID {
+			return fantasy.Usage{}, prior.Usage
+		}
+		return fantasy.Usage{}, nil
 	}
-	out := fantasy.Usage{
-		InputTokens:  int64(usage.InputTokens),
-		OutputTokens: int64(usage.OutputTokens),
-		TotalTokens:  int64(usage.TotalTokens),
+	totals := &claudecode.UsageTotals{
+		InputTokens:  int64(outcome.Usage.InputTokens),
+		OutputTokens: int64(outcome.Usage.OutputTokens),
+		TotalTokens:  int64(outcome.Usage.TotalTokens),
 	}
-	if usage.ThoughtTokens != nil {
-		out.ReasoningTokens = int64(*usage.ThoughtTokens)
+	if outcome.Usage.ThoughtTokens != nil {
+		totals.ReasoningTokens = int64(*outcome.Usage.ThoughtTokens)
 	}
-	if usage.CachedWriteTokens != nil {
-		out.CacheCreationTokens = int64(*usage.CachedWriteTokens)
+	if outcome.Usage.CachedWriteTokens != nil {
+		totals.CacheCreationTokens = int64(*outcome.Usage.CachedWriteTokens)
 	}
-	if usage.CachedReadTokens != nil {
-		out.CacheReadTokens = int64(*usage.CachedReadTokens)
+	if outcome.Usage.CachedReadTokens != nil {
+		totals.CacheReadTokens = int64(*outcome.Usage.CachedReadTokens)
 	}
-	return out
+	base := claudecode.UsageTotals{}
+	if outcome.Resumed && outcome.SessionID == prior.SessionID && prior.Usage != nil {
+		base = *prior.Usage
+	}
+	usage := fantasy.Usage{
+		InputTokens:         totals.InputTokens - base.InputTokens,
+		OutputTokens:        totals.OutputTokens - base.OutputTokens,
+		TotalTokens:         totals.TotalTokens - base.TotalTokens,
+		ReasoningTokens:     totals.ReasoningTokens - base.ReasoningTokens,
+		CacheCreationTokens: totals.CacheCreationTokens - base.CacheCreationTokens,
+		CacheReadTokens:     totals.CacheReadTokens - base.CacheReadTokens,
+	}
+	if usage.InputTokens < 0 || usage.OutputTokens < 0 || usage.TotalTokens < 0 ||
+		usage.ReasoningTokens < 0 || usage.CacheCreationTokens < 0 || usage.CacheReadTokens < 0 {
+		// A negative delta means the adapter restarted its counters;
+		// the raw counts are then the closest per-turn approximation.
+		usage = fantasy.Usage{
+			InputTokens:         totals.InputTokens,
+			OutputTokens:        totals.OutputTokens,
+			TotalTokens:         totals.TotalTokens,
+			ReasoningTokens:     totals.ReasoningTokens,
+			CacheCreationTokens: totals.CacheCreationTokens,
+			CacheReadTokens:     totals.CacheReadTokens,
+		}
+	}
+	return usage, totals
 }

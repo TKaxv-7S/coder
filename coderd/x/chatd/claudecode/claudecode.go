@@ -570,8 +570,23 @@ type RuntimeState struct {
 	SessionID string `json:"session_id,omitempty"`
 	// Cwd is the working directory the session was created with.
 	Cwd string `json:"cwd,omitempty"`
+	// Usage holds the session-cumulative token counts after the last
+	// turn; the next resumed turn subtracts them to derive per-turn
+	// usage.
+	Usage *UsageTotals `json:"usage,omitempty"`
 	// UpdatedAt records when the state was last written.
 	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// UsageTotals mirrors the ACP usage counters, which report
+// session-cumulative counts rather than per-turn ones.
+type UsageTotals struct {
+	InputTokens         int64 `json:"input_tokens,omitempty"`
+	OutputTokens        int64 `json:"output_tokens,omitempty"`
+	TotalTokens         int64 `json:"total_tokens,omitempty"`
+	ReasoningTokens     int64 `json:"reasoning_tokens,omitempty"`
+	CacheCreationTokens int64 `json:"cache_creation_tokens,omitempty"`
+	CacheReadTokens     int64 `json:"cache_read_tokens,omitempty"`
 }
 
 // ParseRuntimeState decodes persisted runtime state, tolerating absent

@@ -1334,6 +1334,11 @@ func (api *API) postChats(rw http.ResponseWriter, r *http.Request) {
 		ParentChatID: uuid.NullUUID{},
 	})
 	if err != nil {
+		// A runtime workspace was provisioned for this chat; without a
+		// chat row nothing tracks it, so reclaim it best-effort.
+		if runtime != database.ChatRuntimeCoder && workspaceSelection.WorkspaceID.Valid {
+			api.deleteChatRuntimeWorkspace(ctx, apiKey.UserID, workspaceSelection.WorkspaceID.UUID)
+		}
 		if maybeWriteLimitErr(ctx, rw, err) {
 			return
 		}
@@ -4782,6 +4787,45 @@ func (api *API) createChatRuntimeWorkspace(
 		return codersdk.Workspace{}, false
 	}
 	return workspace, true
+}
+
+// deleteChatRuntimeWorkspace best-effort deletes a runtime workspace
+// whose chat creation failed after provisioning, so a rejected create
+// does not leave an untracked workspace running under the user. The
+// request context may already be canceled; cleanup still runs.
+func (api *API) deleteChatRuntimeWorkspace(ctx context.Context, ownerID uuid.UUID, workspaceID uuid.UUID) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+	defer cancel()
+	logCleanupFailure := func(err error) {
+		api.Logger.Error(ctx, "failed to clean up runtime chat workspace after chat creation failure",
+			slog.F("workspace_id", workspaceID), slog.F("owner_id", ownerID), slog.Error(err))
+	}
+	actor, _, err := httpmw.UserRBACSubject(ctx, api.Database, ownerID, rbac.ScopeAll)
+	if err != nil {
+		logCleanupFailure(xerrors.Errorf("load user authorization: %w", err))
+		return
+	}
+	ctx = dbauthz.As(ctx, actor)
+	workspace, err := api.Database.GetWorkspaceByID(ctx, workspaceID)
+	if err != nil {
+		logCleanupFailure(xerrors.Errorf("get workspace: %w", err))
+		return
+	}
+	_, err = api.postWorkspaceBuildsInternal(
+		ctx,
+		database.APIKey{UserID: ownerID},
+		workspace,
+		codersdk.CreateWorkspaceBuildRequest{
+			Transition: codersdk.WorkspaceTransitionDelete,
+		},
+		func(action policy.Action, object rbac.Objecter) bool {
+			return api.HTTPAuth.Authorizer.Authorize(ctx, actor, action, object.RBACObject()) == nil
+		},
+		audit.WorkspaceBuildBaggage{},
+	)
+	if err != nil {
+		logCleanupFailure(xerrors.Errorf("create delete build: %w", err))
+	}
 }
 
 func (api *API) validateCreateChatWorkspaceSelection(
