@@ -74,7 +74,7 @@ type sqlcQuerier interface {
 	// The WHERE clause must match the predicate of
 	// idx_chat_messages_search_tsv_pending exactly so the partial index
 	// serves this query.
-	// NULL means "pending", '' means "backfilled, no text".
+	// NULL means "pending", empty tsvector means "backfilled, no text".
 	BackfillChatMessagesSearchTsv(ctx context.Context, batchSize int32) (int64, error)
 	BackoffChatDiffStatus(ctx context.Context, arg BackoffChatDiffStatusParams) error
 	// Deletes heartbeat rows for the supplied (chat_id, runner_id) pairs.

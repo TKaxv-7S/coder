@@ -6184,7 +6184,7 @@ FROM batch WHERE cm.id = batch.id
 // The WHERE clause must match the predicate of
 // idx_chat_messages_search_tsv_pending exactly so the partial index
 // serves this query.
-// NULL means "pending", ” means "backfilled, no text".
+// NULL means "pending", empty tsvector means "backfilled, no text".
 func (q *sqlQuerier) BackfillChatMessagesSearchTsv(ctx context.Context, batchSize int32) (int64, error) {
 	result, err := q.db.ExecContext(ctx, backfillChatMessagesSearchTsv, batchSize)
 	if err != nil {
