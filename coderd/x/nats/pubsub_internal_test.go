@@ -589,10 +589,6 @@ func TestSubscribeError(t *testing.T) {
 			})
 			require.ErrorIs(t, err, assert.AnError)
 			require.Nil(t, cancel)
-			// The failed group must be removed so the event can be
-			// subscribed again. subscribeGroup's cleanup closes
-			// subscribeDone (unblocking SubscribeWithErr) before it
-			// takes ps.mu and deletes the map entry, so poll.
 			require.Eventually(t, func() bool {
 				ps.mu.Lock()
 				defer ps.mu.Unlock()
