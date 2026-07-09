@@ -8,7 +8,6 @@ import (
 	"net"
 	"net/url"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	natsserver "github.com/nats-io/nats-server/v2/server"
@@ -204,12 +203,7 @@ type Pubsub struct {
 	clustered     bool
 	serverOpts    *natsserver.Options
 	currentRoutes []*url.URL
-	// peerIPs holds the IPs of the currently configured cluster routes,
-	// published by setPeerAddresses (under clusterMu) and read lock-free on the
-	// accept-side handshake path so verification never contends on clusterMu.
-	peerIPs atomic.Pointer[[]net.IP]
 	// clusterTLS is non-nil when the cluster route listener runs mutual TLS.
-	// Its valid-peer-IP set is kept in sync with currentRoutes.
 	clusterTLS *clusterTLS
 
 	peerFetcher PeerFetcher
@@ -382,9 +376,6 @@ func New(ctx context.Context, logger slog.Logger, opts Options) (pubSub *Pubsub,
 	p.serverOpts = sopts.Clone()
 	p.currentRoutes = cloneRouteURLs(sopts.Routes)
 	p.clusterTLS = ct
-	if ct != nil {
-		ct.peerIPs = p.knownPeerIPs
-	}
 	handlers := p.buildConnHandlers()
 
 	publishPool, err := newConnPool(ns, opts, handlers, opts.PublishConns, "coder-pubsub-pub")
