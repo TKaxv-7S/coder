@@ -883,17 +883,16 @@ func (api *API) Close() error {
 	return api.AGPL.Close()
 }
 
-// configureNATSClusterTLS swaps the real nats_ca CA cache into the NATS pubsub,
-// enabling cluster mTLS. The leaf IP SAN peers verify is this replica's cluster
-// host, fixed when the pubsub was constructed, so without an IP cluster host no
-// leaf can be minted and routes stay plaintext (token auth only). The CA is
-// read lazily by the TLS callbacks on each handshake, so nothing reads it here.
-func (api *API) configureNATSClusterTLS(natsPubsub *nats.Pubsub) {
+// logNATSClusterMTLS logs whether cluster mTLS is active. The leaf IP SAN peers
+// verify is this replica's cluster host, fixed when the pubsub was constructed,
+// so if it is not an IP no leaf can be minted and routes stay plaintext (token
+// auth only).
+func (api *API) logNATSClusterMTLS() {
 	if net.ParseIP(api.Options.ClusterHost) == nil {
 		api.Logger.Warn(api.ctx, "nats cluster mTLS inactive: cluster host is not an IP; cluster routes use token auth only",
 			slog.F("cluster_host", api.Options.ClusterHost))
+		return
 	}
-	natsPubsub.SetCACache(api.AGPL.NATSCACache)
 	api.Logger.Info(api.ctx, "nats cluster mTLS enabled")
 }
 
@@ -1024,11 +1023,12 @@ func (api *API) updateEntitlements(ctx context.Context) error {
 				}
 
 				if natsPubsub, ok := api.Pubsub.(*nats.Pubsub); ok {
-					// Swap the real nats_ca CA cache in before peers are known
-					// so the first route handshake can negotiate mTLS.
-					api.configureNATSClusterTLS(natsPubsub)
+					// Swap the real nats_ca CA cache and the replica peer fetcher
+					// in so the first route handshake can negotiate mTLS.
+					natsPubsub.SetCACache(api.AGPL.NATSCACache)
 					natsPubsub.SetPeerFetcher(api.replicaManager)
 					api.replicaManager.SetCallback("nats", natsPubsub.RefreshPeers)
+					api.logNATSClusterMTLS()
 				}
 
 				api.replicaManager.SetCallback("derp", func() {
