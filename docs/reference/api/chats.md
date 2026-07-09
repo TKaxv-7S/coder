@@ -1606,6 +1606,10 @@ Experimental: this endpoint is subject to change.
             "valid": true
           },
           "media_type": "string",
+          "metadata": {
+            "property1": "string",
+            "property2": "string"
+          },
           "name": "string",
           "parsed_commands": [
             [
@@ -1689,6 +1693,10 @@ Experimental: this endpoint is subject to change.
             "valid": true
           },
           "media_type": "string",
+          "metadata": {
+            "property1": "string",
+            "property2": "string"
+          },
           "name": "string",
           "parsed_commands": [
             [
@@ -1824,6 +1832,10 @@ Experimental: this endpoint is subject to change.
           "valid": true
         },
         "media_type": "string",
+        "metadata": {
+          "property1": "string",
+          "property2": "string"
+        },
         "name": "string",
         "parsed_commands": [
           [
@@ -1906,6 +1918,10 @@ Experimental: this endpoint is subject to change.
           "valid": true
         },
         "media_type": "string",
+        "metadata": {
+          "property1": "string",
+          "property2": "string"
+        },
         "name": "string",
         "parsed_commands": [
           [
@@ -2039,6 +2055,10 @@ Experimental: this endpoint is subject to change.
           "valid": true
         },
         "media_type": "string",
+        "metadata": {
+          "property1": "string",
+          "property2": "string"
+        },
         "name": "string",
         "parsed_commands": [
           [
@@ -2459,6 +2479,10 @@ Experimental: this endpoint is subject to change.
           "valid": true
         },
         "media_type": "string",
+        "metadata": {
+          "property1": "string",
+          "property2": "string"
+        },
         "name": "string",
         "parsed_commands": [
           [
@@ -2540,6 +2564,10 @@ Experimental: this endpoint is subject to change.
         "valid": true
       },
       "media_type": "string",
+      "metadata": {
+        "property1": "string",
+        "property2": "string"
+      },
       "name": "string",
       "parsed_commands": [
         [
@@ -2609,6 +2637,10 @@ Experimental: this endpoint is subject to change.
             "valid": true
           },
           "media_type": "string",
+          "metadata": {
+            "property1": "string",
+            "property2": "string"
+          },
           "name": "string",
           "parsed_commands": [
             [
