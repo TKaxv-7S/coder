@@ -1,9 +1,9 @@
 # Data Retention
 
 Coder supports configurable retention policies that automatically purge old
-Audit Logs, Connection Logs, Workspace Agent Logs, API keys, and AI Gateway
-records. These policies help manage database growth by removing records older
-than a specified duration.
+Audit Logs, Connection Logs, Workspace Agent Logs, API keys, AI Gateway
+records, and Agent Firewall boundary logs. These policies help manage database
+growth by removing records older than a specified duration.
 
 ## Overview
 
@@ -31,6 +31,7 @@ a YAML configuration file.
 |----------------------|------------------------------------|----------------------------------------|----------------|-----------------------------------------|
 | Audit Logs           | `--audit-logs-retention`           | `CODER_AUDIT_LOGS_RETENTION`           | `0` (disabled) | How long to retain Audit Log entries    |
 | Connection Logs      | `--connection-logs-retention`      | `CODER_CONNECTION_LOGS_RETENTION`      | `0` (disabled) | How long to retain Connection Logs      |
+| Boundary Logs        | `--boundary-log-retention`         | `CODER_BOUNDARY_LOG_RETENTION`         | `0` (disabled) | How long to retain Agent Firewall boundary logs |
 | API Keys             | `--api-keys-retention`             | `CODER_API_KEYS_RETENTION`             | `7d`           | How long to retain expired API keys     |
 | Workspace Agent Logs | `--workspace-agent-logs-retention` | `CODER_WORKSPACE_AGENT_LOGS_RETENTION` | `7d`           | How long to retain workspace agent logs |
 | AI Gateway           | `--ai-gateway-retention`           | `CODER_AI_GATEWAY_RETENTION`           | `60d`          | How long to retain AI Gateway records   |
@@ -57,6 +58,7 @@ Go duration units (`h`, `m`, `s`):
 coder server \
   --audit-logs-retention=365d \
   --connection-logs-retention=90d \
+  --boundary-log-retention=90d \
   --api-keys-retention=7d \
   --workspace-agent-logs-retention=7d \
   --ai-gateway-retention=60d
@@ -67,6 +69,7 @@ coder server \
 ```bash
 export CODER_AUDIT_LOGS_RETENTION=365d
 export CODER_CONNECTION_LOGS_RETENTION=90d
+export CODER_BOUNDARY_LOG_RETENTION=90d
 export CODER_API_KEYS_RETENTION=7d
 export CODER_WORKSPACE_AGENT_LOGS_RETENTION=7d
 export CODER_AI_GATEWAY_RETENTION=60d
@@ -78,6 +81,7 @@ export CODER_AI_GATEWAY_RETENTION=60d
 retention:
   audit_logs: 365d
   connection_logs: 90d
+  boundary_logs: 90d
   api_keys: 7d
   workspace_agent_logs: 7d
 
@@ -139,6 +143,18 @@ For details on what data is retained, see the
 [AI Gateway Data Retention](../../ai-coder/ai-gateway/setup.md#data-retention)
 documentation.
 
+### Boundary Logs Behavior
+
+<!-- SKELETON: expand each topic sentence below into a full paragraph. -->
+
+Boundary log retention controls how long Agent Firewall boundary logs, which record the HTTP requests processed by the Agent Firewall confinement proxy, are kept before deletion.
+
+Boundary session records are purged only after all of their associated logs have been deleted and the session itself has aged past the retention window.
+
+Boundary log retention is disabled by default (`0`), so boundary logs are kept indefinitely until an administrator configures a retention period.
+
+For details on the Agent Firewall feature that produces these logs, see [Agent Firewall](../../ai-coder/agent-firewall/index.md).
+
 ## Best Practices
 
 ### Recommended Starting Configuration
@@ -149,6 +165,7 @@ For most deployments, we recommend:
 retention:
   audit_logs: 365d
   connection_logs: 90d
+  boundary_logs: 90d
   api_keys: 7d
   workspace_agent_logs: 7d
 
@@ -195,6 +212,7 @@ To keep data indefinitely for any data type, set its retention value to `0`:
 retention:
   audit_logs: 0s           # Keep audit logs forever
   connection_logs: 0s      # Keep connection logs forever
+  boundary_logs: 0s        # Keep Agent Firewall boundary logs forever
   api_keys: 0s             # Keep expired API keys forever
   workspace_agent_logs: 0s # Keep workspace agent logs forever
 
@@ -206,7 +224,8 @@ ai_gateway:
 
 The purge process logs deletion counts at the `DEBUG` level. To monitor
 retention activity, enable debug logging or search your logs for entries
-containing the table name (e.g., `audit_logs`, `connection_logs`, `api_keys`).
+containing the table name (e.g., `audit_logs`, `connection_logs`,
+`boundary_logs`, `api_keys`).
 
 ## Related Documentation
 
@@ -214,6 +233,8 @@ containing the table name (e.g., `audit_logs`, `connection_logs`, `api_keys`).
   purge procedures.
 - [Connection Logs](../monitoring/connection-logs.md): Learn about Connection
   Logs and monitoring.
+- [Agent Firewall](../../ai-coder/agent-firewall/index.md): Learn about Agent
+  Firewall and the boundary logs it produces.
 - [AI Gateway](../../ai-coder/ai-gateway/index.md): Learn about AI Gateway for
   centralized LLM and MCP proxy management.
 - [AI Gateway Setup](../../ai-coder/ai-gateway/setup.md#data-retention): Configure
