@@ -64,7 +64,7 @@ func sanitizeCompactionPrompt(
 // results from a copy of messages. Provider-executed blocks produced by
 // one provider can be rejected when replayed to another, and compaction
 // only needs the conversation text. Messages emptied by stripping are
-// dropped. The input is never mutated.
+// dropped.
 func stripProviderExecutedToolParts(
 	ctx context.Context,
 	logger slog.Logger,
@@ -106,7 +106,6 @@ func stripProviderExecutedToolParts(
 // replaceUnsupportedFileParts swaps file parts the compaction model does
 // not accept for short text placeholders in a copy of messages, so the
 // summary notes the attachment existed instead of silently losing it.
-// The input is never mutated.
 func replaceUnsupportedFileParts(
 	ctx context.Context,
 	logger slog.Logger,
