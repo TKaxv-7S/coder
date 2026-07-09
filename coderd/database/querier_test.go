@@ -11868,6 +11868,7 @@ func TestInsertChatMessages(t *testing.T) {
 		)
 
 		chat, err := store.InsertChat(ctx, database.InsertChatParams{
+			Runtime:           database.ChatRuntimeCoder,
 			OrganizationID:    org.ID,
 			Status:            database.ChatStatusWaiting,
 			ClientType:        database.ChatClientTypeUi,
@@ -11926,8 +11927,8 @@ func TestInsertChatMessages(t *testing.T) {
 
 		gotChat, err := store.GetChatByID(ctx, chat.ID)
 		require.NoError(t, err)
-		require.Equal(t, modelConfigA.ID, chat.LastModelConfigID)
-		require.Equal(t, modelConfigB.ID, gotChat.LastModelConfigID)
+		require.Equal(t, uuid.NullUUID{UUID: modelConfigA.ID, Valid: true}, chat.LastModelConfigID)
+		require.Equal(t, uuid.NullUUID{UUID: modelConfigB.ID, Valid: true}, gotChat.LastModelConfigID)
 	})
 
 	t.Run("SameModelDoesNotBreakAnything", func(t *testing.T) {
@@ -11939,7 +11940,7 @@ func TestInsertChatMessages(t *testing.T) {
 
 		gotChat, err := store.GetChatByID(ctx, chat.ID)
 		require.NoError(t, err)
-		require.Equal(t, modelConfigA.ID, gotChat.LastModelConfigID)
+		require.Equal(t, uuid.NullUUID{UUID: modelConfigA.ID, Valid: true}, gotChat.LastModelConfigID)
 	})
 
 	t.Run("BatchInsertMultipleMessages", func(t *testing.T) {
@@ -12049,6 +12050,7 @@ func TestGetChatMessagesForPromptByChatID(t *testing.T) {
 	newChat := func(t *testing.T) database.Chat {
 		t.Helper()
 		chat, err := db.InsertChat(ctx, database.InsertChatParams{
+			Runtime:           database.ChatRuntimeCoder,
 			OrganizationID:    org.ID,
 			Status:            database.ChatStatusWaiting,
 			ClientType:        database.ChatClientTypeUi,
@@ -12789,6 +12791,7 @@ func TestChatPinOrderQueries(t *testing.T) {
 		t.Helper()
 
 		chat, err := db.InsertChat(ctx, database.InsertChatParams{
+			Runtime:           database.ChatRuntimeCoder,
 			OrganizationID:    orgID,
 			Status:            database.ChatStatusWaiting,
 			ClientType:        database.ChatClientTypeUi,
@@ -12965,6 +12968,7 @@ func TestChatPinOrderConstraints(t *testing.T) {
 		ctx := testutil.Context(t, testutil.WaitMedium)
 
 		parent, err := db.InsertChat(ctx, database.InsertChatParams{
+			Runtime:           database.ChatRuntimeCoder,
 			OrganizationID:    org.ID,
 			Status:            database.ChatStatusCompleted,
 			ClientType:        database.ChatClientTypeUi,
@@ -12975,6 +12979,7 @@ func TestChatPinOrderConstraints(t *testing.T) {
 		require.NoError(t, err)
 
 		child, err := db.InsertChat(ctx, database.InsertChatParams{
+			Runtime:           database.ChatRuntimeCoder,
 			OrganizationID:    org.ID,
 			Status:            database.ChatStatusCompleted,
 			ClientType:        database.ChatClientTypeUi,
@@ -12996,6 +13001,7 @@ func TestChatPinOrderConstraints(t *testing.T) {
 		ctx := testutil.Context(t, testutil.WaitMedium)
 
 		chat, err := db.InsertChat(ctx, database.InsertChatParams{
+			Runtime:           database.ChatRuntimeCoder,
 			OrganizationID:    org.ID,
 			Status:            database.ChatStatusCompleted,
 			ClientType:        database.ChatClientTypeUi,
@@ -13060,6 +13066,7 @@ func TestChatLabels(t *testing.T) {
 		require.NoError(t, err)
 
 		chat, err := db.InsertChat(ctx, database.InsertChatParams{
+			Runtime:           database.ChatRuntimeCoder,
 			OrganizationID:    org.ID,
 			Status:            database.ChatStatusWaiting,
 			ClientType:        database.ChatClientTypeUi,
@@ -13089,6 +13096,7 @@ func TestChatLabels(t *testing.T) {
 		ctx := testutil.Context(t, testutil.WaitMedium)
 
 		chat, err := db.InsertChat(ctx, database.InsertChatParams{
+			Runtime:           database.ChatRuntimeCoder,
 			OrganizationID:    org.ID,
 			Status:            database.ChatStatusWaiting,
 			ClientType:        database.ChatClientTypeUi,
@@ -13107,6 +13115,7 @@ func TestChatLabels(t *testing.T) {
 		ctx := testutil.Context(t, testutil.WaitMedium)
 
 		chat, err := db.InsertChat(ctx, database.InsertChatParams{
+			Runtime:           database.ChatRuntimeCoder,
 			OrganizationID:    org.ID,
 			Status:            database.ChatStatusWaiting,
 			ClientType:        database.ChatClientTypeUi,
@@ -13135,6 +13144,7 @@ func TestChatLabels(t *testing.T) {
 		ctx := testutil.Context(t, testutil.WaitMedium)
 
 		parent, err := db.InsertChat(ctx, database.InsertChatParams{
+			Runtime:           database.ChatRuntimeCoder,
 			OrganizationID:    org.ID,
 			Status:            database.ChatStatusWaiting,
 			ClientType:        database.ChatClientTypeUi,
@@ -13144,6 +13154,7 @@ func TestChatLabels(t *testing.T) {
 		})
 		require.NoError(t, err)
 		child, err := db.InsertChat(ctx, database.InsertChatParams{
+			Runtime:           database.ChatRuntimeCoder,
 			OrganizationID:    org.ID,
 			Status:            database.ChatStatusWaiting,
 			ClientType:        database.ChatClientTypeUi,
@@ -13170,6 +13181,7 @@ func TestChatLabels(t *testing.T) {
 		ctx := testutil.Context(t, testutil.WaitMedium)
 
 		chat, err := db.InsertChat(ctx, database.InsertChatParams{
+			Runtime:           database.ChatRuntimeCoder,
 			OrganizationID:    org.ID,
 			Status:            database.ChatStatusWaiting,
 			ClientType:        database.ChatClientTypeUi,
@@ -13213,6 +13225,7 @@ func TestChatLabels(t *testing.T) {
 		require.NoError(t, err)
 
 		chat, err := db.InsertChat(ctx, database.InsertChatParams{
+			Runtime:           database.ChatRuntimeCoder,
 			OrganizationID:    org.ID,
 			Status:            database.ChatStatusWaiting,
 			ClientType:        database.ChatClientTypeUi,
@@ -13254,6 +13267,7 @@ func TestChatLabels(t *testing.T) {
 			labelsJSON, err := json.Marshal(tc.labels)
 			require.NoError(t, err)
 			_, err = db.InsertChat(ctx, database.InsertChatParams{
+				Runtime:           database.ChatRuntimeCoder,
 				OrganizationID:    org.ID,
 				Status:            database.ChatStatusWaiting,
 				ClientType:        database.ChatClientTypeUi,
@@ -13350,6 +13364,7 @@ func TestUpdateChatLastTurnSummary(t *testing.T) {
 	require.NoError(t, err)
 
 	chat, err := db.InsertChat(ctx, database.InsertChatParams{
+		Runtime:           database.ChatRuntimeCoder,
 		OrganizationID:    org.ID,
 		Status:            database.ChatStatusWaiting,
 		ClientType:        database.ChatClientTypeUi,
@@ -13485,6 +13500,7 @@ func TestDeleteChatDebugDataAfterMessageIDIncludesTriggeredRuns(t *testing.T) {
 	require.NoError(t, err)
 
 	chat, err := store.InsertChat(ctx, database.InsertChatParams{
+		Runtime:           database.ChatRuntimeCoder,
 		OrganizationID:    org.ID,
 		Status:            database.ChatStatusWaiting,
 		ClientType:        database.ChatClientTypeUi,
@@ -13676,6 +13692,7 @@ func TestDeleteChatDebugDataAfterMessageIDStepLevelFieldBoundariesAndNulls(t *te
 	require.NoError(t, err)
 
 	chat, err := store.InsertChat(ctx, database.InsertChatParams{
+		Runtime:           database.ChatRuntimeCoder,
 		OrganizationID:    org.ID,
 		Status:            database.ChatStatusWaiting,
 		ClientType:        database.ChatClientTypeUi,
@@ -13932,6 +13949,7 @@ func TestFinalizeStaleChatDebugRows(t *testing.T) {
 	require.NoError(t, err)
 
 	chat, err := store.InsertChat(ctx, database.InsertChatParams{
+		Runtime:           database.ChatRuntimeCoder,
 		OrganizationID:    org.ID,
 		Status:            database.ChatStatusWaiting,
 		ClientType:        database.ChatClientTypeUi,
@@ -14369,6 +14387,7 @@ func TestChatDebugSQLGuards(t *testing.T) {
 	require.NoError(t, err)
 
 	chatA, err := store.InsertChat(ctx, database.InsertChatParams{
+		Runtime:           database.ChatRuntimeCoder,
 		OrganizationID:    org.ID,
 		Status:            database.ChatStatusWaiting,
 		ClientType:        database.ChatClientTypeUi,
@@ -14379,6 +14398,7 @@ func TestChatDebugSQLGuards(t *testing.T) {
 	require.NoError(t, err)
 
 	chatB, err := store.InsertChat(ctx, database.InsertChatParams{
+		Runtime:           database.ChatRuntimeCoder,
 		OrganizationID:    org.ID,
 		Status:            database.ChatStatusWaiting,
 		ClientType:        database.ChatClientTypeUi,
@@ -14501,6 +14521,7 @@ func TestChatDebugRunCOALESCEPreservation(t *testing.T) {
 	require.NoError(t, err)
 
 	chat, err := store.InsertChat(ctx, database.InsertChatParams{
+		Runtime:           database.ChatRuntimeCoder,
 		OrganizationID:    org.ID,
 		Status:            database.ChatStatusWaiting,
 		ClientType:        database.ChatClientTypeUi,
@@ -14614,6 +14635,7 @@ func TestChatDebugStepCOALESCEPreservation(t *testing.T) {
 	require.NoError(t, err)
 
 	chat, err := store.InsertChat(ctx, database.InsertChatParams{
+		Runtime:           database.ChatRuntimeCoder,
 		OrganizationID:    org.ID,
 		Status:            database.ChatStatusWaiting,
 		ClientType:        database.ChatClientTypeUi,
@@ -14737,6 +14759,7 @@ func TestDeleteChatDebugDataAfterMessageIDNullMessagesSurvive(t *testing.T) {
 	require.NoError(t, err)
 
 	chat, err := store.InsertChat(ctx, database.InsertChatParams{
+		Runtime:           database.ChatRuntimeCoder,
 		OrganizationID:    org.ID,
 		Status:            database.ChatStatusWaiting,
 		ClientType:        database.ChatClientTypeUi,
@@ -14833,6 +14856,7 @@ func TestDeleteChatDebugDataAfterMessageIDStartedBeforeFiltersNewerRuns(t *testi
 	require.NoError(t, err)
 
 	chat, err := store.InsertChat(ctx, database.InsertChatParams{
+		Runtime:           database.ChatRuntimeCoder,
 		OrganizationID:    org.ID,
 		Status:            database.ChatStatusWaiting,
 		ClientType:        database.ChatClientTypeUi,
@@ -14943,6 +14967,7 @@ func TestDeleteChatDebugDataByChatIDStartedBeforeFiltersNewerRuns(t *testing.T) 
 	require.NoError(t, err)
 
 	chat, err := store.InsertChat(ctx, database.InsertChatParams{
+		Runtime:           database.ChatRuntimeCoder,
 		OrganizationID:    org.ID,
 		Status:            database.ChatStatusWaiting,
 		ClientType:        database.ChatClientTypeUi,
@@ -15031,6 +15056,7 @@ func TestGetChatsFilter(t *testing.T) {
 	createRoot := func(title string) database.Chat {
 		t.Helper()
 		chat, err := store.InsertChat(ctx, database.InsertChatParams{
+			Runtime:           database.ChatRuntimeCoder,
 			OrganizationID:    org.ID,
 			Status:            database.ChatStatusWaiting,
 			ClientType:        database.ChatClientTypeUi,
@@ -15045,6 +15071,7 @@ func TestGetChatsFilter(t *testing.T) {
 	createChild := func(root database.Chat, title string) database.Chat {
 		t.Helper()
 		chat, err := store.InsertChat(ctx, database.InsertChatParams{
+			Runtime:           database.ChatRuntimeCoder,
 			OrganizationID:    org.ID,
 			Status:            database.ChatStatusWaiting,
 			ClientType:        database.ChatClientTypeUi,
@@ -15323,6 +15350,7 @@ func TestChatHasUnread(t *testing.T) {
 	require.NoError(t, err)
 
 	chat, err := store.InsertChat(ctx, database.InsertChatParams{
+		Runtime:           database.ChatRuntimeCoder,
 		OrganizationID:    org.ID,
 		Status:            database.ChatStatusWaiting,
 		ClientType:        database.ChatClientTypeUi,

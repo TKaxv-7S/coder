@@ -1241,6 +1241,7 @@ func (s *MethodTestSuite) TestChats() {
 	}))
 	s.Run("InsertChat", s.Mocked(func(dbm *dbmock.MockStore, faker *gofakeit.Faker, check *expects) {
 		arg := testutil.Fake(s.T(), faker, database.InsertChatParams{
+			Runtime:    database.ChatRuntimeCoder,
 			Status:     database.ChatStatusWaiting,
 			ClientType: database.ChatClientTypeUi,
 		})

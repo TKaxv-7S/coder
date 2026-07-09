@@ -33,6 +33,7 @@ func TestActiveAgentChatsIncludeInheritedACLs(t *testing.T) {
 	modelConfig := insertAgentChatTestModelConfig(t, db, owner.ID)
 
 	root, err := db.InsertChat(ctx, database.InsertChatParams{
+		Runtime:           database.ChatRuntimeCoder,
 		OrganizationID:    org.ID,
 		Status:            database.ChatStatusWaiting,
 		ClientType:        database.ChatClientTypeUi,
@@ -44,6 +45,7 @@ func TestActiveAgentChatsIncludeInheritedACLs(t *testing.T) {
 	require.NoError(t, err)
 
 	child, err := db.InsertChat(ctx, database.InsertChatParams{
+		Runtime:           database.ChatRuntimeCoder,
 		OrganizationID:    org.ID,
 		Status:            database.ChatStatusRunning,
 		ClientType:        database.ChatClientTypeUi,

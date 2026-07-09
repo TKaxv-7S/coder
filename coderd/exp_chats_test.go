@@ -2002,7 +2002,8 @@ func TestWatchChats(t *testing.T) {
 
 		require.Equal(t, createdChat.ID, got.ID)
 		require.Equal(t, createdChat.OwnerID, got.OwnerID)
-		require.Equal(t, modelConfig.ID, got.LastModelConfigID)
+		require.NotNil(t, got.LastModelConfigID)
+		require.Equal(t, modelConfig.ID, *got.LastModelConfigID)
 		require.Equal(t, createdChat.Title, got.Title)
 		// CreateChat inserts new chats in the running state under the
 		// chatstate state machine, so the created event carries running.
@@ -4859,6 +4860,7 @@ func TestGetChatUserPrompts(t *testing.T) {
 		modelConfig := createChatModelConfig(t, client)
 
 		chat, err := db.InsertChat(dbauthz.AsSystemRestricted(ctx), database.InsertChatParams{
+			Runtime:           database.ChatRuntimeCoder,
 			OrganizationID:    user.OrganizationID,
 			Status:            database.ChatStatusWaiting,
 			ClientType:        database.ChatClientTypeUi,
@@ -5002,6 +5004,7 @@ func TestGetChatUserPrompts(t *testing.T) {
 		modelConfig := createChatModelConfig(t, client)
 
 		chat, err := db.InsertChat(dbauthz.AsSystemRestricted(ctx), database.InsertChatParams{
+			Runtime:           database.ChatRuntimeCoder,
 			OrganizationID:    user.OrganizationID,
 			Status:            database.ChatStatusWaiting,
 			ClientType:        database.ChatClientTypeUi,
@@ -5036,6 +5039,7 @@ func TestGetChatUserPrompts(t *testing.T) {
 		modelConfig := createChatModelConfig(t, client)
 
 		chat, err := db.InsertChat(dbauthz.AsSystemRestricted(ctx), database.InsertChatParams{
+			Runtime:           database.ChatRuntimeCoder,
 			OrganizationID:    user.OrganizationID,
 			Status:            database.ChatStatusWaiting,
 			ClientType:        database.ChatClientTypeUi,
@@ -5061,6 +5065,7 @@ func TestGetChatUserPrompts(t *testing.T) {
 		modelConfig := createChatModelConfig(t, client)
 
 		chat, err := db.InsertChat(dbauthz.AsSystemRestricted(ctx), database.InsertChatParams{
+			Runtime:           database.ChatRuntimeCoder,
 			OrganizationID:    firstUser.OrganizationID,
 			Status:            database.ChatStatusWaiting,
 			ClientType:        database.ChatClientTypeUi,
@@ -5101,6 +5106,7 @@ func TestGetChatUserPrompts(t *testing.T) {
 		modelConfig := createChatModelConfig(t, client)
 
 		emptyChat, err := db.InsertChat(dbauthz.AsSystemRestricted(ctx), database.InsertChatParams{
+			Runtime:           database.ChatRuntimeCoder,
 			OrganizationID:    user.OrganizationID,
 			Status:            database.ChatStatusWaiting,
 			ClientType:        database.ChatClientTypeUi,
@@ -5116,6 +5122,7 @@ func TestGetChatUserPrompts(t *testing.T) {
 		require.Empty(t, resp.Prompts)
 
 		assistantOnlyChat, err := db.InsertChat(dbauthz.AsSystemRestricted(ctx), database.InsertChatParams{
+			Runtime:           database.ChatRuntimeCoder,
 			OrganizationID:    user.OrganizationID,
 			Status:            database.ChatStatusWaiting,
 			ClientType:        database.ChatClientTypeUi,
@@ -9688,6 +9695,7 @@ func TestPromoteChatQueuedMessage(t *testing.T) {
 		require.NoError(t, err)
 
 		chat, err := db.InsertChat(dbauthz.AsSystemRestricted(ctx), database.InsertChatParams{
+			Runtime:           database.ChatRuntimeCoder,
 			OrganizationID:    user.OrganizationID,
 			Status:            database.ChatStatusWaiting,
 			ClientType:        database.ChatClientTypeUi,
@@ -9805,6 +9813,7 @@ func TestPromoteChatQueuedMessage(t *testing.T) {
 		modelConfig := createChatModelConfig(t, client)
 
 		chat, err := db.InsertChat(dbauthz.AsSystemRestricted(ctx), database.InsertChatParams{
+			Runtime:           database.ChatRuntimeCoder,
 			OrganizationID:    user.OrganizationID,
 			Status:            database.ChatStatusWaiting,
 			ClientType:        database.ChatClientTypeUi,
