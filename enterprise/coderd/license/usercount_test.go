@@ -3,10 +3,12 @@ package license_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/xerrors"
 
 	"github.com/coder/coder/v2/coderd/database"
 	"github.com/coder/coder/v2/coderd/database/dbgen"
@@ -190,7 +192,10 @@ func TestCountWorkspaceCapableUsers(t *testing.T) {
 		require.Equal(t, int64(1), count)
 	})
 
-	t.Run("EntitlementsExperimentGate", func(t *testing.T) {
+	t.Run("EntitlementsAddonGate", func(t *testing.T) {
+		// Permission-based counting is gated on both the experiment and a
+		// valid license carrying the AI Governance addon. Without either,
+		// the legacy active user count applies.
 		rbac.ReloadBuiltinRoles(&rbac.RoleOptions{MinimumImplicitMember: true})
 		t.Cleanup(func() { rbac.ReloadBuiltinRoles(nil) })
 
@@ -204,23 +209,136 @@ func TestCountWorkspaceCapableUsers(t *testing.T) {
 		member(t, db, org.ID, wsUser, rbac.RoleOrgWorkspaceAccess())
 
 		enablements := map[codersdk.FeatureName]bool{}
+		experimentOn := codersdk.Experiments{codersdk.ExperimentPermissionBasedLicensing}
 
-		// Experiment off: legacy count includes the gateway account.
-		entitlements, err := license.Entitlements(ctx, db, 1, 1, coderdenttest.Keys, enablements, authorizer, nil)
+		// No license: legacy count, even with the experiment on.
+		entitlements, err := license.Entitlements(ctx, db, 1, 1, coderdenttest.Keys, enablements, authorizer, experimentOn)
 		require.NoError(t, err)
 		require.Equal(t, int64(2), *entitlements.Features[codersdk.FeatureUserLimit].Actual)
 
-		// Experiment on: only the workspace-capable user counts.
-		entitlements, err = license.Entitlements(ctx, db, 1, 1, coderdenttest.Keys, enablements, authorizer,
-			codersdk.Experiments{codersdk.ExperimentPermissionBasedLicensing})
+		// License without the AI Governance addon: still the legacy count.
+		_, err = db.InsertLicense(ctx, database.InsertLicenseParams{
+			JWT: coderdenttest.GenerateLicense(t, coderdenttest.LicenseOptions{
+				Features: license.Features{codersdk.FeatureUserLimit: 100},
+			}),
+			Exp: dbtime.Now().Add(time.Hour),
+		})
 		require.NoError(t, err)
+		entitlements, err = license.Entitlements(ctx, db, 1, 1, coderdenttest.Keys, enablements, authorizer, experimentOn)
+		require.NoError(t, err)
+		require.Equal(t, int64(2), *entitlements.Features[codersdk.FeatureUserLimit].Actual)
+
+		// License with the AI Governance addon: only the workspace-capable
+		// user counts.
+		_, err = db.InsertLicense(ctx, database.InsertLicenseParams{
+			JWT: coderdenttest.GenerateLicense(t, *(&coderdenttest.LicenseOptions{
+				Features: license.Features{codersdk.FeatureUserLimit: 100},
+			}).AIGovernanceAddon(10)),
+			Exp: dbtime.Now().Add(time.Hour),
+		})
+		require.NoError(t, err)
+		entitlements, err = license.Entitlements(ctx, db, 1, 1, coderdenttest.Keys, enablements, authorizer, experimentOn)
+		require.NoError(t, err)
+		require.Empty(t, entitlements.Errors)
 		require.Equal(t, int64(1), *entitlements.Features[codersdk.FeatureUserLimit].Actual)
 
-		// Experiment on without an authorizer: fall back to the legacy
-		// count instead of failing.
-		entitlements, err = license.Entitlements(ctx, db, 1, 1, coderdenttest.Keys, enablements, nil,
-			codersdk.Experiments{codersdk.ExperimentPermissionBasedLicensing})
+		// Addon present but experiment off: legacy count.
+		entitlements, err = license.Entitlements(ctx, db, 1, 1, coderdenttest.Keys, enablements, authorizer, nil)
 		require.NoError(t, err)
 		require.Equal(t, int64(2), *entitlements.Features[codersdk.FeatureUserLimit].Actual)
+
+		// Addon present, experiment on, but no authorizer: fall back to the
+		// legacy count instead of failing.
+		entitlements, err = license.Entitlements(ctx, db, 1, 1, coderdenttest.Keys, enablements, nil, experimentOn)
+		require.NoError(t, err)
+		require.Equal(t, int64(2), *entitlements.Features[codersdk.FeatureUserLimit].Actual)
+	})
+
+	t.Run("LicensesEntitlementsCountFn", func(t *testing.T) {
+		// Exercises LicensesEntitlements directly: the count function is
+		// only invoked when a valid license carries the addon, grace
+		// period licenses still gate the count, and count errors fall
+		// back to the legacy count with a recorded error.
+		now := time.Now()
+		enablements := map[codersdk.FeatureName]bool{}
+
+		dbLicense := func(opts coderdenttest.LicenseOptions) database.License {
+			return database.License{
+				UUID: uuid.New(),
+				JWT:  coderdenttest.GenerateLicense(t, opts),
+				Exp:  now.Add(time.Hour * 24 * 60),
+			}
+		}
+		addonLicense := func() database.License {
+			return dbLicense(*(&coderdenttest.LicenseOptions{
+				Features: license.Features{codersdk.FeatureUserLimit: 100},
+			}).Valid(now).AIGovernanceAddon(10))
+		}
+
+		t.Run("NoAddonFnNotCalled", func(t *testing.T) {
+			licenses := []database.License{dbLicense(*(&coderdenttest.LicenseOptions{
+				Features: license.Features{codersdk.FeatureUserLimit: 100},
+			}).Valid(now))}
+			entitlements, err := license.LicensesEntitlements(ctx, now, licenses, enablements, coderdenttest.Keys, license.FeatureArguments{
+				ActiveUserCount: 7,
+				WorkspaceCapableUserCountFn: func(context.Context) (int64, error) {
+					t.Fatal("count fn must not be called without the addon")
+					return 0, nil
+				},
+			})
+			require.NoError(t, err)
+			require.Equal(t, int64(7), *entitlements.Features[codersdk.FeatureUserLimit].Actual)
+		})
+
+		t.Run("AddonUsesFn", func(t *testing.T) {
+			entitlements, err := license.LicensesEntitlements(ctx, now, []database.License{addonLicense()}, enablements, coderdenttest.Keys, license.FeatureArguments{
+				ActiveUserCount: 7,
+				WorkspaceCapableUserCountFn: func(context.Context) (int64, error) {
+					return 3, nil
+				},
+			})
+			require.NoError(t, err)
+			require.Empty(t, entitlements.Errors)
+			require.Equal(t, int64(3), *entitlements.Features[codersdk.FeatureUserLimit].Actual)
+		})
+
+		t.Run("GracePeriodAddonUsesFn", func(t *testing.T) {
+			// A license in its grace period still includes the addon, so
+			// counting must not revert until the license hard-expires.
+			licenses := []database.License{dbLicense(*(&coderdenttest.LicenseOptions{
+				Features: license.Features{codersdk.FeatureUserLimit: 100},
+			}).GracePeriod(now).AIGovernanceAddon(10))}
+			entitlements, err := license.LicensesEntitlements(ctx, now, licenses, enablements, coderdenttest.Keys, license.FeatureArguments{
+				ActiveUserCount: 7,
+				WorkspaceCapableUserCountFn: func(context.Context) (int64, error) {
+					return 3, nil
+				},
+			})
+			require.NoError(t, err)
+			require.Equal(t, int64(3), *entitlements.Features[codersdk.FeatureUserLimit].Actual)
+		})
+
+		t.Run("FnErrorFallsBack", func(t *testing.T) {
+			entitlements, err := license.LicensesEntitlements(ctx, now, []database.License{addonLicense()}, enablements, coderdenttest.Keys, license.FeatureArguments{
+				ActiveUserCount: 7,
+				WorkspaceCapableUserCountFn: func(context.Context) (int64, error) {
+					return 0, xerrors.New("boom")
+				},
+			})
+			require.NoError(t, err)
+			require.Equal(t, int64(7), *entitlements.Features[codersdk.FeatureUserLimit].Actual)
+			require.Len(t, entitlements.Errors, 1)
+			require.Contains(t, entitlements.Errors[0], "Error counting workspace-capable users")
+		})
+
+		t.Run("ContextCanceledBails", func(t *testing.T) {
+			_, err := license.LicensesEntitlements(ctx, now, []database.License{addonLicense()}, enablements, coderdenttest.Keys, license.FeatureArguments{
+				ActiveUserCount: 7,
+				WorkspaceCapableUserCountFn: func(context.Context) (int64, error) {
+					return 0, context.Canceled
+				},
+			})
+			require.ErrorIs(t, err, context.Canceled)
+		})
 	})
 }

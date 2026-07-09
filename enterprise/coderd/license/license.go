@@ -43,20 +43,22 @@ func Entitlements(
 		return codersdk.Entitlements{}, err
 	}
 
-	var activeUserCount int64
+	// nolint:gocritic // Getting active user count is a system function.
+	activeUserCount, err := db.GetActiveUserCount(dbauthz.AsSystemRestricted(ctx), false) // Don't include system user in license count.
+	if err != nil {
+		return codersdk.Entitlements{}, xerrors.Errorf("query active user count: %w", err)
+	}
+
+	// Permission-based licensing counts only users the RBAC engine
+	// authorizes to create workspaces. Users without workspace-create
+	// capability ("gateway accounts") do not consume seats. The count is
+	// resolved lazily by LicensesEntitlements, and only when a valid
+	// license carries the AI Governance addon; deployments without the
+	// addon always use the plain active user count.
+	var workspaceCapableUserCountFn WorkspaceCapableUserCountFn
 	if experiments.Enabled(codersdk.ExperimentPermissionBasedLicensing) && authorizer != nil {
-		// Permission-based licensing counts only users the RBAC engine
-		// authorizes to create workspaces. Users without workspace-create
-		// capability ("gateway accounts") do not consume seats.
-		activeUserCount, err = CountWorkspaceCapableUsers(ctx, db, authorizer)
-		if err != nil {
-			return codersdk.Entitlements{}, xerrors.Errorf("count workspace capable users: %w", err)
-		}
-	} else {
-		// nolint:gocritic // Getting active user count is a system function.
-		activeUserCount, err = db.GetActiveUserCount(dbauthz.AsSystemRestricted(ctx), false) // Don't include system user in license count.
-		if err != nil {
-			return codersdk.Entitlements{}, xerrors.Errorf("query active user count: %w", err)
+		workspaceCapableUserCountFn = func(ctx context.Context) (int64, error) {
+			return CountWorkspaceCapableUsers(ctx, db, authorizer)
 		}
 	}
 
@@ -78,11 +80,12 @@ func Entitlements(
 	}
 
 	entitlements, err := LicensesEntitlements(ctx, now, licenses, enablements, keys, FeatureArguments{
-		ActiveUserCount:       activeUserCount,
-		ActiveAISeatCount:     activeAISeatCount,
-		ReplicaCount:          replicaCount,
-		ExternalAuthCount:     externalAuthCount,
-		ExternalTemplateCount: int64(len(externalTemplates)),
+		ActiveUserCount:             activeUserCount,
+		ActiveAISeatCount:           activeAISeatCount,
+		ReplicaCount:                replicaCount,
+		ExternalAuthCount:           externalAuthCount,
+		ExternalTemplateCount:       int64(len(externalTemplates)),
+		WorkspaceCapableUserCountFn: workspaceCapableUserCountFn,
 		ManagedAgentCountFn: func(ctx context.Context, startTime time.Time, endTime time.Time) (int64, error) {
 			// This is not super accurate, as the start and end times will be
 			// truncated to the date in UTC timezone. This is an optimization
@@ -117,9 +120,17 @@ type FeatureArguments struct {
 	// state of the world, but a count between two points in time determined by
 	// the licenses.
 	ManagedAgentCountFn ManagedAgentCountFn
+	// WorkspaceCapableUserCountFn returns the number of active users the
+	// RBAC engine authorizes to create workspaces. It is invoked only when
+	// a valid license carries the AI Governance addon; the result then
+	// replaces ActiveUserCount for the user_limit feature and its
+	// warnings. May be nil, in which case ActiveUserCount is always used.
+	WorkspaceCapableUserCountFn WorkspaceCapableUserCountFn
 }
 
 type ManagedAgentCountFn func(ctx context.Context, from time.Time, to time.Time) (int64, error)
+
+type WorkspaceCapableUserCountFn func(ctx context.Context) (int64, error)
 
 // LicensesEntitlements returns the entitlements for licenses. Entitlements are
 // merged from all licenses and the highest entitlement is used for each feature.
@@ -144,6 +155,11 @@ func LicensesEntitlements(
 	// vs inherited from FeatureSet (Premium). Only explicit grants should
 	// suppress the soft warning for AI Bridge GA.
 	hasExplicitAIBridgeEntitlement := false
+
+	// Track whether any valid license carries the AI Governance addon with
+	// its dependencies satisfied. This gates permission-based seat
+	// counting below.
+	hasAIGovernanceAddon := false
 
 	// Default all entitlements to be disabled.
 	entitlements := codersdk.Entitlements{
@@ -386,6 +402,9 @@ func LicensesEntitlements(
 				// Ignore the addon and don't add any features.
 				continue
 			}
+			if addon == codersdk.AddonAIGovernance {
+				hasAIGovernanceAddon = true
+			}
 			for _, featureName := range addon.Features() {
 				if _, exists := addonFeatures[featureName]; !exists {
 					addonFeatures[featureName] = codersdk.Feature{
@@ -397,6 +416,29 @@ func LicensesEntitlements(
 		}
 		for featureName, feature := range addonFeatures {
 			entitlements.AddFeature(featureName, feature)
+		}
+	}
+
+	// Permission-based seat counting. When a valid license carries the AI
+	// Governance addon, only workspace-capable users consume user_limit
+	// seats; gateway accounts (users without workspace-create) are free.
+	// The resolved count overwrites featureArguments.ActiveUserCount,
+	// which the user_limit feature's Actual pointer aliases, so both the
+	// feature value and the over-limit warnings below observe it.
+	if hasAIGovernanceAddon && featureArguments.WorkspaceCapableUserCountFn != nil {
+		capableCount, err := featureArguments.WorkspaceCapableUserCountFn(ctx)
+		if xerrors.Is(err, context.Canceled) || xerrors.Is(err, context.DeadlineExceeded) {
+			// If the context is canceled, we want to bail the entire
+			// LicensesEntitlements call.
+			return entitlements, xerrors.Errorf("count workspace capable users: %w", err)
+		}
+		if err != nil {
+			// Fall back to the legacy active user count rather than failing
+			// the entitlements computation.
+			entitlements.Errors = append(entitlements.Errors,
+				fmt.Sprintf("Error counting workspace-capable users: %s", err.Error()))
+		} else {
+			featureArguments.ActiveUserCount = capableCount
 		}
 	}
 
