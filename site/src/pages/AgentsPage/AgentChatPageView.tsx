@@ -1040,8 +1040,6 @@ interface AgentChatPageLoadingViewProps {
 	isModelCatalogLoading?: boolean;
 	planModeEnabled?: boolean;
 	onPlanModeToggle?: (enabled: boolean) => void;
-	// Pins the composer to the Claude Code runtime (badge instead of
-	// model selector, model options not required to send).
 	isClaudeCodeChat?: boolean;
 	isSidebarCollapsed: boolean;
 	onToggleSidebarCollapsed: () => void;

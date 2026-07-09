@@ -180,7 +180,6 @@ interface ChatPageInputProps {
 	aiGatewayDisabled?: boolean;
 	planModeEnabled?: boolean;
 	onPlanModeToggle?: (enabled: boolean) => void;
-	// Pins the composer to the Claude Code runtime.
 	isClaudeCodeChat?: boolean;
 	isModelCatalogLoading?: boolean;
 	// Imperative editor handle plus the one-time initial draft,

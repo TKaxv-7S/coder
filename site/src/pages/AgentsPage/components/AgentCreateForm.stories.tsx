@@ -157,6 +157,8 @@ const getCreateOptions = (onCreateChat: unknown): CreateChatSubmission => {
 
 type CreateChatSubmission = {
 	model?: string;
+	runtime?: string;
+	workspaceId?: string;
 };
 
 export const RootPersonalModelOverrideModelSelected: Story = {
@@ -857,13 +859,7 @@ export const ClaudeCodeRuntimeSubmission: Story = {
 		await waitFor(() => {
 			expect(args.onCreateChat).toHaveBeenCalled();
 		});
-		const options = (args.onCreateChat as ReturnType<typeof fn>).mock
-			.calls[0]?.[0] as
-			| { runtime?: string; model?: string; workspaceId?: string }
-			| undefined;
-		if (!options) {
-			throw new Error("Expected onCreateChat to receive options");
-		}
+		const options = getCreateOptions(args.onCreateChat);
 		expect(options.runtime).toBe("claude_code");
 		expect(options.model).toBeUndefined();
 		expect(options.workspaceId).toBeUndefined();

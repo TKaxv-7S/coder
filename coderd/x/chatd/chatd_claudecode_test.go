@@ -37,9 +37,9 @@ type claudeCodeTestSetup struct {
 
 // seedClaudeCodeChatDependencies seeds everything a claude_code chat
 // turn needs: an org member, an enabled anthropic provider with a key,
-// an enabled runtime config, and a workspace chain with an agent. When
-// running is false the latest build is a settled stop, exercising the
-// restart path.
+// an enabled runtime config, and a workspace chain with an agent.
+// Passing a stop transition leaves the latest build as a settled stop,
+// exercising the restart path.
 func seedClaudeCodeChatDependencies(t *testing.T, db database.Store, transition database.WorkspaceTransition) claudeCodeTestSetup {
 	t.Helper()
 	ctx := context.Background()
