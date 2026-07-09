@@ -138,6 +138,11 @@ type Options struct {
 	// clock overrides the cluster TLS clock, for tests.
 	clock quartz.Clock
 
+	// clusterTLSTimeout overrides the cluster route TLS handshake timeout, for
+	// tests. Zero leaves the NATS default (2s). Tests use a longer timeout
+	// because handshakes are flaky under load and in CI.
+	clusterTLSTimeout time.Duration
+
 	// PeerFetcher provides the current set of peer route addresses.
 	// RefreshPeers uses it to update the configured cluster routes.
 	PeerFetcher PeerFetcher
@@ -340,7 +345,11 @@ func New(ctx context.Context, logger slog.Logger, opts Options) (pubSub *Pubsub,
 		selfIP := net.ParseIP(opts.ClusterHost)
 		ct = newClusterTLS(ctx, logger, opts.clock, opts.ClusterCA, selfIP)
 		sopts.Cluster.TLSConfig = ct.tlsConfig()
-		sopts.Cluster.TLSTimeout = clusterTLSTimeout.Seconds()
+		// Leave TLSTimeout unset (NATS defaults to 2s) unless a test overrides
+		// it; the default has not shown a need to change in production.
+		if opts.clusterTLSTimeout > 0 {
+			sopts.Cluster.TLSTimeout = opts.clusterTLSTimeout.Seconds()
+		}
 	}
 
 	ns, err := startEmbeddedServer(sopts)

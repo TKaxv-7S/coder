@@ -23,9 +23,6 @@ import (
 )
 
 const (
-	// clusterTLSTimeout is the route TLS handshake timeout. NATS defaults to a
-	// tight 2s, which is flaky under load and in CI.
-	clusterTLSTimeout = 10 * time.Second
 	// leafSerialBits is the entropy of a leaf certificate serial number.
 	leafSerialBits = 128
 	// clockSkewToleranceTLS backdates a leaf's NotBefore so a peer with a

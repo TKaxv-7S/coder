@@ -85,10 +85,11 @@ func newTLSPubsub(t *testing.T, ca cryptokeys.SigningKeycache, ip net.IP) *Pubsu
 	logger := slogtest.Make(t, nil)
 	ctx := testutil.Context(t, testutil.WaitLong)
 	ps, err := New(ctx, logger, Options{
-		ClusterHost:    ip.String(),
-		ClusterPort:    natsserver.RANDOM_PORT,
-		disableCluster: false,
-		ClusterCA:      ca,
+		ClusterHost:       ip.String(),
+		ClusterPort:       natsserver.RANDOM_PORT,
+		disableCluster:    false,
+		ClusterCA:         ca,
+		clusterTLSTimeout: testClusterTLSTimeout,
 	})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = ps.Close() })
