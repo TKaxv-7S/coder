@@ -11,9 +11,16 @@ import {
 } from "#/components/DropdownMenu/DropdownMenu";
 import { useDashboard } from "#/modules/dashboard/useDashboard";
 import { useFeatureVisibility } from "#/modules/dashboard/useFeatureVisibility";
-import { getSeverity, severityBorderClassName } from "#/utils/budget";
+import { getSeverity, type UsageSeverity } from "#/utils/budget";
 import { UserDropdownAISpend } from "./UserDropdownAISpend";
 import { UserDropdownContent } from "./UserDropdownContent";
+
+/** Avatar border color per AI spend severity. */
+const severityBorderClasses = {
+	normal: "border-content-secondary",
+	warning: "border-content-warning",
+	exceeded: "border-content-destructive",
+} as const satisfies Record<UsageSeverity, string>;
 
 interface UserDropdownProps {
 	user: TypesGen.User;
@@ -31,7 +38,7 @@ export const UserDropdown: FC<UserDropdownProps> = ({
 	const { experiments } = useDashboard();
 	// TODO(AIGOV-443): drop the experiment gate once cost control is stable.
 	const aibridgeVisible =
-		useFeatureVisibility().aibridge &&
+		Boolean(useFeatureVisibility().aibridge) &&
 		experiments.includes("ai-gateway-cost-control");
 	const { data, isError } = useQuery({
 		...meAISpend(),
@@ -40,7 +47,7 @@ export const UserDropdown: FC<UserDropdownProps> = ({
 
 	// A null limit is unlimited and still shown.
 	const hasValidSpend =
-		!!data &&
+		data !== undefined &&
 		data.current_spend_micros >= 0 &&
 		(data.spend_limit_micros === null || data.spend_limit_micros >= 0);
 	const spend =
@@ -66,7 +73,7 @@ export const UserDropdown: FC<UserDropdownProps> = ({
 						fallback={user.username}
 						src={user.avatar_url}
 						size="lg"
-						className={spend ? severityBorderClassName(severity) : undefined}
+						className={spend ? severityBorderClasses[severity] : undefined}
 					/>
 				</button>
 			</DropdownMenuTrigger>

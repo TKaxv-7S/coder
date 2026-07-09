@@ -75,7 +75,7 @@ const GroupMembersPage: FC = () => {
 	const { experiments } = useDashboard();
 	// TODO(AIGOV-443): drop the experiment gate once cost control is stable.
 	const aibridgeVisible =
-		useFeatureVisibility().aibridge &&
+		Boolean(useFeatureVisibility().aibridge) &&
 		experiments.includes("ai-gateway-cost-control");
 	// Spend resets at period_end, rendered in the viewer's local time.
 	const { data: aiSpend } = useQuery({
@@ -93,7 +93,8 @@ const GroupMembersPage: FC = () => {
 	if (resetAt) {
 		aiBudgetNote += ` Resets ${resetAt}.`;
 	}
-	if (groupBudget && groupBudget.spend_limit_micros > 0) {
+	// A $0 default still shows: it means no spending allowance.
+	if (groupBudget) {
 		aiBudgetNote += ` The group's default limit is ${formatBudgetUSD(
 			groupBudget.spend_limit_micros,
 		)} per member.`;

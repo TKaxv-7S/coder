@@ -1,10 +1,13 @@
 import type { FC } from "react";
-import {
-	clampPercentage,
-	severityProgressClassName,
-	type UsageSeverity,
-} from "#/utils/budget";
+import { clampPercentage, type UsageSeverity } from "#/utils/budget";
 import { cn } from "#/utils/cn";
+
+/** Bar fill color per usage severity. */
+const severityProgressClasses = {
+	normal: "bg-content-secondary",
+	warning: "bg-content-warning",
+	exceeded: "bg-content-destructive",
+} as const satisfies Record<UsageSeverity, string>;
 
 interface UsageBarProps {
 	/** Fraction used, 0-100. Clamped for safety. */
@@ -38,7 +41,7 @@ export const UsageBar: FC<UsageBarProps> = ({
 			<div
 				className={cn(
 					"h-full rounded-full transition-all duration-300 ease-out",
-					severityProgressClassName(severity),
+					severityProgressClasses[severity],
 				)}
 				style={{ width: `${clampedPercent}%` }}
 			/>

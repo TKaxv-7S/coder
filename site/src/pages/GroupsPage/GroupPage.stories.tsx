@@ -8,7 +8,6 @@ import {
 	API,
 	type GroupMemberAICostControl,
 	type GroupMemberWithAICostControl,
-	type UserAISpend,
 } from "#/api/api";
 import {
 	getGroupByIdQueryKey,
@@ -23,7 +22,11 @@ import {
 	getUserAIBudgetOverrideQueryKey,
 	meAISpendKey,
 } from "#/api/queries/users";
-import type { ReducedUser } from "#/api/typesGenerated";
+import type {
+	GroupAIBudget,
+	ReducedUser,
+	UserAISpendStatus,
+} from "#/api/typesGenerated";
 import {
 	MockDefaultOrganization,
 	MockGroup,
@@ -95,18 +98,15 @@ const membersQuery = (data: unknown) => ({
 	data,
 });
 
-// period_end is exclusive.
-const aiSpendQuery = {
-	key: meAISpendKey,
-	data: {
-		user_id: MockUserOwner.id,
-		spend_limit_micros: 9_000_000_000,
-		effective_group_id: MockGroupWithoutMembers.id,
-		limit_source: "group",
-		current_spend_micros: 1_345_000_000,
-		period_start: "2026-06-01T00:00:00Z",
-		period_end: "2026-07-01T00:00:00Z",
-	} satisfies UserAISpend,
+/** period_end is exclusive. */
+const mockUserAISpend: UserAISpendStatus = {
+	user_id: MockUserOwner.id,
+	spend_limit_micros: 9_000_000_000,
+	effective_group_id: MockGroupWithoutMembers.id,
+	limit_source: "group",
+	current_spend_micros: 1_345_000_000,
+	period_start: "2026-06-01T00:00:00Z",
+	period_end: "2026-07-01T00:00:00Z",
 };
 
 export default meta;
@@ -257,28 +257,26 @@ export const FiltersByMembers: Story = {
 	},
 };
 
+const mockCostControl: GroupMemberAICostControl = {
+	current_spend_micros: 1_345_000_000,
+	spend_limit_micros: 9_000_000_000,
+	effective_group_id: MockGroupWithoutMembers.id,
+	limit_source: "group",
+};
+
 const memberWithSpend = (
 	user: ReducedUser,
 	overrides: Partial<GroupMemberAICostControl> = {},
 ): GroupMemberWithAICostControl => ({
 	...user,
-	ai_cost_control: {
-		current_spend_micros: 1_345_000_000,
-		spend_limit_micros: 9_000_000_000,
-		effective_group_id: MockGroupWithoutMembers.id,
-		limit_source: "group",
-		...overrides,
-	},
+	ai_cost_control: { ...mockCostControl, ...overrides },
 });
 
-const groupBudgetQuery = {
-	key: groupAIBudget(MockGroupWithoutMembers.id).queryKey,
-	data: {
-		group_id: MockGroupWithoutMembers.id,
-		spend_limit_micros: 7_000_000_000,
-		created_at: "2026-06-01T00:00:00Z",
-		updated_at: "2026-06-01T00:00:00Z",
-	},
+const mockGroupBudget: GroupAIBudget = {
+	group_id: MockGroupWithoutMembers.id,
+	spend_limit_micros: 7_000_000_000,
+	created_at: "2026-06-01T00:00:00Z",
+	updated_at: "2026-06-01T00:00:00Z",
 };
 
 export const WithMemberAIBudget: Story = {
@@ -297,8 +295,11 @@ export const WithMemberAIBudget: Story = {
 				count: 1,
 			}),
 			permissionsQuery({ canUpdateGroup: true }),
-			aiSpendQuery,
-			groupBudgetQuery,
+			{ key: meAISpendKey, data: mockUserAISpend },
+			{
+				key: groupAIBudget(MockGroupWithoutMembers.id).queryKey,
+				data: mockGroupBudget,
+			},
 		],
 	},
 	play: async ({ canvasElement }) => {
@@ -369,7 +370,7 @@ export const AIBudgetActionDisabledForOtherGroup: Story = {
 				count: 1,
 			}),
 			permissionsQuery({ canUpdateGroup: true }),
-			aiSpendQuery,
+			{ key: meAISpendKey, data: mockUserAISpend },
 			{ key: groupAIBudget(MockGroupWithoutMembers.id).queryKey, data: null },
 			{
 				key: getGroupByIdQueryKey(MockGroup2.id, { exclude_members: true }),
@@ -391,6 +392,7 @@ export const AIBudgetActionDisabledForOtherGroup: Story = {
 	},
 };
 
+/** A null effective group means no budget applies: the member is unlimited. */
 export const WithMemberAIBudgetWithoutEffectiveGroup: Story = {
 	parameters: {
 		features: ["aibridge"],
@@ -398,11 +400,16 @@ export const WithMemberAIBudgetWithoutEffectiveGroup: Story = {
 		queries: [
 			groupQuery(MockGroupWithoutMembers),
 			groupMembersQuery({
-				users: [memberWithSpend(MockUserOwner, { effective_group_id: null })],
+				users: [
+					memberWithSpend(MockUserOwner, {
+						effective_group_id: null,
+						spend_limit_micros: null,
+					}),
+				],
 				count: 1,
 			}),
 			permissionsQuery({ canUpdateGroup: true }),
-			aiSpendQuery,
+			{ key: meAISpendKey, data: mockUserAISpend },
 			{ key: getUserAIBudgetOverrideQueryKey(MockUserOwner.id), data: null },
 			{
 				key: getGroupsForUserQueryKey(
@@ -421,13 +428,11 @@ export const WithMemberAIBudgetWithoutEffectiveGroup: Story = {
 		const cell = await canvas.findByTestId(
 			`member-ai-budget-${MockUserOwner.id}`,
 		);
-		await expect(cell).not.toHaveTextContent("$1,345");
+		await expect(cell).toHaveTextContent("Unlimited");
 		await userEvent.click(
 			within(cell).getByRole("button", { name: "More info" }),
 		);
-		await expect(
-			await body.findByText(/managed by another org/),
-		).toBeInTheDocument();
+		await expect(await body.findByText(/isn't restricted/)).toBeInTheDocument();
 		await userEvent.keyboard("{Escape}");
 
 		await userEvent.click(
@@ -455,7 +460,7 @@ export const OpenAIBudgetForCurrentGroupMember: Story = {
 				count: 1,
 			}),
 			permissionsQuery({ canUpdateGroup: true }),
-			aiSpendQuery,
+			{ key: meAISpendKey, data: mockUserAISpend },
 			{ key: getUserAIBudgetOverrideQueryKey(MockUserOwner.id), data: null },
 			{
 				key: getGroupsForUserQueryKey(
@@ -484,14 +489,13 @@ export const OpenAIBudgetForCurrentGroupMember: Story = {
 	},
 };
 
-// Per-state details are covered by GroupMemberBudgetCells.stories.
-const showcaseMember = (
-	user: Partial<ReducedUser>,
-	costControl: Partial<GroupMemberAICostControl>,
-): GroupMemberWithAICostControl =>
-	memberWithSpend({ ...MockUserMember, ...user }, costControl);
+/** Per-state details are covered by GroupMemberBudgetCells.stories. */
+const mockShowcaseMember: GroupMemberWithAICostControl = {
+	...MockUserMember,
+	ai_cost_control: mockCostControl,
+};
 
-// Doesn't resolve via getGroupById, standing in for a group in another org.
+/** Unresolvable via getGroupById, standing in for another org's group. */
 const unresolvedGroupId = "external-org-group";
 
 export const AIBudgetShowcase: Story = {
@@ -502,80 +506,107 @@ export const AIBudgetShowcase: Story = {
 			groupQuery(MockGroupWithoutMembers),
 			groupMembersQuery({
 				users: [
-					showcaseMember(
-						{ id: "member-none", username: "alice", name: "Alice Chen" },
-						{
+					{
+						...mockShowcaseMember,
+						id: "member-none",
+						username: "alice",
+						name: "Alice Chen",
+						ai_cost_control: {
+							...mockCostControl,
 							current_spend_micros: 0,
 							spend_limit_micros: 0,
 							effective_group_id: MockGroupWithoutMembers.organization_id,
 						},
-					),
-					showcaseMember(
-						{ id: "member-unlimited", username: "bob", name: "Bob Diaz" },
-						{
+					},
+					{
+						...mockShowcaseMember,
+						id: "member-unlimited",
+						username: "bob",
+						name: "Bob Diaz",
+						ai_cost_control: {
+							...mockCostControl,
 							current_spend_micros: 0,
 							spend_limit_micros: null,
 							effective_group_id: MockGroupWithoutMembers.organization_id,
 						},
-					),
-					showcaseMember(
-						{ id: "member-elsewhere", username: "priya", name: "Priya Nair" },
-						{
+					},
+					{
+						...mockShowcaseMember,
+						id: "member-elsewhere",
+						username: "priya",
+						name: "Priya Nair",
+						ai_cost_control: {
+							...mockCostControl,
 							current_spend_micros: 456_000_000,
 							effective_group_id: unresolvedGroupId,
 						},
-					),
-					showcaseMember(
-						{ id: "member-regular", username: "jordan", name: "Jordan Lee" },
-						{
+					},
+					{
+						...mockShowcaseMember,
+						id: "member-regular",
+						username: "jordan",
+						name: "Jordan Lee",
+						ai_cost_control: {
+							...mockCostControl,
 							current_spend_micros: 3_235_000_000,
 							spend_limit_micros: 7_000_000_000,
 						},
-					),
-					showcaseMember(
-						{
-							id: "member-custom",
-							username: "sam",
-							name: "Sam Okafor",
-							status: "dormant",
-						},
-						{
+					},
+					{
+						...mockShowcaseMember,
+						id: "member-custom",
+						username: "sam",
+						name: "Sam Okafor",
+						status: "dormant",
+						ai_cost_control: {
+							...mockCostControl,
 							current_spend_micros: 7_175_000_000,
 							limit_source: "user_override",
 						},
-					),
-					showcaseMember(
-						{ id: "member-near", username: "morgan", name: "Morgan Ito" },
-						{
+					},
+					{
+						...mockShowcaseMember,
+						id: "member-near",
+						username: "morgan",
+						name: "Morgan Ito",
+						ai_cost_control: {
+							...mockCostControl,
 							current_spend_micros: 6_735_000_000,
 							spend_limit_micros: 7_000_000_000,
 						},
-					),
-					showcaseMember(
-						{ id: "member-over", username: "casey", name: "Casey Novak" },
-						{
+					},
+					{
+						...mockShowcaseMember,
+						id: "member-over",
+						username: "casey",
+						name: "Casey Novak",
+						ai_cost_control: {
+							...mockCostControl,
 							current_spend_micros: 7_200_000_000,
 							spend_limit_micros: 7_000_000_000,
 						},
-					),
-					showcaseMember(
-						{
-							id: "member-other-group",
-							username: "riley",
-							name: "Riley Park",
-							status: "suspended",
-						},
-						{
+					},
+					{
+						...mockShowcaseMember,
+						id: "member-other-group",
+						username: "riley",
+						name: "Riley Park",
+						status: "suspended",
+						ai_cost_control: {
+							...mockCostControl,
 							current_spend_micros: 456_000_000,
 							effective_group_id: MockGroup2.id,
 						},
-					),
+					},
 				],
 				count: 8,
 			}),
 			permissionsQuery({ canUpdateGroup: true }),
-			aiSpendQuery,
-			groupBudgetQuery,
+			{ key: meAISpendKey, data: mockUserAISpend },
+			{
+				key: groupAIBudget(MockGroupWithoutMembers.id).queryKey,
+				data: mockGroupBudget,
+			},
 			{
 				key: getGroupByIdQueryKey(unresolvedGroupId, { exclude_members: true }),
 				data: null,
