@@ -5930,7 +5930,14 @@ func (api *API) putChatAutoArchiveDays(rw http.ResponseWriter, r *http.Request) 
 	rw.WriteHeader(http.StatusNoContent)
 }
 
-// EXPERIMENTAL: this endpoint is experimental and is subject to change.
+// @Summary List chat runtime configs
+// @ID list-chat-runtime-configs
+// @Security CoderSessionToken
+// @Tags Chats
+// @Produce json
+// @Success 200 {array} codersdk.ChatRuntimeConfig
+// @Router /api/experimental/chats/config/runtimes [get]
+// @Description Experimental: this endpoint is subject to change.
 func (api *API) listChatRuntimeConfigs(rw http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if !api.Authorize(r, policy.ActionRead, rbac.ResourceDeploymentConfig) {
@@ -5952,7 +5959,16 @@ func (api *API) listChatRuntimeConfigs(rw http.ResponseWriter, r *http.Request) 
 	httpapi.Write(ctx, rw, http.StatusOK, resp)
 }
 
-// EXPERIMENTAL: this endpoint is experimental and is subject to change.
+// @Summary Upsert chat runtime config
+// @ID upsert-chat-runtime-config
+// @Security CoderSessionToken
+// @Tags Chats
+// @Accept json
+// @Produce json
+// @Param request body codersdk.UpsertChatRuntimeConfigRequest true "Request body"
+// @Success 200 {object} codersdk.ChatRuntimeConfig
+// @Router /api/experimental/chats/config/runtimes [put]
+// @Description Experimental: this endpoint is subject to change.
 func (api *API) putChatRuntimeConfig(rw http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if !api.Authorize(r, policy.ActionUpdate, rbac.ResourceDeploymentConfig) {
@@ -6020,7 +6036,15 @@ func (api *API) putChatRuntimeConfig(rw http.ResponseWriter, r *http.Request) {
 	httpapi.Write(ctx, rw, http.StatusOK, convertChatRuntimeConfig(config))
 }
 
-// EXPERIMENTAL: this endpoint is experimental and is subject to change.
+// @Summary Delete chat runtime config
+// @ID delete-chat-runtime-config
+// @Security CoderSessionToken
+// @Tags Chats
+// @Param organization_id query string true "Organization ID" format(uuid)
+// @Param runtime query string true "Chat runtime"
+// @Success 204
+// @Router /api/experimental/chats/config/runtimes [delete]
+// @Description Experimental: this endpoint is subject to change.
 func (api *API) deleteChatRuntimeConfig(rw http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if !api.Authorize(r, policy.ActionUpdate, rbac.ResourceDeploymentConfig) {
@@ -6054,7 +6078,15 @@ func (api *API) deleteChatRuntimeConfig(rw http.ResponseWriter, r *http.Request)
 	rw.WriteHeader(http.StatusNoContent)
 }
 
-// EXPERIMENTAL: this endpoint is experimental and is subject to change.
+// @Summary List chat runtime availability
+// @ID list-chat-runtime-availability
+// @Security CoderSessionToken
+// @Tags Chats
+// @Produce json
+// @Success 200 {array} codersdk.ChatRuntimeAvailability
+// @Router /api/experimental/chats/runtime-availability [get]
+// @Description Experimental: this endpoint is subject to change.
+//
 // listChatRuntimeAvailability reports which external runtimes are
 // enabled for organizations the requesting user belongs to, so the UI
 // can decide whether to offer runtime-backed chats. Configs are read
