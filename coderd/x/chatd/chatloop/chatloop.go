@@ -280,6 +280,14 @@ type GenerateCompactionOptions struct {
 	ToolCallID          string
 	ToolName            string
 
+	// ResolvedProvider, ResolvedModel, and ModelConfigID identify the
+	// model that actually generates the summary, which can differ from
+	// the chat model when a compaction model override is configured.
+	// Debug runs record these instead of the parent run's identity.
+	ResolvedProvider string
+	ResolvedModel    string
+	ModelConfigID    uuid.UUID
+
 	PublishMessagePart func(codersdk.ChatMessageRole, codersdk.ChatMessagePart)
 }
 

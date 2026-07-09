@@ -684,7 +684,11 @@ func (s *taskStarter) generateCompaction(
 	}
 	compactionOpts := prepared.Compaction.Options
 	compactionOpts.PublishMessagePart = attempt.publish
-	outcome, err := chatloop.GenerateCompaction(ctx, compactionOpts)
+	// Attach the turn debug run so the compaction call records a child
+	// debug run; without it startCompactionDebugRun finds no parent and
+	// skips debug instrumentation entirely.
+	runCtx := input.DebugTurn.Ensure(ctx, prepared.Chat, prepared.Debug)
+	outcome, err := chatloop.GenerateCompaction(runCtx, compactionOpts)
 	if err != nil {
 		s.server.metrics.RecordCompaction(compactionProvider(compactionOpts), compactionModel(compactionOpts), false, err)
 		return xerrors.Errorf("generate compaction: %w", err)

@@ -571,20 +571,57 @@ func (server *Server) prepareGeneration(
 	if override, ok := server.resolveUserCompactionThreshold(ctx, chat.OwnerID, modelConfig.ID); ok {
 		effectiveThreshold = override
 	}
+	compactionModel := model
+	compactionPrompt := prompt
+	compactionResolvedProvider := resolvedProvider
+	compactionResolvedModel := debugModel
+	compactionModelConfigID := modelConfig.ID
+	// The effective compaction limit is the stricter of the chat model's
+	// and the compaction model's context limits: the history must also fit
+	// the summarizer's window. Post-compaction continuation checks keep
+	// using the chat model's limit (ContextLimitFallback below), since the
+	// follow-up assistant generation runs on the chat model.
+	compactionContextLimit := modelConfig.ContextLimit
+	compactionOverride, compactionOverrideSet, err := server.resolveCompactionModelOverride(ctx, chat, modelOpts)
+	if err != nil {
+		cleanup()
+		return generationPrepared{}, err
+	}
+	if compactionOverrideSet {
+		compactionModel = compactionOverride.model
+		compactionResolvedProvider = compactionOverride.resolvedProvider
+		compactionResolvedModel = compactionOverride.resolvedModel
+		compactionModelConfigID = compactionOverride.modelConfig.ID
+		if overrideLimit := compactionOverride.modelConfig.ContextLimit; overrideLimit > 0 &&
+			(compactionContextLimit <= 0 || overrideLimit < compactionContextLimit) {
+			compactionContextLimit = overrideLimit
+		}
+		compactionPrompt = sanitizeCompactionPrompt(
+			ctx,
+			logger,
+			prompt,
+			compactionOverride.model,
+			modelConfig,
+			compactionOverride.modelConfig,
+		)
+	}
 	compactionOptions := chatloop.GenerateCompactionOptions{
-		Model:                model,
-		Messages:             prompt,
+		Model:                compactionModel,
+		Messages:             compactionPrompt,
 		ThresholdPercent:     effectiveThreshold,
-		ContextLimit:         modelConfig.ContextLimit,
-		ContextLimitFallback: modelConfig.ContextLimit,
+		ContextLimit:         compactionContextLimit,
+		ContextLimitFallback: compactionContextLimit,
 		ToolCallID:           compactionToolCallID,
 		ToolName:             "chat_summarized",
 		DebugSvc:             debugSvc,
 		ChatID:               chat.ID,
 		HistoryTipMessageID:  historyTipMessageID,
+		ResolvedProvider:     compactionResolvedProvider,
+		ResolvedModel:        compactionResolvedModel,
+		ModelConfigID:        compactionModelConfigID,
 	}
 	compactionOptions.StepUsage = latestPromptUsage(promptRows)
-	compactionNeeded := shouldCompactPromptUsage(compactionOptions.StepUsage, modelConfig.ContextLimit, effectiveThreshold)
+	compactionNeeded := shouldCompactPromptUsage(compactionOptions.StepUsage, compactionContextLimit, effectiveThreshold)
 
 	// workspaceCtx.currentChatSnapshot may carry a freshly persisted
 	// AgentID/BuildID binding from the getWorkspaceAgent call above.
