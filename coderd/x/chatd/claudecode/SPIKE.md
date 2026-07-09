@@ -72,6 +72,19 @@ needed: `ANTHROPIC_API_KEY` in the process env was sufficient, no
    initialize ~0.2-0.4s; session/new ~1.7s; session/resume ~1.9s (spawn + init
    + resume ~2.1s); short haiku prompt turn 5-10s wall. Per-turn process
    respawn adds roughly 2s overhead, acceptable for chat turns.
+8. Model pinning: `ANTHROPIC_MODEL` is NOT honored in ACP mode (found in
+   dogfood 2026-07-09, full-stack dev instance). The env var demonstrably
+   reaches the adapter and the bundled `cli.js` (verified via
+   `/proc/<pid>/environ` during live turns), and the gateway serves the
+   requested model when asked directly, but the agent SDK spawns `cli.js`
+   in stream-json mode with no `--model` flag and that mode resolves the
+   model from options/settings only; every ACP turn used the sonnet
+   default. The same `cli.js` honors `ANTHROPIC_MODEL` in `-p` print mode.
+   The runtime config `Model` knob is therefore ineffective with adapter
+   0.16.2. Working alternative, verified end to end: the template writes
+   `~/.claude/settings.json` with `{"model": "..."}`; `cli.js` runs with
+   `--setting-sources user,project,local` and the next ACP turn served the
+   pinned model.
 
 ## Limitations (not tested here)
 
@@ -92,4 +105,6 @@ needed: `ANTHROPIC_API_KEY` in the process env was sufficient, no
 GO. Resume across process kills works via session/resume with the same cwd,
 and ANTHROPIC_BASE_URL routing is fully honored, so the per-turn process model
 and gateway routing assumptions in this package hold for adapter 0.16.2.
-Usage/billing data is the one gap: not available over ACP from this adapter.
+Two gaps remain with this adapter: usage/billing data is not available over
+ACP, and ANTHROPIC_MODEL is ignored in ACP mode (finding 8), so model pinning
+requires the template to write `~/.claude/settings.json`.
