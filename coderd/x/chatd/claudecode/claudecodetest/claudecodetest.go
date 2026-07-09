@@ -5,6 +5,7 @@ package claudecodetest
 import (
 	"context"
 	"io"
+	stdslog "log/slog"
 	"slices"
 	"sync"
 
@@ -192,6 +193,8 @@ func (t *PipeTransport) Start(_ context.Context) (claudecode.Process, error) {
 	clientReads, agentWrites := io.Pipe()
 	agentReads, clientWrites := io.Pipe()
 	conn := acp.NewAgentSideConnection(t.Agent, agentWrites, agentReads)
+	// Mirrors RunTurn: slog.Default()'s handler is not race-safe.
+	conn.SetLogger(stdslog.New(stdslog.DiscardHandler))
 	t.Agent.setConn(conn)
 	return &pipeProcess{
 		stdin:  clientWrites,

@@ -10,6 +10,7 @@ package claudecode
 import (
 	"context"
 	"encoding/json"
+	stdslog "log/slog"
 	"strings"
 	"sync"
 	"time"
@@ -90,6 +91,10 @@ func RunTurn(ctx context.Context, transport Transport, input TurnInput) (TurnOut
 		logger:  input.Logger,
 	}
 	conn := acp.NewClientSideConnection(collector, process.Stdin(), process.Stdout())
+	// Without an explicit logger the SDK logs through slog.Default(),
+	// whose process-wide handler is not guaranteed to be safe for
+	// concurrent use (trivy installs a racy deferred handler).
+	conn.SetLogger(stdslog.New(stdslog.DiscardHandler))
 
 	// The connection dies with the process; a canceled parent must
 	// still let the cancel handshake below run, so RPCs use an
