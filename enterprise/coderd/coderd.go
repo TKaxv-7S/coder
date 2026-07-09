@@ -802,7 +802,6 @@ type Options struct {
 	// Used for high availability.
 	ReplicaSyncUpdateInterval time.Duration
 	ReplicaErrorGracePeriod   time.Duration
-	ClusterHost               string // IP or hostname to reach this specific replica
 	DERPServerRelayAddress    string
 	DERPServerRegionID        int
 

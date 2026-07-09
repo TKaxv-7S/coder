@@ -205,6 +205,13 @@ type Options struct {
 	TLSCertificates    []tls.Certificate
 	TailnetCoordinator tailnet.Coordinator
 	DERPServer         *derp.Server
+	// ClusterHost is this replica's routable cluster address (IP or hostname),
+	// resolved from DeploymentValues.Cluster.Host, falling back to the DERP
+	// relay host for older HA deployments that predate the setting. It is used
+	// as the NATS cluster route host and, when it is an IP, the cluster mTLS
+	// leaf IP SAN. It is consumed by the NATS pubsub (AGPL) and, under
+	// enterprise HA, by replicasync.
+	ClusterHost string
 	// BaseDERPMap is used as the base DERP map for all clients and agents.
 	// Proxies are added to this list.
 	BaseDERPMap                    *tailcfg.DERPMap
