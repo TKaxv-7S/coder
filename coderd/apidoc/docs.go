@@ -24341,6 +24341,10 @@ const docTemplate = `{
                         "type": "string"
                     }
                 },
+                "session_id": {
+                    "type": "string",
+                    "format": "uuid"
+                },
                 "success": {
                     "type": "boolean"
                 }

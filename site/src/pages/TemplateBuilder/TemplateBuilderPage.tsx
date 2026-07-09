@@ -1,4 +1,4 @@
-import { type FC, useEffect } from "react";
+import { type FC, useEffect, useMemo } from "react";
 import { useMutation, useQuery } from "react-query";
 import { Navigate, useNavigate } from "react-router";
 import { deploymentConfig } from "#/api/queries/deployment";
@@ -23,6 +23,10 @@ const TemplateBuilderPage: FC = () => {
 	const createMutation = useMutation(createTemplateFromBuilder());
 	const sessionMutation = useMutation(recordTemplateBuilderSession());
 
+	// Stable session ID for the lifetime of this page mount, shared
+	// across wizard_entry and compose_completion telemetry events.
+	const sessionId = useMemo(() => crypto.randomUUID(), []);
+
 	const builderDisabled = data?.config?.template_builder?.disabled ?? false;
 	const wizardReady =
 		!builderDisabled && !isLoading && permissions.createTemplates;
@@ -33,8 +37,8 @@ const TemplateBuilderPage: FC = () => {
 		if (!wizardReady) {
 			return;
 		}
-		reportSession({ event_type: "wizard_entry" });
-	}, [wizardReady, reportSession]);
+		reportSession({ session_id: sessionId, event_type: "wizard_entry" });
+	}, [wizardReady, reportSession, sessionId]);
 
 	const basesQuery = useQuery({
 		...templateBuilderBases(),
@@ -60,6 +64,7 @@ const TemplateBuilderPage: FC = () => {
 		createMutation.mutate(req, {
 			onSuccess: (resp) => {
 				sessionMutation.mutate({
+					session_id: state.sessionId,
 					event_type: "compose_completion",
 					base_template_id: state.baseTemplateId ?? undefined,
 					module_ids: state.modules.map((m) => m.id),
@@ -74,6 +79,7 @@ const TemplateBuilderPage: FC = () => {
 			},
 			onError: () => {
 				sessionMutation.mutate({
+					session_id: state.sessionId,
 					event_type: "compose_completion",
 					base_template_id: state.baseTemplateId ?? undefined,
 					module_ids: state.modules.map((m) => m.id),
@@ -94,6 +100,7 @@ const TemplateBuilderPage: FC = () => {
 				createError={createMutation.error}
 				isCreating={createMutation.isPending}
 				onClearCreateError={() => createMutation.reset()}
+				sessionId={sessionId}
 			/>
 		</>
 	);

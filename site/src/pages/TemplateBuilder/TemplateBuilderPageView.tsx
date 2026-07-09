@@ -45,7 +45,7 @@ import {
 import { TemplateAlternatives } from "./TemplateAlternatives";
 import { TemplateCustomizationsStep } from "./TemplateCustomizationsStep";
 import {
-	initialWizardState,
+	createWizardState,
 	type TemplateBuilderWizardState,
 	type WizardAction,
 	wizardReducer,
@@ -58,6 +58,7 @@ interface TemplateBuilderPageViewProps {
 	createError: Error | null;
 	isCreating: boolean;
 	onClearCreateError?: () => void;
+	sessionId: string;
 }
 
 export const TemplateBuilderPageView: FC<TemplateBuilderPageViewProps> = ({
@@ -67,8 +68,13 @@ export const TemplateBuilderPageView: FC<TemplateBuilderPageViewProps> = ({
 	createError,
 	isCreating,
 	onClearCreateError,
+	sessionId,
 }) => {
-	const [state, dispatch] = useReducer(wizardReducer, initialWizardState);
+	const [state, dispatch] = useReducer(
+		wizardReducer,
+		sessionId,
+		createWizardState,
+	);
 	const [stepIndex, setStepIndex] = useState(0);
 	const modulesQuery = useQuery(templateBuilderModules(state.selectedBase?.id));
 

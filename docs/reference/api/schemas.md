@@ -12429,6 +12429,7 @@ Restarts will only happen on weekdays in this list on weeks which line up with W
   "module_ids": [
     "string"
   ],
+  "session_id": "1ffd059c-17ea-40a8-8aef-70fd0307db82",
   "success": true
 }
 ```
@@ -12441,6 +12442,7 @@ Restarts will only happen on weekdays in this list on weeks which line up with W
 | `duration_seconds` | number                                                                               | false    |              |             |
 | `event_type`       | [codersdk.TemplateBuilderSessionEventType](#codersdktemplatebuildersessioneventtype) | true     |              |             |
 | `module_ids`       | array of string                                                                      | false    |              |             |
+| `session_id`       | string                                                                               | false    |              |             |
 | `success`          | boolean                                                                              | false    |              |             |
 
 #### Enumerated Values

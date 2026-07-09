@@ -43,6 +43,8 @@ export type TemplateBuilderWizardState = {
 	selectedModules: SelectedModuleMeta[];
 	/** Epoch millis when the wizard was entered, used for telemetry duration. */
 	enteredAt: number;
+	/** Stable ID shared across wizard_entry and compose_completion events. */
+	sessionId: string;
 };
 
 export const initialWizardState: TemplateBuilderWizardState = {
@@ -56,8 +58,20 @@ export const initialWizardState: TemplateBuilderWizardState = {
 	icon: "",
 	selectedBase: null,
 	selectedModules: [],
-	enteredAt: Date.now(),
+	enteredAt: 0,
+	sessionId: "",
 };
+
+/** Creates a fresh wizard state with the given session ID and current timestamp. */
+export function createWizardState(
+	sessionId: string,
+): TemplateBuilderWizardState {
+	return {
+		...initialWizardState,
+		enteredAt: Date.now(),
+		sessionId,
+	};
+}
 
 export type WizardAction =
 	| { type: "SET_BASE"; base: SelectedBaseMeta }
