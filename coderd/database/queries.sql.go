@@ -8690,10 +8690,9 @@ WHERE
         ELSE true
     END
     -- websearch_to_tsquery accepts quoted phrases, OR, and -negation;
-    -- the 'simple' config folds case and skips stemming. btrim makes
-    -- whitespace-only search behave like empty.
+    -- the 'simple' config folds case and skips stemming.
     AND CASE
-        WHEN btrim($16::text) != '' THEN (
+        WHEN btrim($16::text, E' \t\n\r') != '' THEN (
             -- Served by idx_chats_title_fts.
             to_tsvector('simple', chats_expanded.title) @@ websearch_to_tsquery('simple', $16)
             -- Served by idx_chat_diff_statuses_pr_title_fts.

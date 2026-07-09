@@ -15364,6 +15364,15 @@ func TestGetChatsSearch(t *testing.T) {
 	msgChat := createRoot("plain one")
 	insertMsg(msgChat.ID, database.ChatMessageRoleUser, database.ChatMessageVisibilityBoth, "kubernetes cluster restart")
 
+	assistantMsgChat := createRoot("plain assistant")
+	insertMsg(assistantMsgChat.ID, database.ChatMessageRoleAssistant, database.ChatMessageVisibilityBoth, "grafana dashboard tuning")
+
+	userVisMsgChat := createRoot("plain uservis")
+	insertMsg(userVisMsgChat.ID, database.ChatMessageRoleUser, database.ChatMessageVisibilityUser, "vault token rotation")
+
+	assistantUserVisMsgChat := createRoot("plain assistant uservis")
+	insertMsg(assistantUserVisMsgChat.ID, database.ChatMessageRoleAssistant, database.ChatMessageVisibilityUser, "redis eviction policy")
+
 	deletedMsgChat := createRoot("plain two")
 	deletedMsg := insertMsg(deletedMsgChat.ID, database.ChatMessageRoleUser, database.ChatMessageVisibilityBoth, "terraform apply failure")
 
@@ -15373,7 +15382,7 @@ func TestGetChatsSearch(t *testing.T) {
 
 	ineligibleChat := createRoot("plain three")
 	toolMsg := insertMsg(ineligibleChat.ID, database.ChatMessageRoleTool, database.ChatMessageVisibilityBoth, "forbidden secret token")
-	modelMsg := insertMsg(ineligibleChat.ID, database.ChatMessageRoleUser, database.ChatMessageVisibilityModel, "forbidden secret token")
+	modelOnlyMsg := insertMsg(ineligibleChat.ID, database.ChatMessageRoleUser, database.ChatMessageVisibilityModel, "forbidden secret token")
 
 	// Ineligible rows keep search_tsv NULL after backfill.
 	_, err = store.BackfillChatMessagesSearchTsv(ctx, 1000)
@@ -15388,11 +15397,11 @@ func TestGetChatsSearch(t *testing.T) {
 	pendingChat := createRoot("plain four")
 	insertMsg(pendingChat.ID, database.ChatMessageRoleUser, database.ChatMessageVisibilityBoth, "elasticsearch indexing")
 
-	// Force search_tsv onto ineligible rows to prove the role and
-	// visibility predicates exclude them even when the vector is set.
+	// Prove role/visibility predicates exclude rows even when search_tsv
+	// is set.
 	_, err = sqlDB.ExecContext(ctx,
 		`UPDATE chat_messages SET search_tsv = to_tsvector('simple', 'forbidden secret token') WHERE id = ANY($1)`,
-		pq.Array([]int64{toolMsg.ID, modelMsg.ID}))
+		pq.Array([]int64{toolMsg.ID, modelOnlyMsg.ID}))
 	require.NoError(t, err)
 
 	_, err = store.ArchiveChatByID(ctx, archivedChat.ID)
@@ -15400,8 +15409,9 @@ func TestGetChatsSearch(t *testing.T) {
 
 	allRootIDs := []uuid.UUID{
 		titleChat.ID, archivedChat.ID, prTitleChat.ID, mergedChat.ID,
-		msgChat.ID, deletedMsgChat.ID, childParent.ID, ineligibleChat.ID,
-		pendingChat.ID,
+		msgChat.ID, assistantMsgChat.ID, userVisMsgChat.ID,
+		assistantUserVisMsgChat.ID, deletedMsgChat.ID, childParent.ID,
+		ineligibleChat.ID, pendingChat.ID,
 	}
 
 	tests := []struct {
@@ -15414,6 +15424,9 @@ func TestGetChatsSearch(t *testing.T) {
 		{"Title/AndSemantics", database.GetChatsParams{Search: "deploy nonexistent"}, nil},
 		{"PRTitle/Match", database.GetChatsParams{Search: "authentication"}, []uuid.UUID{prTitleChat.ID, mergedChat.ID}},
 		{"Message/Match", database.GetChatsParams{Search: "kubernetes restart"}, []uuid.UUID{msgChat.ID}},
+		{"Message/AssistantRoleMatch", database.GetChatsParams{Search: "grafana tuning"}, []uuid.UUID{assistantMsgChat.ID}},
+		{"Message/UserVisibilityMatch", database.GetChatsParams{Search: "vault rotation"}, []uuid.UUID{userVisMsgChat.ID}},
+		{"Message/AssistantUserVisibilityMatch", database.GetChatsParams{Search: "redis eviction"}, []uuid.UUID{assistantUserVisMsgChat.ID}},
 		{"PRNumber/Match", database.GetChatsParams{Search: "42"}, []uuid.UUID{prTitleChat.ID}},
 		{"PRNumber/NonNumericNoMatch", database.GetChatsParams{Search: "42abc"}, nil},
 		{"PRNumber/OversizedDigitsNoError", database.GetChatsParams{Search: "1111111111111111111111111"}, nil},
@@ -15422,7 +15435,7 @@ func TestGetChatsSearch(t *testing.T) {
 		{"Message/DeletedNoMatch", database.GetChatsParams{Search: "terraform"}, nil},
 		// Parent also excluded: EXISTS is per-chat, not per-tree.
 		{"Message/ChildNotSurfaced", database.GetChatsParams{Search: "orchestrator saga"}, nil},
-		{"Message/IneligibleRolesNoMatch", database.GetChatsParams{Search: "forbidden secret"}, nil},
+		{"Message/IneligibleMessagesNoMatch", database.GetChatsParams{Search: "forbidden secret"}, nil},
 		{"Composed/ArchivedDefaultIncludesAll", database.GetChatsParams{Search: "deploy pipeline"}, []uuid.UUID{titleChat.ID, archivedChat.ID}},
 		{"Composed/ArchivedFalseExcludes", database.GetChatsParams{Search: "deploy pipeline", Archived: sql.NullBool{Bool: false, Valid: true}}, []uuid.UUID{titleChat.ID}},
 		{"Composed/ArchivedTrueOnly", database.GetChatsParams{Search: "deploy pipeline", Archived: sql.NullBool{Bool: true, Valid: true}}, []uuid.UUID{archivedChat.ID}},
@@ -15430,6 +15443,7 @@ func TestGetChatsSearch(t *testing.T) {
 		{"Composed/SearchAndPRStatus", database.GetChatsParams{Search: "authentication", PullRequestStatuses: []string{"merged"}}, []uuid.UUID{mergedChat.ID}},
 		{"EmptySearch/ReturnsAll", database.GetChatsParams{Search: ""}, allRootIDs},
 		{"WhitespaceSearch/ReturnsAll", database.GetChatsParams{Search: "   "}, allRootIDs},
+		{"TabOnlySearch/ReturnsAll", database.GetChatsParams{Search: "\t\t"}, allRootIDs},
 		{"EmptySearch/TitleQueryStillWorks", database.GetChatsParams{Search: "", TitleQuery: "pipeline alpha"}, []uuid.UUID{titleChat.ID}},
 		{"EmptySearch/PRTitleQueryStillWorks", database.GetChatsParams{Search: "", PrTitleQuery: "authentication bug"}, []uuid.UUID{prTitleChat.ID}},
 	}
