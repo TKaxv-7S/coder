@@ -100,6 +100,18 @@ needed: `ANTHROPIC_API_KEY` in the process env was sufficient, no
   exercised).
 - Gateway behavior under load, rate limiting, and long multi-tool turns.
 
+## Security note: the provider key is exposed to the workspace owner
+
+The per-turn env injection means `ANTHROPIC_API_KEY` lives in the adapter
+process environment inside the chat owner's workspace. Workspace owners run
+code as the same user and can read `/proc/<pid>/environ`, so enabling the
+runtime hands the configured key to every user who can create runtime chats,
+letting them call the provider directly and bypass chatd usage limits.
+Admins must configure a scoped, rate-limited key (for example an AI gateway
+token), never a raw organization-wide provider key. Keeping the key
+server-side requires routing turns through a coderd-side proxy with
+short-lived per-user credentials, which is follow-up work.
+
 ## Verdict
 
 GO. Resume across process kills works via session/resume with the same cwd,
