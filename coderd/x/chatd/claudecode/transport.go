@@ -11,7 +11,10 @@ import (
 
 // DefaultAdapterCommand launches the Claude Code ACP adapter inside the
 // workspace. The template backing the runtime must provide it on PATH.
-const DefaultAdapterCommand = "claude-code-acp"
+// The binary ships in the @agentclientprotocol/claude-agent-acp npm
+// package (the renamed successor of the deprecated
+// @zed-industries/claude-code-acp).
+const DefaultAdapterCommand = "claude-agent-acp"
 
 // Process is a running ACP adapter with stdio attached. Stdout carries
 // newline-delimited JSON-RPC; stderr is logging only.

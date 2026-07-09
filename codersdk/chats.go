@@ -123,7 +123,7 @@ type ChatRuntimeConfig struct {
 	Runtime        ChatRuntime `json:"runtime"`
 	// TemplateID is the template chat workspaces are created from. The
 	// template must provide the runtime's agent executable (e.g. the
-	// claude-code-acp adapter for the claude_code runtime).
+	// claude-agent-acp adapter for the claude_code runtime).
 	TemplateID uuid.UUID `json:"template_id" format:"uuid"`
 	Enabled    bool      `json:"enabled"`
 	// Model optionally pins the model the runtime agent uses. Empty

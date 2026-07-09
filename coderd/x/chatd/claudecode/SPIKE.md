@@ -120,3 +120,37 @@ and gateway routing assumptions in this package hold for adapter 0.16.2.
 Two gaps remain with this adapter: usage/billing data is not available over
 ACP, and ANTHROPIC_MODEL is ignored in ACP mode (finding 8), so model pinning
 requires the template to write `~/.claude/settings.json`.
+
+## Addendum: adapter renamed, re-validated on 0.58.1 (2026-07-09)
+
+`@zed-industries/claude-code-acp` is deprecated on npm ("renamed to
+@agentclientprotocol/claude-agent-acp. Please migrate to continue receiving
+updates.") and frozen at 0.16.2. The successor is
+`@agentclientprotocol/claude-agent-acp` (github.com/agentclientprotocol/
+claude-agent-acp), which installs a different binary name:
+`claude-agent-acp`. `DefaultAdapterCommand` now targets it.
+
+Re-validated versions: adapter 0.58.1 (@agentclientprotocol/sdk 1.2.1,
+@anthropic-ai/claude-agent-sdk 0.3.205), same acp-go-sdk v0.13.5 and node
+v22.19.0, same probe design (local pipes + dummy listener + live gateway
+turns).
+
+| Gate | 0.16.2 | 0.58.1 |
+|---|---|---|
+| initialize with acp-go-sdk v0.13.5 (protocolVersion 1) | pass | pass |
+| Stdio purity (all runs) | pass | pass |
+| ANTHROPIC_BASE_URL routing exclusivity | pass | pass |
+| Resume hard gate (turn, SIGKILL, fresh process, session/resume, recall) | pass | pass (resume ~3.4s vs ~1.9s) |
+| session/load fallback, history replayed as updates | pass | pass |
+| session/cancel resolves stopReason=cancelled | pass (~8ms) | pass (~12ms) |
+| Session storage `~/.claude/projects/<cwd-slug>/<id>.jsonl` | pass | pass |
+| ANTHROPIC_MODEL honored in ACP mode | FAIL (finding 8) | PASS: requested model was `claude-haiku-4-5` with the env var set, `claude-opus-4-8` without |
+| Usage over ACP | absent (finding 6) | PASS: `PromptResponse.usage` populated (input/output/cached tokens) plus `usage_update` session updates |
+
+Both 0.16.2 gaps are fixed in 0.58.1: the runtime config `Model` knob works
+through env injection (no `~/.claude/settings.json` workaround needed), and
+per-turn usage lands in `TurnOutcome.Usage`. Capability changes: session
+capabilities grew (`close`, `delete`, `additionalDirectories`), `authMethods`
+is now empty (API-key env remains sufficient), and the same five session
+modes are advertised (`default`, `acceptEdits`, `plan`, `dontAsk`,
+`bypassPermissions`).

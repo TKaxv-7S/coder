@@ -2945,7 +2945,7 @@ export interface ChatRuntimeConfig {
 	/**
 	 * TemplateID is the template chat workspaces are created from. The
 	 * template must provide the runtime's agent executable (e.g. the
-	 * claude-code-acp adapter for the claude_code runtime).
+	 * claude-agent-acp adapter for the claude_code runtime).
 	 */
 	readonly template_id: string;
 	readonly enabled: boolean;

@@ -17864,7 +17864,7 @@ const docTemplate = `{
                     "$ref": "#/definitions/codersdk.ChatRuntime"
                 },
                 "template_id": {
-                    "description": "TemplateID is the template chat workspaces are created from. The\ntemplate must provide the runtime's agent executable (e.g. the\nclaude-code-acp adapter for the claude_code runtime).",
+                    "description": "TemplateID is the template chat workspaces are created from. The\ntemplate must provide the runtime's agent executable (e.g. the\nclaude-agent-acp adapter for the claude_code runtime).",
                     "type": "string",
                     "format": "uuid"
                 },
