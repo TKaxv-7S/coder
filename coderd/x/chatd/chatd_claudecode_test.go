@@ -168,7 +168,7 @@ func claudeCodeConfigOverrides(t *testing.T, agent *claudecodetest.FakeAgent) fu
 		cfg.AgentConn = func(_ context.Context, _ uuid.UUID) (workspacesdk.AgentConn, func(), error) {
 			return mockConn, func() {}, nil
 		}
-		cfg.ClaudeCodeTransport = func(_ context.Context, _ workspacesdk.AgentConn, env map[string]string) (claudecode.Transport, func(), error) {
+		cfg.ClaudeCodeTransport = func(_ context.Context, _ workspacesdk.AgentConn, _ database.WorkspaceAgent, env map[string]string) (claudecode.Transport, func(), error) {
 			require.Equal(t, "test-anthropic-key", env["ANTHROPIC_API_KEY"])
 			require.Equal(t, "claude-test-model", env["ANTHROPIC_MODEL"])
 			return &claudecodetest.PipeTransport{Agent: agent}, func() {}, nil

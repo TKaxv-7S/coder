@@ -112,7 +112,7 @@ func (s *taskStarter) startClaudeCodeGeneration(
 	if transportFn == nil {
 		transportFn = s.sshClaudeCodeTransport
 	}
-	transport, closeTransport, err := transportFn(ctx, conn, env)
+	transport, closeTransport, err := transportFn(ctx, conn, agent, env)
 	if err != nil {
 		if ctx.Err() != nil {
 			return errors.Join(errTaskExpectedExit, xerrors.Errorf("claude code transport: %w", err))
@@ -502,6 +502,7 @@ func (s *taskStarter) dialClaudeCodeAgent(
 type ClaudeCodeTransportFunc func(
 	ctx context.Context,
 	conn workspacesdk.AgentConn,
+	agent database.WorkspaceAgent,
 	env map[string]string,
 ) (claudecode.Transport, func(), error)
 
@@ -511,13 +512,14 @@ type ClaudeCodeTransportFunc func(
 func (s *taskStarter) sshClaudeCodeTransport(
 	ctx context.Context,
 	conn workspacesdk.AgentConn,
+	agent database.WorkspaceAgent,
 	env map[string]string,
 ) (claudecode.Transport, func(), error) {
 	sshClient, err := conn.SSHClient(ctx)
 	if err != nil {
 		return nil, nil, xerrors.Errorf("workspace ssh client: %w", err)
 	}
-	if err := claudeCodeAdapterPreflight(ctx, s.opts.Clock, sshClient); err != nil {
+	if err := s.claudeCodeAdapterPreflight(ctx, sshClient, agent.ID); err != nil {
 		_ = sshClient.Close()
 		return nil, nil, err
 	}
@@ -533,7 +535,78 @@ func (s *taskStarter) sshClaudeCodeTransport(
 // the workspace before starting a turn, so a template that does not
 // ship it produces a legible configuration error instead of an opaque
 // protocol failure.
-func claudeCodeAdapterPreflight(ctx context.Context, clock quartz.Clock, client *gossh.Client) error {
+func (s *taskStarter) claudeCodeAdapterPreflight(
+	ctx context.Context,
+	client *gossh.Client,
+	agentID uuid.UUID,
+) error {
+	probe := func(ctx context.Context) error {
+		return probeClaudeCodeAdapter(ctx, s.opts.Clock, client)
+	}
+	scriptsSettled := func(ctx context.Context) bool {
+		agent, err := s.server.db.GetWorkspaceAgentByID(ctx, agentID)
+		if err != nil {
+			return false
+		}
+		switch agent.LifecycleState {
+		case database.WorkspaceAgentLifecycleStateCreated,
+			database.WorkspaceAgentLifecycleStateStarting:
+			return false
+		default:
+			return true
+		}
+	}
+	return waitForClaudeCodeAdapter(ctx, s.opts.Clock, probe, scriptsSettled)
+}
+
+// waitForClaudeCodeAdapter probes for the adapter binary until it
+// appears. Templates commonly install the adapter from a startup
+// script, and a turn dials the agent as soon as it connects, which can
+// be before those scripts finish (always right after an automatic
+// workspace start when the install lives outside a persistent volume).
+// A failed probe is therefore conclusive only once the agent reports
+// its startup scripts settled, or after the ready timeout.
+func waitForClaudeCodeAdapter(
+	ctx context.Context,
+	clock quartz.Clock,
+	probe func(context.Context) error,
+	scriptsSettled func(context.Context) bool,
+) error {
+	deadline := clock.Now("chatworker", "claudecode-preflight").Add(claudeCodeWorkspaceReadyTimeout)
+	for {
+		// Snapshot settledness before probing: scripts finishing after
+		// a failed probe must not fail the turn without a re-probe.
+		settled := scriptsSettled(ctx)
+		err := probe(ctx)
+		if err == nil {
+			return nil
+		}
+		if ctx.Err() != nil {
+			return xerrors.Errorf("claude code adapter preflight: %w", ctx.Err())
+		}
+		if settled || !clock.Now("chatworker", "claudecode-preflight").Before(deadline) {
+			return chaterror.WithClassification(
+				xerrors.Errorf("claude code adapter preflight: %w", err),
+				chaterror.ClassifiedError{
+					Kind: codersdk.ChatErrorKindConfig,
+					Message: "The workspace does not provide the Claude Code adapter (" + claudecode.DefaultAdapterCommand + "). " +
+						"The template configured for this runtime must preinstall it.",
+				},
+			)
+		}
+		timer := clock.NewTimer(claudeCodeWorkspacePollInterval, "chatworker", "claudecode-preflight")
+		select {
+		case <-timer.C:
+		case <-ctx.Done():
+			timer.Stop()
+			return xerrors.Errorf("claude code adapter preflight: %w", ctx.Err())
+		}
+	}
+}
+
+// probeClaudeCodeAdapter checks once whether the adapter binary is on
+// PATH inside the workspace.
+func probeClaudeCodeAdapter(ctx context.Context, clock quartz.Clock, client *gossh.Client) error {
 	session, err := client.NewSession()
 	if err != nil {
 		return xerrors.Errorf("new ssh session: %w", err)
@@ -549,21 +622,11 @@ func claudeCodeAdapterPreflight(ctx context.Context, clock quartz.Clock, client 
 	select {
 	case err = <-done:
 	case <-timer.C:
-		return xerrors.New("claude code adapter preflight timed out")
+		return xerrors.New("claude code adapter probe timed out")
 	case <-ctx.Done():
-		return xerrors.Errorf("claude code adapter preflight: %w", ctx.Err())
+		return xerrors.Errorf("claude code adapter probe: %w", ctx.Err())
 	}
-	if err != nil {
-		return chaterror.WithClassification(
-			xerrors.Errorf("claude code adapter preflight: %w", err),
-			chaterror.ClassifiedError{
-				Kind: codersdk.ChatErrorKindConfig,
-				Message: "The workspace does not provide the Claude Code adapter (" + claudecode.DefaultAdapterCommand + "). " +
-					"The template configured for this runtime must preinstall it.",
-			},
-		)
-	}
-	return nil
+	return err
 }
 
 // persistClaudeCodeRuntimeState best-effort records the ACP session

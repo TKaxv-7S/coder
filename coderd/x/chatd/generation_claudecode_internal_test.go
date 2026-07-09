@@ -3,16 +3,138 @@ package chatd
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
+	"golang.org/x/xerrors"
 
 	"cdr.dev/slog/v3"
 	acp "github.com/coder/acp-go-sdk"
 	"github.com/coder/coder/v2/coderd/database"
+	"github.com/coder/coder/v2/coderd/x/chatd/chaterror"
 	"github.com/coder/coder/v2/coderd/x/chatd/chatprompt"
 	"github.com/coder/coder/v2/coderd/x/chatd/claudecode"
 	"github.com/coder/coder/v2/codersdk"
+	"github.com/coder/coder/v2/testutil"
+	"github.com/coder/quartz"
 )
+
+func TestWaitForClaudeCodeAdapter(t *testing.T) {
+	t.Parallel()
+
+	adapterMissing := xerrors.New("exit status 1")
+
+	t.Run("RetriesWhileScriptsRun", func(t *testing.T) {
+		t.Parallel()
+		ctx := testutil.Context(t, testutil.WaitShort)
+		clock := quartz.NewMock(t)
+		trap := clock.Trap().NewTimer("chatworker", "claudecode-preflight")
+		defer trap.Close()
+
+		probes := 0
+		probe := func(context.Context) error {
+			probes++
+			if probes >= 3 {
+				return nil
+			}
+			return adapterMissing
+		}
+
+		done := make(chan error, 1)
+		go func() {
+			done <- waitForClaudeCodeAdapter(ctx, clock, probe,
+				func(context.Context) bool { return false })
+		}()
+
+		for range 2 {
+			call := trap.MustWait(ctx)
+			call.MustRelease(ctx)
+			clock.Advance(claudeCodeWorkspacePollInterval).MustWait(ctx)
+		}
+		require.NoError(t, testutil.RequireReceive(ctx, t, done))
+		require.Equal(t, 3, probes)
+	})
+
+	t.Run("SettledScriptsFailImmediately", func(t *testing.T) {
+		t.Parallel()
+		ctx := testutil.Context(t, testutil.WaitShort)
+		clock := quartz.NewMock(t)
+
+		probes := 0
+		err := waitForClaudeCodeAdapter(ctx, clock,
+			func(context.Context) error { probes++; return adapterMissing },
+			func(context.Context) bool { return true })
+		require.Error(t, err)
+		require.Equal(t, 1, probes)
+		classified := chaterror.Classify(err)
+		require.Equal(t, codersdk.ChatErrorKindConfig, classified.Kind)
+	})
+
+	t.Run("DeadlineBoundsUnsettledScripts", func(t *testing.T) {
+		t.Parallel()
+		ctx := testutil.Context(t, testutil.WaitShort)
+		clock := quartz.NewMock(t)
+		trap := clock.Trap().NewTimer("chatworker", "claudecode-preflight")
+		defer trap.Close()
+
+		done := make(chan error, 1)
+		go func() {
+			done <- waitForClaudeCodeAdapter(ctx, clock,
+				func(context.Context) error { return adapterMissing },
+				func(context.Context) bool { return false })
+		}()
+
+		// Advance past the ready timeout; the next failed probe is
+		// conclusive.
+		elapsed := time.Duration(0)
+		for elapsed < claudeCodeWorkspaceReadyTimeout {
+			call := trap.MustWait(ctx)
+			call.MustRelease(ctx)
+			clock.Advance(claudeCodeWorkspacePollInterval).MustWait(ctx)
+			elapsed += claudeCodeWorkspacePollInterval
+		}
+		err := testutil.RequireReceive(ctx, t, done)
+		require.Error(t, err)
+		classified := chaterror.Classify(err)
+		require.Equal(t, codersdk.ChatErrorKindConfig, classified.Kind)
+	})
+
+	t.Run("ScriptsSettlingAfterFailedProbeReprobes", func(t *testing.T) {
+		t.Parallel()
+		ctx := testutil.Context(t, testutil.WaitShort)
+		clock := quartz.NewMock(t)
+		trap := clock.Trap().NewTimer("chatworker", "claudecode-preflight")
+		defer trap.Close()
+
+		// First iteration: not settled, probe fails. The install then
+		// finishes before the second probe, which must succeed even
+		// though the scripts settled in between.
+		probes := 0
+		probe := func(context.Context) error {
+			probes++
+			if probes >= 2 {
+				return nil
+			}
+			return adapterMissing
+		}
+		settledCalls := 0
+		settled := func(context.Context) bool {
+			settledCalls++
+			return settledCalls > 1
+		}
+
+		done := make(chan error, 1)
+		go func() {
+			done <- waitForClaudeCodeAdapter(ctx, clock, probe, settled)
+		}()
+
+		call := trap.MustWait(ctx)
+		call.MustRelease(ctx)
+		clock.Advance(claudeCodeWorkspacePollInterval).MustWait(ctx)
+		require.NoError(t, testutil.RequireReceive(ctx, t, done))
+		require.Equal(t, 2, probes)
+	})
+}
 
 func claudeCodeTextMessage(t *testing.T, id int64, role database.ChatMessageRole, text string) database.ChatMessage {
 	t.Helper()
