@@ -97,12 +97,13 @@ func RunTurn(ctx context.Context, transport Transport, input TurnInput) (TurnOut
 	// concurrent use (trivy installs a racy deferred handler).
 	conn.SetLogger(stdslog.New(stdslog.DiscardHandler))
 
-	// The connection dies with the process; a canceled parent must
-	// still let the cancel handshake below run, so RPCs use an
-	// uncancelable context and cancellation is handled explicitly.
-	rpcCtx := context.WithoutCancel(ctx)
-
-	initResp, err := conn.Initialize(rpcCtx, acp.InitializeRequest{
+	// Setup RPCs stay cancelable so a hung adapter cannot outlive an
+	// interrupted chat or a shutting-down worker: a canceled ctx
+	// aborts them, RunTurn returns, and the deferred Close reaps the
+	// process. Only the prompt and its cancel handshake below use an
+	// uncancelable context, so an interrupt can still resolve the
+	// in-flight prompt with stopReason=canceled per spec.
+	initResp, err := conn.Initialize(ctx, acp.InitializeRequest{
 		ProtocolVersion:    acp.ProtocolVersionNumber,
 		ClientCapabilities: acp.ClientCapabilities{
 			// Claude Code executes tools inside the workspace itself;
@@ -117,16 +118,19 @@ func RunTurn(ctx context.Context, transport Transport, input TurnInput) (TurnOut
 		return TurnOutcome{}, xerrors.Errorf("initialize: %w", err)
 	}
 
-	session, resumed, err := establishSession(rpcCtx, conn, collector, initResp.AgentCapabilities, input)
+	session, resumed, err := establishSession(ctx, conn, collector, initResp.AgentCapabilities, input)
 	if err != nil {
 		return TurnOutcome{}, err
 	}
 
 	if input.PermissionMode != "" {
-		if _, err := conn.SetSessionMode(rpcCtx, acp.SetSessionModeRequest{
+		if _, err := conn.SetSessionMode(ctx, acp.SetSessionModeRequest{
 			SessionId: session,
 			ModeId:    acp.SessionModeId(input.PermissionMode),
 		}); err != nil {
+			if ctx.Err() != nil {
+				return TurnOutcome{}, xerrors.Errorf("set session mode: %w", err)
+			}
 			// Mode support varies by adapter version; a turn without
 			// the requested mode still runs under the auto-deny
 			// permission policy.
@@ -139,6 +143,12 @@ func RunTurn(ctx context.Context, transport Transport, input TurnInput) (TurnOut
 	if !resumed && input.ReseedContext != "" {
 		promptText = input.ReseedContext + "\n\n" + promptText
 	}
+
+	// The connection dies with the process; a canceled parent must
+	// still let the cancel handshake below run, so the prompt RPCs
+	// use an uncancelable context and cancellation is handled
+	// explicitly.
+	rpcCtx := context.WithoutCancel(ctx)
 
 	type promptResult struct {
 		resp acp.PromptResponse
@@ -202,6 +212,11 @@ func establishSession(
 			if err == nil {
 				return prior, true, nil
 			}
+			// Resume failures normally fall back, but a canceled turn
+			// must abort the chain, not race a fallback session.
+			if ctx.Err() != nil {
+				return "", false, xerrors.Errorf("resume session: %w", err)
+			}
 			input.Logger.Warn(ctx, "claude code session resume failed, falling back",
 				slog.F("session_id", input.SessionID), slog.Error(err))
 		}
@@ -218,6 +233,9 @@ func establishSession(
 			collector.setSuppressed(false)
 			if err == nil {
 				return prior, true, nil
+			}
+			if ctx.Err() != nil {
+				return "", false, xerrors.Errorf("load session: %w", err)
 			}
 			input.Logger.Warn(ctx, "claude code session load failed, starting new session",
 				slog.F("session_id", input.SessionID), slog.Error(err))

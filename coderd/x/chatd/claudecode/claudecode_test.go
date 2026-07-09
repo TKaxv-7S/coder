@@ -269,6 +269,49 @@ func TestRunTurnToolCallMapping(t *testing.T) {
 	assert.Equal(t, codersdk.ChatMessagePartTypeText, parts[3].part.Type)
 }
 
+func TestRunTurnCancelDuringSetup(t *testing.T) {
+	t.Parallel()
+	ctx := testutil.Context(t, testutil.WaitShort)
+
+	// A hung setup RPC (session/resume here) must abort when the turn
+	// context is canceled instead of wedging the runner forever.
+	hung := make(chan struct{})
+	agent := &claudecodetest.FakeAgent{
+		Capabilities: acp.AgentCapabilities{
+			SessionCapabilities: acp.SessionCapabilities{
+				Resume: &acp.SessionResumeCapabilities{},
+			},
+		},
+	}
+	agent.OnResumeSession = func(acp.ResumeSessionRequest) error {
+		close(hung)
+		<-ctx.Done()
+		return ctx.Err()
+	}
+
+	turnCtx, cancel := context.WithCancel(ctx)
+	go func() {
+		<-hung
+		cancel()
+	}()
+
+	_, err := claudecode.RunTurn(turnCtx, &claudecodetest.PipeTransport{Agent: agent}, claudecode.TurnInput{
+		Cwd:        "/home/coder",
+		SessionID:  "sess-hang",
+		PromptText: "hello",
+		Publish:    func(codersdk.ChatMessageRole, codersdk.ChatMessagePart) {},
+		Logger:     testLogger(t),
+	})
+	// The SDK surfaces the abort as a JSON-RPC "Request canceled"
+	// error rather than context.Canceled; what matters is that the
+	// turn failed promptly instead of racing a fallback session or
+	// prompting.
+	require.Error(t, err)
+	require.ErrorContains(t, err, "resume session")
+	require.Empty(t, agent.NewSessions())
+	require.Empty(t, agent.Prompts())
+}
+
 func TestRunTurnToolCallInputUpdate(t *testing.T) {
 	t.Parallel()
 	ctx := testutil.Context(t, testutil.WaitShort)
