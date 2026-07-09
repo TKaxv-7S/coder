@@ -168,8 +168,15 @@ func RunTurn(ctx context.Context, transport Transport, input TurnInput) (TurnOut
 	case result = <-resultCh:
 	case <-ctx.Done():
 		// Interrupt: ask the agent to stop, then wait briefly for the
-		// prompt to resolve with stopReason=canceled per spec.
-		_ = conn.Cancel(rpcCtx, acp.CancelNotification{SessionId: session})
+		// prompt to resolve with stopReason=canceled per spec. The
+		// cancel notification goes out on its own bounded context in a
+		// goroutine so a wedged connection (blocked JSON-RPC write)
+		// cannot keep RunTurn from reaching the timeout below.
+		go func() {
+			cancelCtx, done := context.WithTimeout(rpcCtx, cancelResolveTimeout)
+			defer done()
+			_ = conn.Cancel(cancelCtx, acp.CancelNotification{SessionId: session})
+		}()
 		select {
 		case result = <-resultCh:
 		case <-time.After(cancelResolveTimeout):
