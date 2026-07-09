@@ -221,6 +221,7 @@ func AIProvider(t testing.TB, db database.Store, seed database.AIProvider, munge
 		Type:        provType,
 		Name:        name,
 		DisplayName: displayName,
+		Icon:        seed.Icon,
 		Enabled:     takeFirst(seed.Enabled, true),
 		// Use an unsupported scheme so leaked test provider calls fail immediately without retries.
 		BaseUrl:       takeFirst(seed.BaseUrl, "invalid://test.invalid/"),
@@ -2021,6 +2022,8 @@ func AIBridgeInterception(t testing.TB, db database.Store, seed database.InsertA
 			ID:             interception.ID,
 			EndedAt:        *endedAt,
 			CredentialHint: takeFirst(seed.CredentialHint, ""),
+			ErrorType:      database.NullAIBridgeInterceptionErrorType{},
+			ErrorMessage:   sql.NullString{},
 		})
 		require.NoError(t, err, "insert aibridge interception")
 	}
