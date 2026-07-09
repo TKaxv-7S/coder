@@ -8,6 +8,7 @@
 package claudecode
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	stdslog "log/slog"
@@ -254,6 +255,9 @@ type openToolCall struct {
 	name     string
 	rawInput json.RawMessage
 	output   strings.Builder
+	// contentIndex locates the ToolCallContent appended to
+	// turnCollector.content so later input updates can patch it.
+	contentIndex int
 }
 
 var _ acp.Client = (*turnCollector)(nil)
@@ -326,14 +330,15 @@ func (c *turnCollector) handleToolCallLocked(call *acp.SessionUpdateToolCall) {
 	if c.openToolCalls == nil {
 		c.openToolCalls = map[string]*openToolCall{}
 	}
-	c.openToolCalls[string(call.ToolCallId)] = &openToolCall{
-		name:     name,
-		rawInput: input,
-	}
 	content := fantasy.ToolCallContent{
 		ToolCallID: string(call.ToolCallId),
 		ToolName:   name,
 		Input:      string(input),
+	}
+	c.openToolCalls[string(call.ToolCallId)] = &openToolCall{
+		name:         name,
+		rawInput:     input,
+		contentIndex: len(c.content),
 	}
 	c.content = append(c.content, content)
 	c.emit(codersdk.ChatMessageRoleAssistant,
@@ -353,7 +358,22 @@ func (c *turnCollector) handleToolCallUpdateLocked(update *acp.SessionToolCallUp
 		return
 	}
 	if update.RawInput != nil {
-		open.rawInput = marshalRawJSON(update.RawInput)
+		// Adapters may open a tool call with empty or partial input
+		// and deliver the final arguments in a later update. Patch
+		// the already-appended durable content and re-emit the part
+		// (the preview merges parts by tool call id) so history and
+		// preview keep the final input.
+		if input := marshalRawJSON(update.RawInput); !bytes.Equal(input, open.rawInput) {
+			open.rawInput = input
+			content := fantasy.ToolCallContent{
+				ToolCallID: id,
+				ToolName:   open.name,
+				Input:      string(input),
+			}
+			c.content[open.contentIndex] = content
+			c.emit(codersdk.ChatMessageRoleAssistant,
+				chatprompt.PartFromContentWithLogger(context.Background(), c.logger, content))
+		}
 	}
 	c.collectToolContentLocked(id, update.Content)
 	var status acp.ToolCallStatus

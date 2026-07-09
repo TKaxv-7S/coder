@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"charm.land/fantasy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/xerrors"
@@ -266,6 +267,69 @@ func TestRunTurnToolCallMapping(t *testing.T) {
 	// pipeline wraps it, so preview and durable parts match.
 	assert.JSONEq(t, `{"output":"package main"}`, string(parts[2].part.Result))
 	assert.Equal(t, codersdk.ChatMessagePartTypeText, parts[3].part.Type)
+}
+
+func TestRunTurnToolCallInputUpdate(t *testing.T) {
+	t.Parallel()
+	ctx := testutil.Context(t, testutil.WaitShort)
+
+	agent := &claudecodetest.FakeAgent{}
+	agent.OnPrompt = func(ctx context.Context, conn *acp.AgentSideConnection, params acp.PromptRequest) (acp.PromptResponse, error) {
+		// Open with no input; the final arguments arrive only in a
+		// later update, as some adapters stream them.
+		sendUpdate(ctx, t, conn, params.SessionId, acp.SessionUpdate{
+			ToolCall: &acp.SessionUpdateToolCall{
+				ToolCallId: "tool-1",
+				Title:      "Read file",
+				Kind:       acp.ToolKindRead,
+				Status:     acp.ToolCallStatusInProgress,
+			},
+		})
+		sendUpdate(ctx, t, conn, params.SessionId, acp.SessionUpdate{
+			ToolCallUpdate: &acp.SessionToolCallUpdate{
+				ToolCallId: "tool-1",
+				RawInput:   map[string]any{"path": "main.go"},
+			},
+		})
+		completed := acp.ToolCallStatusCompleted
+		sendUpdate(ctx, t, conn, params.SessionId, acp.SessionUpdate{
+			ToolCallUpdate: &acp.SessionToolCallUpdate{
+				ToolCallId: "tool-1",
+				Status:     &completed,
+				Content: []acp.ToolCallContent{
+					acp.ToolContent(acp.TextBlock("package main")),
+				},
+			},
+		})
+		return acp.PromptResponse{StopReason: acp.StopReasonEndTurn}, nil
+	}
+
+	recorder := &partRecorder{}
+	outcome, err := claudecode.RunTurn(ctx, &claudecodetest.PipeTransport{Agent: agent}, claudecode.TurnInput{
+		Cwd:        "/home/coder",
+		PromptText: "read main.go",
+		Publish:    recorder.publish,
+		Logger:     testLogger(t),
+	})
+	require.NoError(t, err)
+
+	// The durable content keeps one tool call entry patched with the
+	// final input, not the empty input it opened with.
+	require.Len(t, outcome.Content, 2)
+	call, ok := outcome.Content[0].(fantasy.ToolCallContent)
+	require.True(t, ok)
+	assert.Equal(t, "tool-1", call.ToolCallID)
+	assert.JSONEq(t, `{"path":"main.go"}`, call.Input)
+
+	// The preview stream saw a corrected tool-call part for the same
+	// id carrying the final arguments (parts merge by tool call id).
+	parts := recorder.snapshot()
+	require.Len(t, parts, 3)
+	assert.Equal(t, codersdk.ChatMessagePartTypeToolCall, parts[0].part.Type)
+	assert.Equal(t, codersdk.ChatMessagePartTypeToolCall, parts[1].part.Type)
+	assert.Equal(t, "tool-1", parts[1].part.ToolCallID)
+	assert.JSONEq(t, `{"path":"main.go"}`, string(parts[1].part.Args))
+	assert.Equal(t, codersdk.ChatMessagePartTypeToolResult, parts[2].part.Type)
 }
 
 func TestRunTurnFailedToolCall(t *testing.T) {
