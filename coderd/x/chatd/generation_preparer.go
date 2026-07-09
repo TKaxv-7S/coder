@@ -596,6 +596,14 @@ func (server *Server) prepareGeneration(
 			(compactionContextLimit <= 0 || overrideLimit < compactionContextLimit) {
 			compactionContextLimit = overrideLimit
 		}
+	}
+	compactionStepUsage := latestPromptUsage(promptRows)
+	compactionNeeded := shouldCompactPromptUsage(compactionStepUsage, compactionContextLimit, effectiveThreshold)
+	// Sanitizing rewrites the full prompt, so skip it unless this turn
+	// actually compacts. The sanitized prompt is only consumed by the
+	// compaction generation, which only runs when compactionNeeded is
+	// true at prepare time.
+	if compactionOverrideSet && compactionNeeded {
 		compactionPrompt = sanitizeCompactionPrompt(
 			ctx,
 			logger,
@@ -619,9 +627,8 @@ func (server *Server) prepareGeneration(
 		ResolvedProvider:     compactionResolvedProvider,
 		ResolvedModel:        compactionResolvedModel,
 		ModelConfigID:        compactionModelConfigID,
+		StepUsage:            compactionStepUsage,
 	}
-	compactionOptions.StepUsage = latestPromptUsage(promptRows)
-	compactionNeeded := shouldCompactPromptUsage(compactionOptions.StepUsage, compactionContextLimit, effectiveThreshold)
 
 	// workspaceCtx.currentChatSnapshot may carry a freshly persisted
 	// AgentID/BuildID binding from the getWorkspaceAgent call above.
