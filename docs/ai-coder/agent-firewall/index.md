@@ -233,3 +233,21 @@ Example of an allowed request (assuming stderr):
 ```console
 2026-01-16 00:11:40.564 [info]  coderd.agentrpc: boundary_request owner=joe  workspace_name=some-task-c88d agent_name=dev  decision=allow  workspace_id=f2bd4e9f-7e27-49fc-961e-be4d1c2aa987  http_method=GET http_url=https://coder.example.com  event_time=2026-01-16T00:11:39.388607657Z  matched_rule=domain=coder.example.com request_id=9f30d667-1fc9-47ba-b9e5-8eac46e0abef trace=478b2b45577307c4fd1bcfc64fad6ffb span=9ece4bc70c311edb
 ```
+
+## Data Retention
+
+<!-- SKELETON: expand each topic sentence below into a full paragraph. Headings, table, and links are final. -->
+
+Coder can automatically purge Agent Firewall boundary logs from the control plane database after a configurable retention period so the table does not grow unbounded.
+
+| Setting                | CLI Flag                   | Environment Variable           | YAML                      | Default        |
+|------------------------|----------------------------|--------------------------------|---------------------------|----------------|
+| Boundary log retention | `--boundary-log-retention` | `CODER_BOUNDARY_LOG_RETENTION` | `retention.boundary_logs` | `0` (disabled) |
+
+When retention is left at the default of `0`, boundary logs are retained indefinitely.
+
+Boundary session records are removed only after all of their associated logs have been purged and the session has aged past the retention window.
+
+Retention is enforced by Coder's background purge process, which runs on a fixed interval and deletes eligible records in batches shared with the other retention policies.
+
+For configuration syntax, supported duration formats, and how boundary log retention relates to Coder's other retention settings, see [Data Retention](../../admin/setup/data-retention.md).
