@@ -844,6 +844,23 @@ The dynamic tools timeout goroutine is responsible for waiting for the dynamic t
 
 The abandon chat goroutine is responsible for abandoning the chat. It is spawned whenever the event processing logic determines that the chat no longer needs to be owned by the runner. It applies the `Abandon` transition on the core state machine after checking that the chat is still owned by the runner.
 
+## External runtimes (claude_code)
+
+Chats carry an immutable `chats.runtime` column (`coder` by default). Chats on the `claude_code` runtime delegate whole generation turns to a Claude Code agent instead of the built-in LLM pipeline. The branch lives at the top of `taskStarter.StartGeneration`: after `loadGenerationState`, a `claude_code` chat routes to `startClaudeCodeGeneration` (`generation_claudecode.go`) and skips `prepareGeneration`/`decideGenerationAction` entirely. Everything downstream of the turn is shared with the built-in pipeline: generation attempts, `messagepartbuffer` preview episodes, `CommitStep`/`FinishTurn`/`FinishError` transitions, queue promotion, interrupts, and stale-owner recovery.
+
+The runtime speaks the Agent Client Protocol (ACP, JSON-RPC over stdio) to a `claude-code-acp` adapter process running inside the workspace bound to the chat. The chat's workspace is created server-side at chat creation from an org-scoped admin config (`chat_runtime_configs`: template, enabled flag, optional model and permission mode). Because the runtime chat has no chat model config, `chats.last_model_config_id` is nullable and message sends skip model resolution.
+
+One adapter process serves one generation turn (`claudecode.RunTurn` in `coderd/x/chatd/claudecode`):
+
+1. **Workspace readiness**: if the latest build is a settled stop, the runner creates a start build as the chat owner via the injected `StartWorkspace` fn and polls until a start build succeeds; the dial loop then retries until the agent is reachable. Runner heartbeats stay alive during the wait.
+2. **Transport**: a non-PTY SSH exec channel obtained from the workspace `AgentConn` (`SSHClient`), preceded by a `command -v claude-code-acp` preflight that turns a missing adapter into a legible config error. Tests substitute an in-memory transport via `Config.ClaudeCodeTransport`.
+3. **Session continuity**: the ACP session id and cwd persist in `chats.runtime_state` (jsonb). The next turn resumes via `session/resume` when advertised, falls back to `session/load` (suppressing the history replay), and otherwise starts a new session seeded with a lossy plain-text transcript rendered from the chat's history (`BuildReseedContext`). The turn prompt is the trailing run of user messages in history, so the flow is re-entrant after a crash between commit and finish.
+4. **Streaming**: ACP `session/update` notifications map onto existing chat message parts (text, reasoning, tool-call, tool-result) and publish through the same message part buffer episode as built-in turns, so the stream loop and multi-window delivery work unchanged. On completion the collected content commits through `CommitStep` and the turn finishes through `FinishTurn`; ACP usage totals land on the assistant message's token columns.
+5. **Interrupts**: runner context cancellation sends `session/cancel` and waits bounded time for the prompt to resolve with `stopReason=cancelled`; buffered partials persist through the normal interrupt task.
+6. **Permissions**: the adapter runs in the admin-configured permission mode (e.g. `acceptEdits`); any residual `session/request_permission` is auto-denied with a visible note in the stream. The client advertises no fs or terminal capabilities because Claude Code executes tools inside the workspace itself.
+
+Auxiliary LLM side effects are gated for runtime chats: chat creation keeps the fallback title (no LLM title generation), and end-of-turn status labels skip model resolution.
+
 ## Runner cleanup
 
 When the manager cleans up a runner, the runner must cancel all goroutines it has spawned and unsubscribe from pubsub.
