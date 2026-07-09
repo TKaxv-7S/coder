@@ -3485,6 +3485,9 @@ func (q *querier) GetChatRetentionDays(ctx context.Context) (int32, error) {
 // creation and the UI can discover runtime availability; the config
 // contains no secrets.
 func (q *querier) GetChatRuntimeConfig(ctx context.Context, arg database.GetChatRuntimeConfigParams) (database.ChatRuntimeConfig, error) {
+	if _, ok := ActorFromContext(ctx); !ok {
+		return database.ChatRuntimeConfig{}, ErrNoActor
+	}
 	return q.db.GetChatRuntimeConfig(ctx, arg)
 }
 

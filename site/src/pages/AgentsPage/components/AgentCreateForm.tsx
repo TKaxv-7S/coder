@@ -285,13 +285,16 @@ export const AgentCreateForm: FC<AgentCreateFormProps> = ({
 		useState<TypesGen.Organization | null>(null);
 	const organizationId = selectedOrg?.id ?? "";
 	const [planModeEnabled, setPlanModeEnabled] = useState(false);
-	const [claudeCodeSelected, setClaudeCodeSelected] = useState(false);
+	// The selection remembers the org it was made in, so any org
+	// switch drops it instead of silently carrying it over.
+	const [claudeCodeSelectedOrgId, setClaudeCodeSelectedOrgId] = useState<
+		string | null
+	>(null);
 	const claudeCodeAvailable = Boolean(
 		organizationId && claudeCodeOrgIds?.has(organizationId),
 	);
-	// The selection is pinned to the org it was made in; switching to an
-	// org without the runtime drops it.
-	const claudeCodeEnabled = claudeCodeSelected && claudeCodeAvailable;
+	const claudeCodeEnabled =
+		claudeCodeAvailable && claudeCodeSelectedOrgId === organizationId;
 	const hasModelOptions = modelOptions.length > 0;
 	const hasConfiguredModels = hasConfiguredModelsInCatalog(modelCatalog);
 	const hasUserFixableModelProviders = hasUserFixableProviders(modelCatalog);
@@ -379,11 +382,10 @@ export const AgentCreateForm: FC<AgentCreateFormProps> = ({
 		submitDraft();
 		// Runtime chats carry only the message: the server binds a
 		// workspace and the runtime manages its own model, so the
-		// picker-driven options are not sent.
+		// picker-driven options and file attachments are not sent.
 		const options: CreateChatOptions = claudeCodeEnabled
 			? {
 					message,
-					fileIDs,
 					organizationId,
 					runtime: "claude_code",
 				}
@@ -565,7 +567,16 @@ export const AgentCreateForm: FC<AgentCreateFormProps> = ({
 						}
 						claudeCodeEnabled={claudeCodeEnabled}
 						onClaudeCodeToggle={
-							claudeCodeAvailable ? setClaudeCodeSelected : undefined
+							claudeCodeAvailable
+								? (enabled) => {
+										if (enabled) {
+											// The runtime does not accept file
+											// attachments; drop any staged ones.
+											resetAttachments();
+										}
+										setClaudeCodeSelectedOrgId(enabled ? organizationId : null);
+									}
+								: undefined
 						}
 						attachments={attachments}
 						onAttach={claudeCodeEnabled ? undefined : handleAttach}

@@ -474,7 +474,7 @@ export const ChatPageInput: FC<ChatPageInputProps> = ({
 			}}
 			sendShortcut={sendShortcut}
 			attachments={attachments}
-			onAttach={handleAttach}
+			onAttach={isClaudeCodeChat ? undefined : handleAttach}
 			onRemoveAttachment={handleRemoveAttachment}
 			uploadStates={uploadStates}
 			previewUrls={previewUrls}

@@ -262,7 +262,9 @@ func TestRunTurnToolCallMapping(t *testing.T) {
 	assert.Equal(t, codersdk.ChatMessagePartTypeToolResult, parts[2].part.Type)
 	assert.Equal(t, codersdk.ChatMessageRoleTool, parts[2].role)
 	assert.False(t, parts[2].part.IsError)
-	assert.JSONEq(t, `"package main"`, string(parts[2].part.Result))
+	// Non-JSON text output is wrapped the same way the persisted
+	// pipeline wraps it, so preview and durable parts match.
+	assert.JSONEq(t, `{"output":"package main"}`, string(parts[2].part.Result))
 	assert.Equal(t, codersdk.ChatMessagePartTypeText, parts[3].part.Type)
 }
 

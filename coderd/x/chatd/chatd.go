@@ -1656,6 +1656,15 @@ func (p *Server) EditMessage(
 		// foreign-key error from the message-insert path.
 		var modelOverride uuid.NullUUID
 		if opts.ModelConfigID != uuid.Nil {
+			// External runtimes manage their own model; edits
+			// cannot override it. Mirrors the send-message path.
+			if lockedChat.Runtime != database.ChatRuntimeCoder {
+				return xerrors.Errorf(
+					"%w: model config cannot be set on %s runtime chats",
+					ErrInvalidModelConfigID,
+					lockedChat.Runtime,
+				)
+			}
 			if _, err := store.GetChatModelConfigByID(
 				chatdModelConfigLookupContext(ctx),
 				opts.ModelConfigID,

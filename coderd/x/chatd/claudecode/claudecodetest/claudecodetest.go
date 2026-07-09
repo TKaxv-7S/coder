@@ -5,6 +5,7 @@ package claudecodetest
 import (
 	"context"
 	"io"
+	"slices"
 	"sync"
 
 	acp "github.com/coder/acp-go-sdk"
@@ -53,42 +54,42 @@ func (a *FakeAgent) setConn(conn *acp.AgentSideConnection) {
 func (a *FakeAgent) NewSessions() []acp.NewSessionRequest {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	return append([]acp.NewSessionRequest{}, a.newSessions...)
+	return slices.Clone(a.newSessions)
 }
 
 // ResumeSessions returns recorded session/resume requests.
 func (a *FakeAgent) ResumeSessions() []acp.ResumeSessionRequest {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	return append([]acp.ResumeSessionRequest{}, a.resumeSessions...)
+	return slices.Clone(a.resumeSessions)
 }
 
 // LoadSessions returns recorded session/load requests.
 func (a *FakeAgent) LoadSessions() []acp.LoadSessionRequest {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	return append([]acp.LoadSessionRequest{}, a.loadSessions...)
+	return slices.Clone(a.loadSessions)
 }
 
 // Prompts returns recorded session/prompt requests.
 func (a *FakeAgent) Prompts() []acp.PromptRequest {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	return append([]acp.PromptRequest{}, a.prompts...)
+	return slices.Clone(a.prompts)
 }
 
 // Cancels returns recorded session/cancel notifications.
 func (a *FakeAgent) Cancels() []acp.CancelNotification {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	return append([]acp.CancelNotification{}, a.cancels...)
+	return slices.Clone(a.cancels)
 }
 
 // Modes returns recorded session/set_mode requests.
 func (a *FakeAgent) Modes() []acp.SetSessionModeRequest {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	return append([]acp.SetSessionModeRequest{}, a.modes...)
+	return slices.Clone(a.modes)
 }
 
 func (a *FakeAgent) Initialize(_ context.Context, _ acp.InitializeRequest) (acp.InitializeResponse, error) {

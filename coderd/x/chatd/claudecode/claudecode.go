@@ -19,6 +19,7 @@ import (
 
 	"cdr.dev/slog/v3"
 	acp "github.com/coder/acp-go-sdk"
+	"github.com/coder/coder/v2/coderd/x/chatd/chatprompt"
 	"github.com/coder/coder/v2/codersdk"
 )
 
@@ -324,17 +325,14 @@ func (c *turnCollector) handleToolCallLocked(call *acp.SessionUpdateToolCall) {
 		name:     name,
 		rawInput: input,
 	}
-	c.content = append(c.content, fantasy.ToolCallContent{
+	content := fantasy.ToolCallContent{
 		ToolCallID: string(call.ToolCallId),
 		ToolName:   name,
 		Input:      string(input),
-	})
-	c.emit(codersdk.ChatMessageRoleAssistant, codersdk.ChatMessagePart{
-		Type:       codersdk.ChatMessagePartTypeToolCall,
-		ToolCallID: string(call.ToolCallId),
-		ToolName:   name,
-		Args:       input,
-	})
+	}
+	c.content = append(c.content, content)
+	c.emit(codersdk.ChatMessageRoleAssistant,
+		chatprompt.PartFromContentWithLogger(context.Background(), c.logger, content))
 	c.collectToolContentLocked(string(call.ToolCallId), call.Content)
 	if isTerminalToolStatus(call.Status) {
 		c.completeToolCallLocked(string(call.ToolCallId), call.Status, call.RawOutput)
@@ -388,23 +386,20 @@ func (c *turnCollector) completeToolCallLocked(id string, status acp.ToolCallSta
 	if outputText == "" && rawOutput != nil {
 		outputText = string(marshalRawJSON(rawOutput))
 	}
-	isError := status == acp.ToolCallStatusFailed
 	var result fantasy.ToolResultOutputContent
-	if isError {
+	if status == acp.ToolCallStatusFailed {
 		result = fantasy.ToolResultOutputContentError{Error: xerrors.New(outputText)}
 	} else {
 		result = fantasy.ToolResultOutputContentText{Text: outputText}
 	}
-	c.content = append(c.content, fantasy.ToolResultContent{
+	content := fantasy.ToolResultContent{
 		ToolCallID: id,
 		ToolName:   open.name,
 		Result:     result,
-	})
-	resultJSON, err := json.Marshal(outputText)
-	if err != nil {
-		resultJSON = json.RawMessage(`""`)
 	}
-	c.emit(codersdk.ChatMessageRoleTool, codersdk.ChatMessageToolResult(id, open.name, resultJSON, isError, false))
+	c.content = append(c.content, content)
+	c.emit(codersdk.ChatMessageRoleTool,
+		chatprompt.PartFromContentWithLogger(context.Background(), c.logger, content))
 }
 
 // RequestPermission auto-denies: v1 runs the adapter in a permission

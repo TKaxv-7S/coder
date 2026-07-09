@@ -1430,7 +1430,14 @@ const AgentChatPage: FC = () => {
 			attachments,
 			useComposerContent,
 		});
-		if (!hasContent || isSubmissionPending || !agentId || !hasModelOptions) {
+		// Runtime chats manage their own model, so they can submit
+		// without any built-in model options (mirrors isInputDisabled).
+		if (
+			!hasContent ||
+			isSubmissionPending ||
+			!agentId ||
+			(!hasModelOptions && !isClaudeCodeChat)
+		) {
 			return;
 		}
 		// Wait for chat-setting mutations to settle before sending so the

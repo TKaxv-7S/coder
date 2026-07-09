@@ -1161,14 +1161,6 @@ func (api *API) postChats(rw http.ResponseWriter, r *http.Request) {
 			httpapi.Write(ctx, rw, validationStatus, *validationError)
 			return
 		}
-	} else {
-		workspace, ok := api.createChatRuntimeWorkspace(rw, r, runtime, req.OrganizationID, apiKey.UserID)
-		if !ok {
-			return
-		}
-		workspaceSelection = createChatWorkspaceSelection{
-			WorkspaceID: uuid.NullUUID{UUID: workspace.ID, Valid: true},
-		}
 	}
 
 	title := chatprompt.FallbackTitle(titleSource)
@@ -1291,6 +1283,19 @@ func (api *API) postChats(rw http.ResponseWriter, r *http.Request) {
 				Detail:  fmt.Sprintf("got %q, want one of %v", req.ClientType, database.AllChatClientTypeValues()),
 			})
 			return
+		}
+	}
+
+	// Runtime workspace creation is the request's only side effect
+	// besides CreateChat itself, so it runs after all validation to
+	// avoid leaving an orphaned workspace behind a rejected request.
+	if runtime != database.ChatRuntimeCoder {
+		workspace, ok := api.createChatRuntimeWorkspace(rw, r, runtime, req.OrganizationID, apiKey.UserID)
+		if !ok {
+			return
+		}
+		workspaceSelection = createChatWorkspaceSelection{
+			WorkspaceID: uuid.NullUUID{UUID: workspace.ID, Valid: true},
 		}
 	}
 
@@ -6068,29 +6073,30 @@ func (api *API) listChatRuntimeAvailability(rw http.ResponseWriter, r *http.Requ
 		})
 		return
 	}
-	availability := []codersdk.ChatRuntimeAvailability{}
+	memberOrgs := make(map[uuid.UUID]struct{}, len(organizations))
 	for _, org := range organizations {
-		//nolint:gocritic // Members cannot read deployment config; this
-		// exposes only whether a runtime is enabled for their own org.
-		config, err := api.Database.GetChatRuntimeConfig(dbauthz.AsSystemRestricted(ctx), database.GetChatRuntimeConfigParams{
-			OrganizationID: org.ID,
-			Runtime:        database.ChatRuntimeClaudeCode,
+		memberOrgs[org.ID] = struct{}{}
+	}
+	//nolint:gocritic // Members cannot read deployment config; this
+	// exposes only whether a runtime is enabled for their own orgs.
+	configs, err := api.Database.ListChatRuntimeConfigs(dbauthz.AsSystemRestricted(ctx))
+	if err != nil {
+		httpapi.Write(ctx, rw, http.StatusInternalServerError, codersdk.Response{
+			Message: "Internal error fetching chat runtime availability.",
+			Detail:  err.Error(),
 		})
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				continue
-			}
-			httpapi.Write(ctx, rw, http.StatusInternalServerError, codersdk.Response{
-				Message: "Internal error fetching chat runtime availability.",
-				Detail:  err.Error(),
-			})
-			return
-		}
+		return
+	}
+	availability := []codersdk.ChatRuntimeAvailability{}
+	for _, config := range configs {
 		if !config.Enabled {
 			continue
 		}
+		if _, ok := memberOrgs[config.OrganizationID]; !ok {
+			continue
+		}
 		availability = append(availability, codersdk.ChatRuntimeAvailability{
-			OrganizationID: org.ID,
+			OrganizationID: config.OrganizationID,
 			Runtime:        codersdk.ChatRuntime(config.Runtime),
 		})
 	}
