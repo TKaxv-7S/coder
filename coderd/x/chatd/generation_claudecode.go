@@ -494,11 +494,11 @@ func (s *taskStarter) dialClaudeCodeAgent(
 	}
 }
 
-// claudeCodeTransportFunc builds the ACP transport for one turn from
+// ClaudeCodeTransportFunc builds the ACP transport for one turn from
 // an established workspace agent connection. It exists as a seam so
 // tests can substitute an in-memory transport; production uses
 // sshClaudeCodeTransport.
-type claudeCodeTransportFunc func(
+type ClaudeCodeTransportFunc func(
 	ctx context.Context,
 	conn workspacesdk.AgentConn,
 	env map[string]string,

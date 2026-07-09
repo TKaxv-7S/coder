@@ -846,6 +846,7 @@ func TestTemplateAllowlistEnforcement(t *testing.T) {
 			// workspace lookup can fall through to creation.
 			model := seedModelConfig(t, db)
 			chat, err := db.InsertChat(ctx, database.InsertChatParams{
+				Runtime:           database.ChatRuntimeCoder,
 				OrganizationID:    org.ID,
 				OwnerID:           user.ID,
 				LastModelConfigID: uuid.NullUUID{UUID: model.ID, Valid: true},

@@ -168,7 +168,7 @@ type Server struct {
 	createWorkspaceFn              chattool.CreateWorkspaceFn
 	startWorkspaceFn               chattool.StartWorkspaceFn
 	stopWorkspaceFn                chattool.StopWorkspaceFn
-	claudeCodeTransportFn          claudeCodeTransportFunc
+	claudeCodeTransportFn          ClaudeCodeTransportFunc
 	pubsub                         pubsub.Pubsub
 	webpushDispatcher              webpush.Dispatcher
 	providerAPIKeys                chatprovider.ProviderAPIKeys
@@ -1529,6 +1529,19 @@ func resolveSendMessageModelConfigID(
 	chat database.Chat,
 	requested uuid.UUID,
 ) (uuid.UUID, error) {
+	// External runtimes manage their own model; their messages carry
+	// no model config. The API layer rejects explicit overrides before
+	// this point, so a requested ID here is a caller bug.
+	if chat.Runtime != database.ChatRuntimeCoder {
+		if requested != uuid.Nil {
+			return uuid.Nil, xerrors.Errorf(
+				"%w: model config cannot be set on %s runtime chats",
+				ErrInvalidModelConfigID,
+				chat.Runtime,
+			)
+		}
+		return uuid.Nil, nil
+	}
 	if requested == uuid.Nil {
 		return resolveFallbackModelConfigID(ctx, store, chat.LastModelConfigID.UUID)
 	}
@@ -3033,15 +3046,19 @@ type Config struct {
 	CreateWorkspace                chattool.CreateWorkspaceFn
 	StartWorkspace                 chattool.StartWorkspaceFn
 	StopWorkspace                  chattool.StopWorkspaceFn
-	ProviderAPIKeys                chatprovider.ProviderAPIKeys
-	AllowBYOK                      bool
-	AllowBYOKSet                   bool
-	AlwaysEnableDebugLogs          bool
-	WebpushDispatcher              webpush.Dispatcher
-	UsageTracker                   *workspacestats.UsageTracker
-	Clock                          quartz.Clock
-	AIBridgeTransportFactory       *atomic.Pointer[aibridge.TransportFactory]
-	Experiments                    codersdk.Experiments
+	// ClaudeCodeTransport overrides how claude_code runtime turns
+	// reach the workspace-side ACP adapter. Nil uses the SSH exec
+	// transport; tests substitute an in-memory transport.
+	ClaudeCodeTransport      ClaudeCodeTransportFunc
+	ProviderAPIKeys          chatprovider.ProviderAPIKeys
+	AllowBYOK                bool
+	AllowBYOKSet             bool
+	AlwaysEnableDebugLogs    bool
+	WebpushDispatcher        webpush.Dispatcher
+	UsageTracker             *workspacestats.UsageTracker
+	Clock                    quartz.Clock
+	AIBridgeTransportFactory *atomic.Pointer[aibridge.TransportFactory]
+	Experiments              codersdk.Experiments
 
 	PrometheusRegistry prometheus.Registerer
 
@@ -3116,6 +3133,7 @@ func New(ps pubsub.Pubsub, cfg Config) *Server {
 		instructionLookupTimeout:       instructionLookupTimeout,
 		createWorkspaceFn:              cfg.CreateWorkspace,
 		startWorkspaceFn:               cfg.StartWorkspace,
+		claudeCodeTransportFn:          cfg.ClaudeCodeTransport,
 		stopWorkspaceFn:                cfg.StopWorkspace,
 		pubsub:                         ps,
 		webpushDispatcher:              cfg.WebpushDispatcher,

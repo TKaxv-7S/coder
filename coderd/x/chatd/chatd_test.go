@@ -2125,7 +2125,7 @@ func TestAutoPromoteQueuedMessagesPreservesPerTurnModelOrder(t *testing.T) {
 	storedChat, err := db.GetChatByID(ctx, chat.ID)
 	require.NoError(t, err)
 	require.Equal(t, database.ChatStatusWaiting, storedChat.Status)
-	require.Equal(t, modelConfigC.ID, storedChat.LastModelConfigID)
+	require.Equal(t, modelConfigC.ID, storedChat.LastModelConfigID.UUID)
 
 	messages, err := db.GetChatMessagesByChatID(ctx, database.GetChatMessagesByChatIDParams{
 		ChatID:  chat.ID,
@@ -11614,7 +11614,7 @@ func TestEditMessageWithModelConfigOverride(t *testing.T) {
 
 	storedChat, err := db.GetChatByID(ctx, chat.ID)
 	require.NoError(t, err)
-	require.Equal(t, modelB.ID, storedChat.LastModelConfigID,
+	require.Equal(t, modelB.ID, storedChat.LastModelConfigID.UUID,
 		"edit must update last_model_config_id so the assistant turn picks up the new model")
 }
 
@@ -11659,7 +11659,7 @@ func TestEditMessagePreservesModelConfigByDefault(t *testing.T) {
 
 	storedChat, err := db.GetChatByID(ctx, chat.ID)
 	require.NoError(t, err)
-	require.Equal(t, modelA.ID, storedChat.LastModelConfigID,
+	require.Equal(t, modelA.ID, storedChat.LastModelConfigID.UUID,
 		"edit without model override must not change last_model_config_id")
 }
 
@@ -11713,7 +11713,7 @@ func TestEditMessageRejectsUnknownModelConfig(t *testing.T) {
 
 	storedChat, err := db.GetChatByID(ctx, chat.ID)
 	require.NoError(t, err)
-	require.Equal(t, modelA.ID, storedChat.LastModelConfigID)
+	require.Equal(t, modelA.ID, storedChat.LastModelConfigID.UUID)
 }
 
 // TestPromoteQueuedWhileRequiresActionMixedTools guards against

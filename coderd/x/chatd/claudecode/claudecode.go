@@ -204,8 +204,9 @@ func establishSession(
 			// history persisted, so suppress collection during replay.
 			collector.setSuppressed(true)
 			_, err := conn.LoadSession(ctx, acp.LoadSessionRequest{
-				SessionId: prior,
-				Cwd:       resumeCwd,
+				SessionId:  prior,
+				Cwd:        resumeCwd,
+				McpServers: []acp.McpServer{},
 			})
 			collector.setSuppressed(false)
 			if err == nil {
@@ -215,7 +216,12 @@ func establishSession(
 				slog.F("session_id", input.SessionID), slog.Error(err))
 		}
 	}
-	resp, err := conn.NewSession(ctx, acp.NewSessionRequest{Cwd: input.Cwd})
+	resp, err := conn.NewSession(ctx, acp.NewSessionRequest{
+		Cwd: input.Cwd,
+		// MCP passthrough is not supported yet; the field is required
+		// by the schema.
+		McpServers: []acp.McpServer{},
+	})
 	if err != nil {
 		return "", false, xerrors.Errorf("new session: %w", err)
 	}

@@ -150,6 +150,7 @@ func TestPendingChatPersistsSummaryButSkipsWebPush(t *testing.T) {
 	require.NoError(t, err)
 
 	chat, err := db.InsertChat(ctx, database.InsertChatParams{
+		Runtime:           database.ChatRuntimeCoder,
 		OrganizationID:    org.ID,
 		Status:            database.ChatStatusPending,
 		ClientType:        database.ChatClientTypeUi,
@@ -233,6 +234,7 @@ func TestSuccessfulChildChatOutcomeSkipsSummaryAndWebPush(t *testing.T) {
 	require.NoError(t, err)
 
 	parent, err := db.InsertChat(ctx, database.InsertChatParams{
+		Runtime:           database.ChatRuntimeCoder,
 		OrganizationID:    org.ID,
 		Status:            database.ChatStatusWaiting,
 		ClientType:        database.ChatClientTypeUi,
@@ -243,6 +245,7 @@ func TestSuccessfulChildChatOutcomeSkipsSummaryAndWebPush(t *testing.T) {
 	})
 	require.NoError(t, err)
 	child, err := db.InsertChat(ctx, database.InsertChatParams{
+		Runtime:           database.ChatRuntimeCoder,
 		OrganizationID:    org.ID,
 		Status:            database.ChatStatusWaiting,
 		ClientType:        database.ChatClientTypeUi,
