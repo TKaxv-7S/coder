@@ -325,7 +325,7 @@ WITH batch AS (
     LIMIT @batch_size::int
 )
 UPDATE chat_messages cm
--- NULL means "pending", '' means "backfilled, no text".
+-- NULL means "pending", empty tsvector means "backfilled, no text".
 SET search_tsv = COALESCE(
     to_tsvector('simple', chat_message_search_text(cm.content)),
     ''::tsvector)
