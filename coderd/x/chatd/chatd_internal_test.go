@@ -784,7 +784,7 @@ func TestRegenerateChatTitle_PersistsAndBroadcasts(t *testing.T) {
 	chat := database.Chat{
 		ID:                chatID,
 		OwnerID:           ownerID,
-		LastModelConfigID: modelConfigID,
+		LastModelConfigID: uuid.NullUUID{UUID: modelConfigID, Valid: true},
 		Status:            database.ChatStatusRunning,
 		WorkerID:          uuid.NullUUID{UUID: workerID, Valid: true},
 		Title:             chatprompt.FallbackTitle(userPrompt),
@@ -952,7 +952,7 @@ func TestRegenerateChatTitle_SkipsPersistWhenTitleChangedConcurrently(t *testing
 	chat := database.Chat{
 		ID:                chatID,
 		OwnerID:           ownerID,
-		LastModelConfigID: modelConfigID,
+		LastModelConfigID: uuid.NullUUID{UUID: modelConfigID, Valid: true},
 		Status:            database.ChatStatusWaiting,
 		Title:             chatprompt.FallbackTitle(userPrompt),
 	}
@@ -3337,7 +3337,7 @@ func TestGetWorkspaceConnBumpsWorkspaceUsage(t *testing.T) {
 	chat := dbgen.Chat(t, db, database.Chat{
 		OwnerID:           user.ID,
 		OrganizationID:    org.ID,
-		LastModelConfigID: modelConfig.ID,
+		LastModelConfigID: uuid.NullUUID{UUID: modelConfig.ID, Valid: true},
 		WorkspaceID:       uuid.NullUUID{UUID: ws.ID, Valid: true},
 	})
 

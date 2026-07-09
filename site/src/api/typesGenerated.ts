@@ -1595,7 +1595,12 @@ export interface Chat {
 	readonly agent_id?: string;
 	readonly parent_chat_id?: string;
 	readonly root_chat_id?: string;
-	readonly last_model_config_id: string;
+	/**
+	 * LastModelConfigID is nil for chats on external runtimes, which
+	 * are not backed by a chat model config.
+	 */
+	readonly last_model_config_id?: string;
+	readonly runtime: ChatRuntime;
 	readonly title: string;
 	readonly status: ChatStatus;
 	readonly plan_mode?: ChatPlanMode;
@@ -2917,6 +2922,51 @@ export type ChatRole = "" | "read";
 export const ChatRoles: ChatRole[] = ["", "read"];
 
 // From codersdk/chats.go
+export type ChatRuntime = "claude_code" | "coder";
+
+// From codersdk/chats.go
+/**
+ * ChatRuntimeAvailability reports whether an external runtime is
+ * available for new chats in an organization the user is a member of.
+ */
+export interface ChatRuntimeAvailability {
+	readonly organization_id: string;
+	readonly runtime: ChatRuntime;
+}
+
+// From codersdk/chats.go
+/**
+ * ChatRuntimeConfig is the per-organization admin configuration for an
+ * external chat runtime.
+ */
+export interface ChatRuntimeConfig {
+	readonly organization_id: string;
+	readonly runtime: ChatRuntime;
+	/**
+	 * TemplateID is the template chat workspaces are created from. The
+	 * template must provide the runtime's agent executable (e.g. the
+	 * claude-code-acp adapter for the claude_code runtime).
+	 */
+	readonly template_id: string;
+	readonly enabled: boolean;
+	/**
+	 * Model optionally pins the model the runtime agent uses. Empty
+	 * means the runtime default.
+	 */
+	readonly model?: string;
+	/**
+	 * PermissionMode optionally sets the permission mode the runtime
+	 * agent runs with (e.g. acceptEdits). Empty means the runtime
+	 * default.
+	 */
+	readonly permission_mode?: string;
+	readonly created_at: string;
+	readonly updated_at: string;
+}
+
+export const ChatRuntimes: ChatRuntime[] = ["claude_code", "coder"];
+
+// From codersdk/chats.go
 export interface ChatSkillPart {
 	readonly type: "skill";
 	/**
@@ -3595,6 +3645,14 @@ export interface CreateChatRequest {
 	readonly unsafe_dynamic_tools?: readonly DynamicTool[];
 	readonly plan_mode?: ChatPlanMode;
 	readonly client_type?: ChatClientType;
+	/**
+	 * Runtime selects the generation runtime for the chat. Empty means
+	 * the built-in coder runtime. External runtimes (claude_code)
+	 * require an enabled org runtime config; the server creates and
+	 * binds a workspace from the configured template, and the runtime
+	 * cannot be changed after creation.
+	 */
+	readonly runtime?: ChatRuntime;
 }
 
 // From codersdk/users.go
@@ -4662,6 +4720,7 @@ export type Experiment =
 	| "auto-fill-parameters"
 	| "chat-advisor"
 	| "chat-virtual-desktop"
+	| "claude-code-chats"
 	| "example"
 	| "mcp-server-http"
 	| "minimum-implicit-member"
@@ -4676,6 +4735,7 @@ export const Experiments: Experiment[] = [
 	"auto-fill-parameters",
 	"chat-advisor",
 	"chat-virtual-desktop",
+	"claude-code-chats",
 	"example",
 	"mcp-server-http",
 	"minimum-implicit-member",
@@ -9567,6 +9627,20 @@ export interface UploadChatFileResponse {
  */
 export interface UploadResponse {
 	readonly hash: string;
+}
+
+// From codersdk/chats.go
+/**
+ * UpsertChatRuntimeConfigRequest creates or replaces the runtime
+ * configuration for an organization.
+ */
+export interface UpsertChatRuntimeConfigRequest {
+	readonly organization_id: string;
+	readonly runtime: ChatRuntime;
+	readonly template_id: string;
+	readonly enabled: boolean;
+	readonly model?: string;
+	readonly permission_mode?: string;
 }
 
 // From codersdk/chats.go

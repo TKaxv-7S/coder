@@ -1668,7 +1668,7 @@ func TestChatsTelemetry(t *testing.T) {
 	rootChat := dbgen.Chat(t, db, database.Chat{
 		OrganizationID:    org.ID,
 		OwnerID:           user.ID,
-		LastModelConfigID: modelCfg.ID,
+		LastModelConfigID: uuid.NullUUID{UUID: modelCfg.ID, Valid: true},
 		Title:             "Root Chat",
 		Status:            database.ChatStatusRunning,
 		WorkspaceID:       uuid.NullUUID{UUID: ws.ID, Valid: true},
@@ -1679,7 +1679,7 @@ func TestChatsTelemetry(t *testing.T) {
 	childChat := dbgen.Chat(t, db, database.Chat{
 		OrganizationID:    org.ID,
 		OwnerID:           user.ID,
-		LastModelConfigID: modelCfg2.ID,
+		LastModelConfigID: uuid.NullUUID{UUID: modelCfg2.ID, Valid: true},
 		Title:             "Child Chat",
 		Status:            database.ChatStatusCompleted,
 		ParentChatID:      uuid.NullUUID{UUID: rootChat.ID, Valid: true},
@@ -1967,7 +1967,7 @@ func TestChatDiffStatusSummaryTelemetry(t *testing.T) {
 		chat := dbgen.Chat(t, db, database.Chat{
 			OrganizationID:    org.ID,
 			OwnerID:           user.ID,
-			LastModelConfigID: modelCfg.ID,
+			LastModelConfigID: uuid.NullUUID{UUID: modelCfg.ID, Valid: true},
 			Title:             "Chat " + state,
 			Status:            database.ChatStatusCompleted,
 		})
@@ -1997,7 +1997,7 @@ func TestChatDiffStatusSummaryTelemetry(t *testing.T) {
 	noPRChat := dbgen.Chat(t, db, database.Chat{
 		OrganizationID:    org.ID,
 		OwnerID:           user.ID,
-		LastModelConfigID: modelCfg.ID,
+		LastModelConfigID: uuid.NullUUID{UUID: modelCfg.ID, Valid: true},
 		Title:             "Chat no PR",
 		Status:            database.ChatStatusRunning,
 	})

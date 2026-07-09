@@ -115,7 +115,7 @@ func TestSpawnComputerUseAgentInheritsPinnedContext(t *testing.T) {
 	server.configCache.InvalidateProviders()
 
 	ctx = aibridge.WithDelegatedAPIKeyID(ctx, testAPIKeyID(t, db, parentChat.OwnerID))
-	tools := server.subagentTools(ctx, func() database.Chat { return parentChat }, parentChat.LastModelConfigID)
+	tools := server.subagentTools(ctx, func() database.Chat { return parentChat }, parentChat.LastModelConfigID.UUID)
 	tool := findToolByName(tools, spawnAgentToolName)
 	require.NotNil(t, tool)
 

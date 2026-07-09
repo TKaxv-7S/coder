@@ -299,6 +299,12 @@ func (s *taskStarter) StartGeneration(ctx context.Context, input chatWorkerTaskS
 		if err != nil {
 			return xerrors.Errorf("load generation state: %w", err)
 		}
+		if chat.Runtime == database.ChatRuntimeClaudeCode {
+			// External runtimes own the whole turn: the workspace-side
+			// agent builds prompts and executes tools itself, so the
+			// prepare/decide loop below does not apply.
+			return s.startClaudeCodeGeneration(ctx, machine, input, chat, messages)
+		}
 		prepareInput := generationPrepareInput{
 			Chat:     chat,
 			Messages: messages,

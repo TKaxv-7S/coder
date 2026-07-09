@@ -472,7 +472,7 @@ func TestPromptMessagesForVisibleUserPreserveActiveAPIKeyID(t *testing.T) {
 	user := dbgen.User(t, db, database.User{})
 	org := dbgen.Organization(t, db, database.Organization{})
 	model := dbgen.ChatModelConfig(t, db, database.ChatModelConfig{})
-	chat := dbgen.Chat(t, db, database.Chat{OrganizationID: org.ID, OwnerID: user.ID, LastModelConfigID: model.ID})
+	chat := dbgen.Chat(t, db, database.Chat{OrganizationID: org.ID, OwnerID: user.ID, LastModelConfigID: uuid.NullUUID{UUID: model.ID, Valid: true}})
 	oldKey, _ := dbgen.APIKey(t, db, database.APIKey{UserID: user.ID})
 	currentKey, _ := dbgen.APIKey(t, db, database.APIKey{UserID: user.ID})
 	modelOnlyKey, _ := dbgen.APIKey(t, db, database.APIKey{UserID: user.ID})
@@ -525,7 +525,7 @@ func TestPromptMessagesForCompactedChatPreserveActiveAPIKeyID(t *testing.T) {
 	user := dbgen.User(t, db, database.User{})
 	org := dbgen.Organization(t, db, database.Organization{})
 	model := dbgen.ChatModelConfig(t, db, database.ChatModelConfig{})
-	chat := dbgen.Chat(t, db, database.Chat{OrganizationID: org.ID, OwnerID: user.ID, LastModelConfigID: model.ID})
+	chat := dbgen.Chat(t, db, database.Chat{OrganizationID: org.ID, OwnerID: user.ID, LastModelConfigID: uuid.NullUUID{UUID: model.ID, Valid: true}})
 	key, _ := dbgen.APIKey(t, db, database.APIKey{UserID: user.ID})
 
 	visibleUser := dbgen.ChatMessage(t, db, database.ChatMessage{

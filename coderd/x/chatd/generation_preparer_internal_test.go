@@ -125,7 +125,7 @@ func TestDeriveFinalTurnRunResult(t *testing.T) {
 		created, err := chatstate.CreateChat(ctx, db, ps, chatstate.CreateChatInput{
 			OrganizationID:    org.ID,
 			OwnerID:           user.ID,
-			LastModelConfigID: modelCfg.ID,
+			LastModelConfigID: uuid.NullUUID{UUID: modelCfg.ID, Valid: true},
 			Title:             "derive-chat",
 			ClientType:        database.ChatClientTypeUi,
 			InitialMessages: []chatstate.Message{
@@ -161,7 +161,7 @@ func TestDeriveFinalTurnRunResult(t *testing.T) {
 						Content:        mustMarshalText(t, text),
 						Visibility:     database.ChatMessageVisibilityBoth,
 						ContentVersion: chatprompt.CurrentContentVersion,
-						ModelConfigID:  uuid.NullUUID{UUID: chat.LastModelConfigID, Valid: true},
+						ModelConfigID:  uuid.NullUUID{UUID: chat.LastModelConfigID.UUID, Valid: true},
 					},
 				},
 			})
@@ -243,7 +243,7 @@ func TestDeriveFinalTurnRunResult(t *testing.T) {
 		created, err := chatstate.CreateChat(ctx, db, ps, chatstate.CreateChatInput{
 			OrganizationID:    org.ID,
 			OwnerID:           user.ID,
-			LastModelConfigID: modelCfg.ID,
+			LastModelConfigID: uuid.NullUUID{UUID: modelCfg.ID, Valid: true},
 			Title:             "derive-chat-error",
 			ClientType:        database.ChatClientTypeUi,
 			InitialMessages: []chatstate.Message{

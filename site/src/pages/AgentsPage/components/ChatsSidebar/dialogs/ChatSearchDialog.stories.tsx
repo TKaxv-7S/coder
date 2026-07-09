@@ -26,6 +26,7 @@ const mockChat: Chat = {
 	title: "Fix race condition in auth middleware",
 	status: "completed",
 	last_model_config_id: "model-1",
+	runtime: "coder",
 	mcp_server_ids: [],
 	labels: {},
 	last_turn_summary: "Added migration script",

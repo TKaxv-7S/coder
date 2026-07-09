@@ -16739,6 +16739,7 @@ const docTemplate = `{
                     "$ref": "#/definitions/codersdk.ChatError"
                 },
                 "last_model_config_id": {
+                    "description": "LastModelConfigID is nil for chats on external runtimes, which\nare not backed by a chat model config.",
                     "type": "string",
                     "format": "uuid"
                 },
@@ -16779,6 +16780,9 @@ const docTemplate = `{
                 "root_chat_id": {
                     "type": "string",
                     "format": "uuid"
+                },
+                "runtime": {
+                    "$ref": "#/definitions/codersdk.ChatRuntime"
                 },
                 "shared": {
                     "description": "Shared is true when this chat's root chat has explicit user or group ACL entries.",
@@ -17680,6 +17684,17 @@ const docTemplate = `{
                 "ChatRoleDeleted"
             ]
         },
+        "codersdk.ChatRuntime": {
+            "type": "string",
+            "enum": [
+                "coder",
+                "claude_code"
+            ],
+            "x-enum-varnames": [
+                "ChatRuntimeCoder",
+                "ChatRuntimeClaudeCode"
+            ]
+        },
         "codersdk.ChatStatus": {
             "type": "string",
             "enum": [
@@ -18278,6 +18293,14 @@ const docTemplate = `{
                 },
                 "plan_mode": {
                     "$ref": "#/definitions/codersdk.ChatPlanMode"
+                },
+                "runtime": {
+                    "description": "Runtime selects the generation runtime for the chat. Empty means\nthe built-in coder runtime. External runtimes (claude_code)\nrequire an enabled org runtime config; the server creates and\nbinds a workspace from the configured template, and the runtime\ncannot be changed after creation.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/codersdk.ChatRuntime"
+                        }
+                    ]
                 },
                 "system_prompt": {
                     "type": "string"
@@ -19728,13 +19751,15 @@ const docTemplate = `{
                 "minimum-implicit-member",
                 "ai-gateway-cost-control",
                 "chat-advisor",
-                "chat-virtual-desktop"
+                "chat-virtual-desktop",
+                "claude-code-chats"
             ],
             "x-enum-comments": {
                 "ExperimentAIGatewayCostControl": "Enables AI Gateway cost control functionality.",
                 "ExperimentAutoFillParameters": "This should not be taken out of experiments until we have redesigned the feature.",
                 "ExperimentChatAdvisor": "Enables the advisor tool for root agent chats.",
                 "ExperimentChatVirtualDesktop": "Enables virtual desktop and computer use provider for agents.",
+                "ExperimentClaudeCodeChats": "Enables running agent chats on the Claude Code runtime.",
                 "ExperimentExample": "This isn't used for anything.",
                 "ExperimentMCPServerHTTP": "Enables the MCP HTTP server functionality.",
                 "ExperimentMinimumImplicitMember": "Allows organizations to deviate from the default organization-member roles, in support of Gateway Accounts.",
@@ -19756,7 +19781,8 @@ const docTemplate = `{
                 "Allows organizations to deviate from the default organization-member roles, in support of Gateway Accounts.",
                 "Enables AI Gateway cost control functionality.",
                 "Enables the advisor tool for root agent chats.",
-                "Enables virtual desktop and computer use provider for agents."
+                "Enables virtual desktop and computer use provider for agents.",
+                "Enables running agent chats on the Claude Code runtime."
             ],
             "x-enum-varnames": [
                 "ExperimentExample",
@@ -19770,7 +19796,8 @@ const docTemplate = `{
                 "ExperimentMinimumImplicitMember",
                 "ExperimentAIGatewayCostControl",
                 "ExperimentChatAdvisor",
-                "ExperimentChatVirtualDesktop"
+                "ExperimentChatVirtualDesktop",
+                "ExperimentClaudeCodeChats"
             ]
         },
         "codersdk.ExternalAPIKeyScopes": {

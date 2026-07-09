@@ -134,6 +134,7 @@ const baseChatFields = {
 	owner_name: MockUserOwner.name,
 	workspace_id: mockWorkspace.id,
 	last_model_config_id: MODEL_CONFIG_ID,
+	runtime: "coder",
 	mcp_server_ids: [],
 	labels: {},
 	created_at: "2026-02-18T00:00:00.000Z",

@@ -168,6 +168,7 @@ type Server struct {
 	createWorkspaceFn              chattool.CreateWorkspaceFn
 	startWorkspaceFn               chattool.StartWorkspaceFn
 	stopWorkspaceFn                chattool.StopWorkspaceFn
+	claudeCodeTransportFn          claudeCodeTransportFunc
 	pubsub                         pubsub.Pubsub
 	webpushDispatcher              webpush.Dispatcher
 	providerAPIKeys                chatprovider.ProviderAPIKeys
@@ -1122,15 +1123,19 @@ func (e *UsageLimitExceededError) Error() string {
 
 // CreateOptions controls chat creation in the shared chat mutation path.
 type CreateOptions struct {
-	OrganizationID     uuid.UUID
-	OwnerID            uuid.UUID
-	WorkspaceID        uuid.NullUUID
-	BuildID            uuid.NullUUID
-	AgentID            uuid.NullUUID
-	ParentChatID       uuid.NullUUID
-	RootChatID         uuid.NullUUID
-	Title              string
-	ModelConfigID      uuid.UUID
+	OrganizationID uuid.UUID
+	OwnerID        uuid.UUID
+	WorkspaceID    uuid.NullUUID
+	BuildID        uuid.NullUUID
+	AgentID        uuid.NullUUID
+	ParentChatID   uuid.NullUUID
+	RootChatID     uuid.NullUUID
+	Title          string
+	ModelConfigID  uuid.UUID
+	// Runtime selects the generation runtime. Zero value means the
+	// built-in coder runtime, which requires ModelConfigID. External
+	// runtimes leave ModelConfigID unset.
+	Runtime            database.ChatRuntime
 	ChatMode           database.NullChatMode
 	PlanMode           database.NullChatPlanMode
 	ClientType         database.ChatClientType
@@ -1302,18 +1307,22 @@ func (p *Server) CreateChat(ctx context.Context, opts CreateOptions) (database.C
 	initialMessages = append(initialMessages, userMessageWithAPIKeyID(userContent, opts.ModelConfigID, opts.OwnerID, opts.APIKeyID))
 
 	result, err := chatstate.CreateChat(ctx, p.db, p.pubsub, chatstate.CreateChatInput{
-		OrganizationID:    opts.OrganizationID,
-		OwnerID:           opts.OwnerID,
-		WorkspaceID:       opts.WorkspaceID,
-		BuildID:           opts.BuildID,
-		AgentID:           opts.AgentID,
-		ParentChatID:      opts.ParentChatID,
-		RootChatID:        opts.RootChatID,
-		LastModelConfigID: opts.ModelConfigID,
-		Title:             opts.Title,
-		Mode:              opts.ChatMode,
-		PlanMode:          opts.PlanMode,
-		MCPServerIDs:      opts.MCPServerIDs,
+		OrganizationID: opts.OrganizationID,
+		OwnerID:        opts.OwnerID,
+		WorkspaceID:    opts.WorkspaceID,
+		BuildID:        opts.BuildID,
+		AgentID:        opts.AgentID,
+		ParentChatID:   opts.ParentChatID,
+		RootChatID:     opts.RootChatID,
+		LastModelConfigID: uuid.NullUUID{
+			UUID:  opts.ModelConfigID,
+			Valid: opts.ModelConfigID != uuid.Nil,
+		},
+		Runtime:      opts.Runtime,
+		Title:        opts.Title,
+		Mode:         opts.ChatMode,
+		PlanMode:     opts.PlanMode,
+		MCPServerIDs: opts.MCPServerIDs,
 		Labels: pqtype.NullRawMessage{
 			RawMessage: labelsJSON,
 			Valid:      true,
@@ -1521,7 +1530,7 @@ func resolveSendMessageModelConfigID(
 	requested uuid.UUID,
 ) (uuid.UUID, error) {
 	if requested == uuid.Nil {
-		return resolveFallbackModelConfigID(ctx, store, chat.LastModelConfigID)
+		return resolveFallbackModelConfigID(ctx, store, chat.LastModelConfigID.UUID)
 	}
 
 	chatdCtx := chatdModelConfigLookupContext(ctx)
@@ -1946,7 +1955,7 @@ func (p *Server) SubmitToolResults(
 		}
 		modelConfigID := opts.ModelConfigID
 		if modelConfigID == uuid.Nil {
-			modelConfigID = locked.LastModelConfigID
+			modelConfigID = locked.LastModelConfigID.UUID
 		}
 		if _, err := tx.CompleteRequiresAction(chatstate.CompleteRequiresActionInput{
 			CreatedBy:     opts.UserID,
@@ -2827,10 +2836,10 @@ func recordManualTitleUsage(
 			if err := tx.SoftDeleteChatMessageByID(ctx, messages[0].ID); err != nil {
 				return xerrors.Errorf("soft delete manual title usage message: %w", err)
 			}
-			if lockedChat.LastModelConfigID != modelConfig.ID {
+			if lockedChat.LastModelConfigID.UUID != modelConfig.ID {
 				if _, err := tx.UpdateChatLastModelConfigByID(ctx, database.UpdateChatLastModelConfigByIDParams{
 					ID:                chat.ID,
-					LastModelConfigID: lockedChat.LastModelConfigID,
+					LastModelConfigID: lockedChat.LastModelConfigID.UUID,
 				}); err != nil {
 					return xerrors.Errorf("restore chat model config after manual title usage: %w", err)
 				}
@@ -4304,9 +4313,9 @@ func (p *Server) resolveModelConfig(
 	ctx context.Context,
 	chat database.Chat,
 ) (database.ChatModelConfig, error) {
-	if chat.LastModelConfigID != uuid.Nil {
+	if chat.LastModelConfigID.Valid && chat.LastModelConfigID.UUID != uuid.Nil {
 		modelConfig, err := p.configCache.ModelConfigByID(
-			ctx, chat.LastModelConfigID,
+			ctx, chat.LastModelConfigID.UUID,
 		)
 		if err == nil {
 			return modelConfig, nil
@@ -4314,7 +4323,7 @@ func (p *Server) resolveModelConfig(
 		if !xerrors.Is(err, sql.ErrNoRows) {
 			return database.ChatModelConfig{}, xerrors.Errorf(
 				"get chat model config %s: %w",
-				chat.LastModelConfigID, err,
+				chat.LastModelConfigID.UUID, err,
 			)
 		}
 		// Model config was deleted, fall through to default.

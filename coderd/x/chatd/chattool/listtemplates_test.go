@@ -848,7 +848,7 @@ func TestTemplateAllowlistEnforcement(t *testing.T) {
 			chat, err := db.InsertChat(ctx, database.InsertChatParams{
 				OrganizationID:    org.ID,
 				OwnerID:           user.ID,
-				LastModelConfigID: model.ID,
+				LastModelConfigID: uuid.NullUUID{UUID: model.ID, Valid: true},
 				Title:             "allowed-create",
 				Status:            database.ChatStatusWaiting,
 				ClientType:        database.ChatClientTypeApi,

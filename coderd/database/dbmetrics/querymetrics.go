@@ -537,6 +537,14 @@ func (m queryMetricsStore) DeleteChatQueuedMessageReturningCount(ctx context.Con
 	return r0, r1
 }
 
+func (m queryMetricsStore) DeleteChatRuntimeConfig(ctx context.Context, arg database.DeleteChatRuntimeConfigParams) error {
+	start := time.Now()
+	r0 := m.s.DeleteChatRuntimeConfig(ctx, arg)
+	m.queryLatencies.WithLabelValues("DeleteChatRuntimeConfig").Observe(time.Since(start).Seconds())
+	m.queryCounts.WithLabelValues(httpmw.ExtractHTTPRoute(ctx), httpmw.ExtractHTTPMethod(ctx), "DeleteChatRuntimeConfig").Inc()
+	return r0
+}
+
 func (m queryMetricsStore) DeleteChatUsageLimitGroupOverride(ctx context.Context, groupID uuid.UUID) error {
 	start := time.Now()
 	r0 := m.s.DeleteChatUsageLimitGroupOverride(ctx, groupID)
@@ -1742,6 +1750,14 @@ func (m queryMetricsStore) GetChatRetentionDays(ctx context.Context) (int32, err
 	r0, r1 := m.s.GetChatRetentionDays(ctx)
 	m.queryLatencies.WithLabelValues("GetChatRetentionDays").Observe(time.Since(start).Seconds())
 	m.queryCounts.WithLabelValues(httpmw.ExtractHTTPRoute(ctx), httpmw.ExtractHTTPMethod(ctx), "GetChatRetentionDays").Inc()
+	return r0, r1
+}
+
+func (m queryMetricsStore) GetChatRuntimeConfig(ctx context.Context, arg database.GetChatRuntimeConfigParams) (database.ChatRuntimeConfig, error) {
+	start := time.Now()
+	r0, r1 := m.s.GetChatRuntimeConfig(ctx, arg)
+	m.queryLatencies.WithLabelValues("GetChatRuntimeConfig").Observe(time.Since(start).Seconds())
+	m.queryCounts.WithLabelValues(httpmw.ExtractHTTPRoute(ctx), httpmw.ExtractHTTPMethod(ctx), "GetChatRuntimeConfig").Inc()
 	return r0, r1
 }
 
@@ -4713,6 +4729,14 @@ func (m queryMetricsStore) ListChatContextResourcesByChatID(ctx context.Context,
 	return r0, r1
 }
 
+func (m queryMetricsStore) ListChatRuntimeConfigs(ctx context.Context) ([]database.ChatRuntimeConfig, error) {
+	start := time.Now()
+	r0, r1 := m.s.ListChatRuntimeConfigs(ctx)
+	m.queryLatencies.WithLabelValues("ListChatRuntimeConfigs").Observe(time.Since(start).Seconds())
+	m.queryCounts.WithLabelValues(httpmw.ExtractHTTPRoute(ctx), httpmw.ExtractHTTPMethod(ctx), "ListChatRuntimeConfigs").Inc()
+	return r0, r1
+}
+
 func (m queryMetricsStore) ListChatUsageLimitGroupOverrides(ctx context.Context) ([]database.ListChatUsageLimitGroupOverridesRow, error) {
 	start := time.Now()
 	r0, r1 := m.s.ListChatUsageLimitGroupOverrides(ctx)
@@ -5223,6 +5247,14 @@ func (m queryMetricsStore) UpdateChatRetryState(ctx context.Context, arg databas
 	m.queryLatencies.WithLabelValues("UpdateChatRetryState").Observe(time.Since(start).Seconds())
 	m.queryCounts.WithLabelValues(httpmw.ExtractHTTPRoute(ctx), httpmw.ExtractHTTPMethod(ctx), "UpdateChatRetryState").Inc()
 	return r0, r1
+}
+
+func (m queryMetricsStore) UpdateChatRuntimeState(ctx context.Context, arg database.UpdateChatRuntimeStateParams) error {
+	start := time.Now()
+	r0 := m.s.UpdateChatRuntimeState(ctx, arg)
+	m.queryLatencies.WithLabelValues("UpdateChatRuntimeState").Observe(time.Since(start).Seconds())
+	m.queryCounts.WithLabelValues(httpmw.ExtractHTTPRoute(ctx), httpmw.ExtractHTTPMethod(ctx), "UpdateChatRuntimeState").Inc()
+	return r0
 }
 
 func (m queryMetricsStore) UpdateChatStatus(ctx context.Context, arg database.UpdateChatStatusParams) (database.Chat, error) {
@@ -6247,6 +6279,14 @@ func (m queryMetricsStore) UpsertChatRetentionDays(ctx context.Context, retentio
 	m.queryLatencies.WithLabelValues("UpsertChatRetentionDays").Observe(time.Since(start).Seconds())
 	m.queryCounts.WithLabelValues(httpmw.ExtractHTTPRoute(ctx), httpmw.ExtractHTTPMethod(ctx), "UpsertChatRetentionDays").Inc()
 	return r0
+}
+
+func (m queryMetricsStore) UpsertChatRuntimeConfig(ctx context.Context, arg database.UpsertChatRuntimeConfigParams) (database.ChatRuntimeConfig, error) {
+	start := time.Now()
+	r0, r1 := m.s.UpsertChatRuntimeConfig(ctx, arg)
+	m.queryLatencies.WithLabelValues("UpsertChatRuntimeConfig").Observe(time.Since(start).Seconds())
+	m.queryCounts.WithLabelValues(httpmw.ExtractHTTPRoute(ctx), httpmw.ExtractHTTPMethod(ctx), "UpsertChatRuntimeConfig").Inc()
+	return r0, r1
 }
 
 func (m queryMetricsStore) UpsertChatSystemPrompt(ctx context.Context, value string) error {

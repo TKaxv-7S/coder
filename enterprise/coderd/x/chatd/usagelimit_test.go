@@ -106,7 +106,7 @@ func TestResolveUsageLimitStatus_OrgScoped(t *testing.T) {
 		c := dbgen.Chat(t, db, database.Chat{
 			OrganizationID:    orgID,
 			OwnerID:           ownerID,
-			LastModelConfigID: modelCfgID,
+			LastModelConfigID: uuid.NullUUID{UUID: modelCfgID, Valid: true},
 			Title:             "test chat",
 		})
 		_ = dbgen.ChatMessage(t, db, database.ChatMessage{

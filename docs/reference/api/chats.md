@@ -119,6 +119,7 @@ Experimental: this endpoint is subject to change.
     "pin_order": 0,
     "plan_mode": "plan",
     "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
+    "runtime": "coder",
     "shared": true,
     "status": "waiting",
     "title": "string",
@@ -203,7 +204,7 @@ Status Code **200**
 | `»» provider`            | string                                                                             | false    |              | Provider identifies the upstream model provider when known.                                                                                                                                                                                                                |
 | `»» retryable`           | boolean                                                                            | false    |              | Retryable reports whether the underlying error is transient.                                                                                                                                                                                                               |
 | `»» status_code`         | integer                                                                            | false    |              | Status code is the best-effort upstream HTTP status code.                                                                                                                                                                                                                  |
-| `» last_model_config_id` | string(uuid)                                                                       | false    |              |                                                                                                                                                                                                                                                                            |
+| `» last_model_config_id` | string(uuid)                                                                       | false    |              | Last model config ID is nil for chats on external runtimes, which are not backed by a chat model config.                                                                                                                                                                   |
 | `» last_turn_summary`    | string                                                                             | false    |              |                                                                                                                                                                                                                                                                            |
 | `» mcp_server_ids`       | array                                                                              | false    |              |                                                                                                                                                                                                                                                                            |
 | `» organization_id`      | string(uuid)                                                                       | false    |              |                                                                                                                                                                                                                                                                            |
@@ -214,6 +215,7 @@ Status Code **200**
 | `» pin_order`            | integer                                                                            | false    |              |                                                                                                                                                                                                                                                                            |
 | `» plan_mode`            | [codersdk.ChatPlanMode](schemas.md#codersdkchatplanmode)                           | false    |              |                                                                                                                                                                                                                                                                            |
 | `» root_chat_id`         | string(uuid)                                                                       | false    |              |                                                                                                                                                                                                                                                                            |
+| `» runtime`              | [codersdk.ChatRuntime](schemas.md#codersdkchatruntime)                             | false    |              |                                                                                                                                                                                                                                                                            |
 | `» shared`               | boolean                                                                            | false    |              | Shared is true when this chat's root chat has explicit user or group ACL entries.                                                                                                                                                                                          |
 | `» status`               | [codersdk.ChatStatus](schemas.md#codersdkchatstatus)                               | false    |              |                                                                                                                                                                                                                                                                            |
 | `» title`                | string                                                                             | false    |              |                                                                                                                                                                                                                                                                            |
@@ -229,6 +231,7 @@ Status Code **200**
 | `kind`        | `auth`, `config`, `generic`, `instruction_file`, `mcp_config`, `mcp_server`, `missing_key`, `overloaded`, `provider_disabled`, `rate_limit`, `skill`, `stream_silence_timeout`, `timeout`, `usage_limit` |
 | `status`      | `completed`, `error`, `excluded`, `interrupting`, `invalid`, `ok`, `oversize`, `paused`, `pending`, `requires_action`, `running`, `unreadable`, `waiting`                                                |
 | `plan_mode`   | `plan`                                                                                                                                                                                                   |
+| `runtime`     | `claude_code`, `coder`                                                                                                                                                                                   |
 
 To perform this operation, you must be authenticated. [Learn more](authentication.md).
 
@@ -274,6 +277,7 @@ Experimental: this endpoint is subject to change.
   "model_config_id": "f5fb4d91-62ca-4377-9ee6-5d43ba00d205",
   "organization_id": "7c60d51f-b44e-4682-87d6-449835ea4de6",
   "plan_mode": "plan",
+  "runtime": "coder",
   "system_prompt": "string",
   "unsafe_dynamic_tools": [
     {
@@ -391,6 +395,7 @@ Experimental: this endpoint is subject to change.
       "pin_order": 0,
       "plan_mode": "plan",
       "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
+      "runtime": "coder",
       "shared": true,
       "status": "waiting",
       "title": "string",
@@ -483,6 +488,7 @@ Experimental: this endpoint is subject to change.
   "pin_order": 0,
   "plan_mode": "plan",
   "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
+  "runtime": "coder",
   "shared": true,
   "status": "waiting",
   "title": "string",
@@ -732,6 +738,7 @@ Experimental: this endpoint is subject to change.
     "pin_order": 0,
     "plan_mode": "plan",
     "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
+    "runtime": "coder",
     "shared": true,
     "status": "waiting",
     "title": "string",
@@ -878,6 +885,7 @@ Experimental: this endpoint is subject to change.
       "pin_order": 0,
       "plan_mode": "plan",
       "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
+      "runtime": "coder",
       "shared": true,
       "status": "waiting",
       "title": "string",
@@ -970,6 +978,7 @@ Experimental: this endpoint is subject to change.
   "pin_order": 0,
   "plan_mode": "plan",
   "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
+  "runtime": "coder",
   "shared": true,
   "status": "waiting",
   "title": "string",
@@ -1153,6 +1162,7 @@ Experimental: this endpoint is subject to change.
       "pin_order": 0,
       "plan_mode": "plan",
       "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
+      "runtime": "coder",
       "shared": true,
       "status": "waiting",
       "title": "string",
@@ -1245,6 +1255,7 @@ Experimental: this endpoint is subject to change.
   "pin_order": 0,
   "plan_mode": "plan",
   "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
+  "runtime": "coder",
   "shared": true,
   "status": "waiting",
   "title": "string",
@@ -1426,6 +1437,7 @@ Experimental: this endpoint is subject to change.
       "pin_order": 0,
       "plan_mode": "plan",
       "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
+      "runtime": "coder",
       "shared": true,
       "status": "waiting",
       "title": "string",
@@ -1518,6 +1530,7 @@ Experimental: this endpoint is subject to change.
   "pin_order": 0,
   "plan_mode": "plan",
   "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
+  "runtime": "coder",
   "shared": true,
   "status": "waiting",
   "title": "string",
@@ -2266,6 +2279,7 @@ Experimental: this endpoint is subject to change.
       "pin_order": 0,
       "plan_mode": "plan",
       "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
+      "runtime": "coder",
       "shared": true,
       "status": "waiting",
       "title": "string",
@@ -2358,6 +2372,7 @@ Experimental: this endpoint is subject to change.
   "pin_order": 0,
   "plan_mode": "plan",
   "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
+  "runtime": "coder",
   "shared": true,
   "status": "waiting",
   "title": "string",
@@ -2864,6 +2879,7 @@ Experimental: this endpoint is subject to change.
       "pin_order": 0,
       "plan_mode": "plan",
       "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
+      "runtime": "coder",
       "shared": true,
       "status": "waiting",
       "title": "string",
@@ -2956,6 +2972,7 @@ Experimental: this endpoint is subject to change.
   "pin_order": 0,
   "plan_mode": "plan",
   "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
+  "runtime": "coder",
   "shared": true,
   "status": "waiting",
   "title": "string",

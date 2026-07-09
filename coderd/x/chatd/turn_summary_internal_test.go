@@ -63,7 +63,7 @@ func TestUpdateLastTurnSummaryRejectsStaleWrites(t *testing.T) {
 	created, err := chatstate.CreateChat(ctx, db, ps, chatstate.CreateChatInput{
 		OrganizationID:    org.ID,
 		OwnerID:           owner.ID,
-		LastModelConfigID: modelCfg.ID,
+		LastModelConfigID: uuid.NullUUID{UUID: modelCfg.ID, Valid: true},
 		Title:             "summary-chat",
 		ClientType:        database.ChatClientTypeUi,
 		InitialMessages: []chatstate.Message{
@@ -154,7 +154,7 @@ func TestPendingChatPersistsSummaryButSkipsWebPush(t *testing.T) {
 		Status:            database.ChatStatusPending,
 		ClientType:        database.ChatClientTypeUi,
 		OwnerID:           owner.ID,
-		LastModelConfigID: modelCfg.ID,
+		LastModelConfigID: uuid.NullUUID{UUID: modelCfg.ID, Valid: true},
 		Title:             "summary-pending-chat",
 	})
 	require.NoError(t, err)
@@ -237,7 +237,7 @@ func TestSuccessfulChildChatOutcomeSkipsSummaryAndWebPush(t *testing.T) {
 		Status:            database.ChatStatusWaiting,
 		ClientType:        database.ChatClientTypeUi,
 		OwnerID:           owner.ID,
-		LastModelConfigID: modelCfg.ID,
+		LastModelConfigID: uuid.NullUUID{UUID: modelCfg.ID, Valid: true},
 		Title:             "summary-parent-chat",
 		MCPServerIDs:      []uuid.UUID{},
 	})
@@ -249,7 +249,7 @@ func TestSuccessfulChildChatOutcomeSkipsSummaryAndWebPush(t *testing.T) {
 		OwnerID:           owner.ID,
 		ParentChatID:      uuid.NullUUID{UUID: parent.ID, Valid: true},
 		RootChatID:        uuid.NullUUID{UUID: parent.ID, Valid: true},
-		LastModelConfigID: modelCfg.ID,
+		LastModelConfigID: uuid.NullUUID{UUID: modelCfg.ID, Valid: true},
 		Title:             "summary-child-chat",
 		MCPServerIDs:      []uuid.UUID{},
 	})

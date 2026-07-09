@@ -19,14 +19,17 @@ import (
 
 // CreateChatInput configures [CreateChat].
 type CreateChatInput struct {
-	OrganizationID    uuid.UUID
-	OwnerID           uuid.UUID
-	WorkspaceID       uuid.NullUUID
-	BuildID           uuid.NullUUID
-	AgentID           uuid.NullUUID
-	ParentChatID      uuid.NullUUID
-	RootChatID        uuid.NullUUID
-	LastModelConfigID uuid.UUID
+	OrganizationID uuid.UUID
+	OwnerID        uuid.UUID
+	WorkspaceID    uuid.NullUUID
+	BuildID        uuid.NullUUID
+	AgentID        uuid.NullUUID
+	ParentChatID   uuid.NullUUID
+	RootChatID     uuid.NullUUID
+	// LastModelConfigID is unset for chats on external runtimes,
+	// which are not backed by a chat model config.
+	LastModelConfigID uuid.NullUUID
+	Runtime           database.ChatRuntime
 	Title             string
 	Mode              database.NullChatMode
 	PlanMode          database.NullChatPlanMode
@@ -73,6 +76,9 @@ func CreateChat(
 			"initial messages must include at least one message",
 		)
 	}
+	if input.Runtime == "" {
+		input.Runtime = database.ChatRuntimeCoder
+	}
 	var result CreateChatResult
 	buffer := NewPublishBuffer(publisher)
 	defer buffer.Discard()
@@ -86,6 +92,7 @@ func CreateChat(
 			ParentChatID:      input.ParentChatID,
 			RootChatID:        input.RootChatID,
 			LastModelConfigID: input.LastModelConfigID,
+			Runtime:           input.Runtime,
 			Title:             input.Title,
 			Mode:              input.Mode,
 			PlanMode:          input.PlanMode,

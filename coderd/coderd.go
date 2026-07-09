@@ -1277,6 +1277,10 @@ func New(options *Options) *API {
 			r.Get("/", api.listChats)
 			r.Post("/", api.postChats)
 			r.Get("/models", api.listChatModels)
+			r.Group(func(r chi.Router) {
+				r.Use(httpmw.RequireExperimentWithDevBypass(api.Experiments, codersdk.ExperimentClaudeCodeChats))
+				r.Get("/runtime-availability", api.listChatRuntimeAvailability)
+			})
 			r.Get("/watch", api.watchChats)
 			r.Route("/cost", func(r chi.Router) {
 				r.Get("/users", api.chatCostUsers)
@@ -1330,6 +1334,12 @@ func New(options *Options) *API {
 				r.Put("/auto-archive-days", api.putChatAutoArchiveDays)
 				r.Get("/template-allowlist", api.getChatTemplateAllowlist)
 				r.Put("/template-allowlist", api.putChatTemplateAllowlist)
+				r.Group(func(r chi.Router) {
+					r.Use(httpmw.RequireExperimentWithDevBypass(api.Experiments, codersdk.ExperimentClaudeCodeChats))
+					r.Get("/runtimes", api.listChatRuntimeConfigs)
+					r.Put("/runtimes", api.putChatRuntimeConfig)
+					r.Delete("/runtimes", api.deleteChatRuntimeConfig)
+				})
 			})
 			// TODO(cian): place under /api/experimental/chats/config
 			r.Route("/providers", func(r chi.Router) {
