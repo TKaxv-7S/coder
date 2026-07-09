@@ -56,7 +56,7 @@ func (p *Pubsub) SetPeerFetcher(fetcher PeerFetcher) {
 // (Options.ClusterCA set, which installs the TLS callbacks). Passing a noop
 // cache reverts to no mTLS: new route handshakes can no longer mint a leaf and
 // will not form. The leaf IP SAN is fixed at construction from ClusterHost, so
-// it is not passed here.
+// it is not passed here. It logs the resulting mTLS state.
 func (p *Pubsub) SetCACache(ca cryptokeys.SigningKeycache) {
 	if p.clusterTLS == nil {
 		return

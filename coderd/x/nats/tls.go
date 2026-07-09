@@ -84,12 +84,32 @@ func newClusterTLS(ctx context.Context, logger slog.Logger, clock quartz.Clock, 
 // re-mints under the new CA.
 func (t *clusterTLS) setCACache(ca cryptokeys.SigningKeycache) {
 	t.mu.Lock()
-	defer t.mu.Unlock()
 	t.ca = ca
 	t.leaf = nil
 	// Verify pools follow the CA source: drop them so stale roots are not
 	// reused after a swap to a noop or different CA.
 	t.verifyPools = nil
+	ip := t.ip
+	t.mu.Unlock()
+
+	// Log the resulting mTLS state. A noop cache disables mTLS (no leaf can be
+	// minted); a real cache with a valid self IP enables it; a real cache
+	// without an IP cluster host leaves routes plaintext (token auth only).
+	switch {
+	case isNoopSigningCache(ca):
+		t.logger.Info(t.ctx, "nats cluster mTLS disabled")
+	case len(ip) == 0:
+		t.logger.Warn(t.ctx, "nats cluster mTLS inactive: cluster host is not an IP; cluster routes use token auth only")
+	default:
+		t.logger.Info(t.ctx, "nats cluster mTLS enabled")
+	}
+}
+
+// isNoopSigningCache reports whether ca is the no-op cache used to disable
+// cluster mTLS.
+func isNoopSigningCache(ca cryptokeys.SigningKeycache) bool {
+	_, ok := ca.(cryptokeys.NoopSigningKeycache)
+	return ok
 }
 
 // caCache returns the current CA cache under lock so callers do not hold the

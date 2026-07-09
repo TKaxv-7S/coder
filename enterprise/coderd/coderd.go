@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -883,19 +882,6 @@ func (api *API) Close() error {
 	return api.AGPL.Close()
 }
 
-// logNATSClusterMTLS logs whether cluster mTLS is active. The leaf IP SAN peers
-// verify is this replica's cluster host, fixed when the pubsub was constructed,
-// so if it is not an IP no leaf can be minted and routes stay plaintext (token
-// auth only).
-func (api *API) logNATSClusterMTLS() {
-	if net.ParseIP(api.Options.ClusterHost) == nil {
-		api.Logger.Warn(api.ctx, "nats cluster mTLS inactive: cluster host is not an IP; cluster routes use token auth only",
-			slog.F("cluster_host", api.Options.ClusterHost))
-		return
-	}
-	api.Logger.Info(api.ctx, "nats cluster mTLS enabled")
-}
-
 func (api *API) updateEntitlements(ctx context.Context) error {
 	return api.Entitlements.Update(ctx, func(ctx context.Context) (codersdk.Entitlements, error) {
 		replicas := api.replicaManager.AllPrimary()
@@ -1028,7 +1014,6 @@ func (api *API) updateEntitlements(ctx context.Context) error {
 					natsPubsub.SetCACache(api.AGPL.NATSCACache)
 					natsPubsub.SetPeerFetcher(api.replicaManager)
 					api.replicaManager.SetCallback("nats", natsPubsub.RefreshPeers)
-					api.logNATSClusterMTLS()
 				}
 
 				api.replicaManager.SetCallback("derp", func() {
@@ -1062,7 +1047,6 @@ func (api *API) updateEntitlements(ctx context.Context) error {
 					// Revert to the noop CA cache: new route handshakes can no
 					// longer mint a leaf, so the cluster mesh stops forming.
 					natsPubsub.SetCACache(cryptokeys.NoopSigningKeycache{})
-					api.Logger.Info(api.ctx, "nats cluster mTLS disabled")
 					api.replicaManager.SetCallback("nats", nil)
 				}
 			}
