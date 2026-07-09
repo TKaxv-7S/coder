@@ -1,6 +1,7 @@
 import * as path from "node:path";
 import { defineConfig } from "@playwright/test";
 import {
+	coderBinary as coderBinaryPath,
 	coderdPProfPort,
 	coderPort,
 	e2eFakeExperiment1,
@@ -31,6 +32,7 @@ export const retries = (() => {
 const localURL = (port: number, path: string): string => {
 	return `http://localhost:${port}${path}`;
 };
+const coderBinary = JSON.stringify(coderBinaryPath);
 
 export default defineConfig({
 	retries,
@@ -76,12 +78,12 @@ export default defineConfig({
 				}),
 	},
 	webServer: {
-		url: `http://localhost:${coderPort}/api/v2/deployment/config`,
-		// The default timeout is 60s, but `go run` compilation with the
-		// embed tag can take longer on CI.
+		url: `http://localhost:${coderPort}/healthz`,
+		// The default timeout is 60s, but coderd startup can take longer on
+		// loaded CI runners.
 		timeout: 120_000,
 		command: [
-			`go run -tags embed ${path.join(__dirname, "../../enterprise/cmd/coder")}`,
+			coderBinary,
 			"server",
 			"--global-config $(mktemp -d -t e2e-XXXXXXXXXX)",
 			`--access-url=http://localhost:${coderPort}`,
