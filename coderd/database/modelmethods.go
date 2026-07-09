@@ -459,6 +459,16 @@ func (g GetGroupsRow) RBACObject() rbac.Object {
 	return g.Group.RBACObject()
 }
 
+func (g GetOrganizationGroupsAISpendRow) RBACObject() rbac.Object {
+	return rbac.ResourceGroup.WithID(g.GroupID).
+		InOrg(g.OrganizationID).
+		WithGroupACL(map[string][]policy.Action{
+			g.GroupID.String(): {
+				policy.ActionRead,
+			},
+		})
+}
+
 func (gm GroupMember) RBACObject() rbac.Object {
 	return rbac.ResourceGroupMember.WithID(gm.UserID).InOrg(gm.OrganizationID).WithOwner(gm.UserID.String())
 }

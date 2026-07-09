@@ -639,6 +639,12 @@ type sqlcQuerier interface {
 	GetOAuth2ProviderAppsByUserID(ctx context.Context, userID uuid.UUID) ([]GetOAuth2ProviderAppsByUserIDRow, error)
 	GetOrganizationByID(ctx context.Context, id uuid.UUID) (Organization, error)
 	GetOrganizationByName(ctx context.Context, arg GetOrganizationByNameParams) (Organization, error)
+	// Per group in @group_ids belonging to @organization_id, return the group's
+	// configured AI spend limit (nullable) and total AI spend attributed to it
+	// on or after period_start until NOW. Groups not in the given organization
+	// are excluded from the result.
+	// The period_start parameter is normalized to its UTC calendar day.
+	GetOrganizationGroupsAISpend(ctx context.Context, arg GetOrganizationGroupsAISpendParams) ([]GetOrganizationGroupsAISpendRow, error)
 	GetOrganizationIDsByMemberIDs(ctx context.Context, ids []uuid.UUID) ([]GetOrganizationIDsByMemberIDsRow, error)
 	GetOrganizationResourceCountByID(ctx context.Context, organizationID uuid.UUID) (GetOrganizationResourceCountByIDRow, error)
 	GetOrganizations(ctx context.Context, arg GetOrganizationsParams) ([]Organization, error)
