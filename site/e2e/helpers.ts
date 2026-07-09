@@ -81,6 +81,7 @@ export async function login(page: Page, options: LoginOptions = users.owner) {
 	await page.getByLabel("Password").fill(options.password);
 	await page.getByRole("button", { name: "Sign In" }).click();
 	await page.waitForURL(/\/workspaces/);
+	await expect(page).toHaveTitle(/Workspaces/);
 	// biome-ignore lint/suspicious/noExplicitAny: update once logged in
 	(ctx as any)[Symbol.for("currentUser")] = options;
 }
