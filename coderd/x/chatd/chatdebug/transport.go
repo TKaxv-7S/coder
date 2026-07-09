@@ -344,10 +344,9 @@ func (r *recordingBody) Close() error {
 	responseBody = append([]byte(nil), r.buf.Bytes()...)
 	r.mu.Unlock()
 
-	// Only check JSON completeness when the recording buffer is not
-	// truncated. decodedJSON is nil when nothing was precomputed;
-	// non-nil (even if it points at a stored nil, e.g. a JSON "null"
-	// body) means the completeness check already decoded these bytes.
+	// decodedJSON is nil unless the completeness check below decoded
+	// these bytes; non-nil even for a stored nil value (JSON "null").
+	// A truncated buffer is an incomplete prefix, so skip the check.
 	var decodedJSON *any
 	if contentLength < 0 && !truncated {
 		if value, ok := decodeUnknownLengthJSONBody(contentType, responseBody); ok {
@@ -458,11 +457,8 @@ func isCompleteUnknownLengthJSONBody(contentType string, body []byte) bool {
 }
 
 // decodeUnknownLengthJSONBody reports whether body is a single,
-// complete JSON document for the given content type, returning the
-// decoded value alongside the boolean so callers that already know
-// they need it (see Close()'s completeness check) can hand it to
-// buildAttemptLocked instead of triggering a second full decode
-// inside RedactJSONSecrets.
+// complete JSON document for the given content type. It returns the
+// decoded value too, to avoid re-decoding during redaction.
 func decodeUnknownLengthJSONBody(contentType string, body []byte) (any, bool) {
 	if !isJSONLikeContentType(contentType) {
 		return nil, false
@@ -481,18 +477,14 @@ func decodeUnknownLengthJSONBody(contentType string, body []byte) (any, bool) {
 }
 
 // buildAttemptLocked materializes the final Attempt from the current
-// buffered response data plus err. Callers use this from both the
-// record-once append path and the provisional-upgrade replace path so
-// both sites apply the same redaction and status rules. The caller
-// must hold r.mu for the duration of the call.
+// buffered response data plus err. The caller must hold r.mu for the
+// duration of the call.
 //
-// precomputed is nil when nothing was decoded ahead of time. A
-// non-nil precomputed - even one pointing at a stored nil interface,
-// e.g. a JSON "null" body - means the caller already decoded these
-// exact bytes (Close()'s unknown-length completeness check) and it
-// should be redacted directly instead of decoding again inside
-// RedactJSONSecrets.
-func (r *recordingBody) buildAttemptLocked(err error, precomputed *any) Attempt {
+// decodedJSON is nil when nothing was decoded ahead of time. A
+// non-nil decodedJSON - even one pointing at a stored nil interface,
+// e.g. a JSON "null" body - is redacted directly instead of decoding
+// the raw bytes again.
+func (r *recordingBody) buildAttemptLocked(err error, decodedJSON *any) Attempt {
 	finishedAt := time.Now()
 
 	truncated := r.truncated
@@ -504,8 +496,8 @@ func (r *recordingBody) buildAttemptLocked(err error, precomputed *any) Attempt 
 	switch {
 	case truncated:
 		base.ResponseBody = []byte("[TRUNCATED]")
-	case precomputed != nil:
-		if encoded, changed := redactDecodedJSON(*precomputed); changed {
+	case decodedJSON != nil:
+		if encoded, changed := redactDecodedJSON(*decodedJSON); changed {
 			base.ResponseBody = encoded
 		} else {
 			base.ResponseBody = responseBody
@@ -550,9 +542,8 @@ func (r *recordingBody) record(err error) {
 	})
 }
 
-// recordJSON behaves like record but reuses a JSON value already
-// decoded by the caller (see decodeUnknownLengthJSONBody), avoiding a
-// second full decode of the same bytes inside buildAttemptLocked.
+// recordJSON behaves like record but reuses an already-decoded JSON
+// value, avoiding a second full decode of the same bytes.
 func (r *recordingBody) recordJSON(err error, value any) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

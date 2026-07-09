@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
 
@@ -16,6 +17,7 @@ import (
 	"cdr.dev/slog/v3"
 	"github.com/coder/coder/v2/coderd/database"
 	"github.com/coder/coder/v2/coderd/database/pubsub"
+	"github.com/coder/coder/v2/coderd/x/chatd/chattest"
 )
 
 // noopStore implements database.Store by embedding it (nil) and
@@ -57,6 +59,19 @@ func (noopStore) UpdateChatDebugStep(
 		ID:     arg.ID,
 		ChatID: arg.ChatID,
 	}, nil
+}
+
+// TouchChatDebugStepAndRun and GetChatDebugStepsByRunID aren't on the
+// hot path these benchmarks exercise (heartbeat interval and step
+// retry-collision handling respectively), but overriding them avoids
+// a nil-dereference panic if a future benchmark configuration change
+// reaches them through the embedded nil database.Store.
+func (noopStore) TouchChatDebugStepAndRun(context.Context, database.TouchChatDebugStepAndRunParams) error {
+	return nil
+}
+
+func (noopStore) GetChatDebugStepsByRunID(context.Context, uuid.UUID) ([]database.ChatDebugStep, error) {
+	return nil, nil
 }
 
 var _ database.Store = noopStore{}
@@ -132,16 +147,6 @@ func benchStreamParts(nDeltas int) []fantasy.StreamPart {
 	return parts
 }
 
-func streamPartsSeq(parts []fantasy.StreamPart) fantasy.StreamResponse {
-	return func(yield func(fantasy.StreamPart) bool) {
-		for _, p := range parts {
-			if !yield(p) {
-				return
-			}
-		}
-	}
-}
-
 // runContext returns a fresh RunContext/context pair for one
 // benchmark iteration, mirroring a new chat turn.
 func runContext(chatID uuid.UUID) context.Context {
@@ -160,7 +165,7 @@ func BenchmarkWrapModel_Generate(b *testing.B) {
 		FinishReason: fantasy.FinishReasonStop,
 		Usage:        fantasy.Usage{InputTokens: 512, OutputTokens: 128, TotalTokens: 640},
 	}
-	inner := &fakeModel{generate: func(context.Context, fantasy.Call) (*fantasy.Response, error) {
+	inner := &chattest.FakeModel{GenerateFn: func(context.Context, fantasy.Call) (*fantasy.Response, error) {
 		return resp, nil
 	}}
 	model := WrapModel(inner, svc, RecorderOptions{ChatID: chatID, OwnerID: ownerID})
@@ -179,8 +184,8 @@ func BenchmarkWrapModel_Stream(b *testing.B) {
 	chatID, ownerID := uuid.New(), uuid.New()
 	call := benchCall(6, 4)
 	parts := benchStreamParts(200)
-	inner := &fakeModel{stream: func(context.Context, fantasy.Call) (fantasy.StreamResponse, error) {
-		return streamPartsSeq(parts), nil
+	inner := &chattest.FakeModel{StreamFn: func(context.Context, fantasy.Call) (fantasy.StreamResponse, error) {
+		return slices.Values(parts), nil
 	}}
 	model := WrapModel(inner, svc, RecorderOptions{ChatID: chatID, OwnerID: ownerID})
 
@@ -195,35 +200,6 @@ func BenchmarkWrapModel_Stream(b *testing.B) {
 		}
 	}
 }
-
-// fakeModel is a minimal fantasy.LanguageModel double. chattest.FakeModel
-// isn't reused here because benchmarks only ever exercise Generate or
-// Stream and shouldn't pay for the other's nil-check panic wiring.
-type fakeModel struct {
-	generate func(context.Context, fantasy.Call) (*fantasy.Response, error)
-	stream   func(context.Context, fantasy.Call) (fantasy.StreamResponse, error)
-}
-
-func (m *fakeModel) Generate(ctx context.Context, call fantasy.Call) (*fantasy.Response, error) {
-	return m.generate(ctx, call)
-}
-
-func (m *fakeModel) Stream(ctx context.Context, call fantasy.Call) (fantasy.StreamResponse, error) {
-	return m.stream(ctx, call)
-}
-
-func (*fakeModel) GenerateObject(context.Context, fantasy.ObjectCall) (*fantasy.ObjectResponse, error) {
-	panic("not implemented")
-}
-
-func (*fakeModel) StreamObject(context.Context, fantasy.ObjectCall) (fantasy.ObjectStreamResponse, error) {
-	panic("not implemented")
-}
-
-func (*fakeModel) Provider() string { return "bench" }
-func (*fakeModel) Model() string    { return "bench-model" }
-
-var _ fantasy.LanguageModel = (*fakeModel)(nil)
 
 // cannedRoundTripper replays a fixed response body for every request,
 // isolating RecordingTransport's own redaction/buffering cost from any
@@ -265,13 +241,7 @@ func (c *chunkedReader) Read(p []byte) (int, error) {
 	if len(c.data) == 0 {
 		return 0, io.EOF
 	}
-	n := c.chunkSize
-	if n > len(c.data) {
-		n = len(c.data)
-	}
-	if n > len(p) {
-		n = len(p)
-	}
+	n := min(c.chunkSize, len(c.data), len(p))
 	copy(p, c.data[:n])
 	c.data = c.data[n:]
 	return n, nil

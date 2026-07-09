@@ -618,6 +618,45 @@ func TestRecordingTransport_CloseAfterDecoderConsumesUnknownLengthJSONSucceeds(t
 	require.JSONEq(t, `{"token":"[REDACTED]","safe":"ok"}`, string(attempts[0].ResponseBody))
 }
 
+// TestRecordingTransport_CloseAfterDecoderConsumesUnknownLengthJSONWithNoSensitiveKeysSucceeds
+// exercises buildAttemptLocked's decodedJSON!=nil-but-changed==false path:
+// the completeness check precomputes a decoded value, but nothing in it
+// needs redacting, so the original bytes must be recorded unchanged.
+func TestRecordingTransport_CloseAfterDecoderConsumesUnknownLengthJSONWithNoSensitiveKeysSucceeds(t *testing.T) {
+	t.Parallel()
+
+	ctx, sink := newTestSinkContext(t)
+	client := &http.Client{
+		Transport: &RecordingTransport{
+			Base: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+				return &http.Response{ //nolint:exhaustruct // Test response exercises unknown-length close semantics.
+					StatusCode:    http.StatusOK,
+					Header:        http.Header{"Content-Type": []string{"application/json"}},
+					Body:          &scriptedReadCloser{chunks: [][]byte{[]byte(`{"safe":"ok","count":1}`)}},
+					ContentLength: -1,
+				}, nil
+			}),
+		},
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://example.invalid", nil)
+	require.NoError(t, err)
+
+	resp, err := client.Do(req)
+	require.NoError(t, err)
+
+	var decoded map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&decoded))
+	require.Equal(t, "ok", decoded["safe"])
+	require.NoError(t, resp.Body.Close())
+
+	attempts := sink.snapshot()
+	require.Len(t, attempts, 1)
+	require.Equal(t, attemptStatusCompleted, attempts[0].Status)
+	require.Empty(t, attempts[0].Error)
+	require.JSONEq(t, `{"safe":"ok","count":1}`, string(attempts[0].ResponseBody))
+}
+
 func TestRecordingTransport_CloseAfterDecoderConsumesUnknownLengthJSONWithTrailingDocumentMarksFailed(t *testing.T) {
 	t.Parallel()
 

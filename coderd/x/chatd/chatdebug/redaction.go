@@ -95,8 +95,7 @@ var (
 
 func decodeCompleteJSON(data []byte) (any, error) {
 	decoder := json.NewDecoder(bytes.NewReader(data))
-	// Callers may re-marshal the result and float64
-	// would lose precision on large integers.
+	// Preserve precision: callers may re-marshal the result.
 	decoder.UseNumber()
 
 	var value any
@@ -110,6 +109,10 @@ func decodeCompleteJSON(data []byte) (any, error) {
 	return value, nil
 }
 
+// redactDecodedJSON redacts an already-decoded JSON value. ok is
+// false when nothing needed redacting or re-marshaling the redacted
+// value failed; either way the caller should fall back to the
+// original bytes.
 func redactDecodedJSON(value any) (encoded []byte, ok bool) {
 	redacted, changed := redactJSONValue(value)
 	if !changed {
