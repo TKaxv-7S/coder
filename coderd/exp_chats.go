@@ -1150,6 +1150,10 @@ func (api *API) postChats(rw http.ResponseWriter, r *http.Request) {
 			})
 			return
 		}
+		if resp := runtimeChatTextOnlyError(req.Content, "content"); resp != nil {
+			httpapi.Write(ctx, rw, http.StatusBadRequest, *resp)
+			return
+		}
 	}
 
 	var workspaceSelection createChatWorkspaceSelection
@@ -1287,9 +1291,21 @@ func (api *API) postChats(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	// Runtime workspace creation is the request's only side effect
-	// besides CreateChat itself, so it runs after all validation to
-	// avoid leaving an orphaned workspace behind a rejected request.
+	// besides CreateChat itself, so it runs after all validation,
+	// including the usage-limit admission check CreateChat repeats,
+	// to avoid leaving an orphaned workspace behind a rejected
+	// request.
 	if runtime != database.ChatRuntimeCoder {
+		if limitErr := api.chatDaemon.CheckCreateUsageLimit(ctx, apiKey.UserID, req.OrganizationID); limitErr != nil {
+			if maybeWriteLimitErr(ctx, rw, limitErr) {
+				return
+			}
+			httpapi.Write(ctx, rw, http.StatusInternalServerError, codersdk.Response{
+				Message: "Failed to check usage limits.",
+				Detail:  limitErr.Error(),
+			})
+			return
+		}
 		workspace, ok := api.createChatRuntimeWorkspace(rw, r, runtime, req.OrganizationID, apiKey.UserID)
 		if !ok {
 			return
@@ -3171,6 +3187,10 @@ func (api *API) postChatMessages(rw http.ResponseWriter, r *http.Request) {
 			})
 			return
 		}
+		if resp := runtimeChatTextOnlyError(req.Content, "content"); resp != nil {
+			httpapi.Write(ctx, rw, http.StatusBadRequest, *resp)
+			return
+		}
 	}
 
 	contentBlocks, _, fileIDs, inputError := createChatInputFromParts(ctx, api.Database, req.Content, "content")
@@ -3388,6 +3408,13 @@ func (api *API) patchChatMessage(rw http.ResponseWriter, r *http.Request) {
 	var req codersdk.EditChatMessageRequest
 	if !httpapi.Read(ctx, rw, r, &req) {
 		return
+	}
+
+	if chat.Runtime != database.ChatRuntimeCoder {
+		if resp := runtimeChatTextOnlyError(req.Content, "content"); resp != nil {
+			httpapi.Write(ctx, rw, http.StatusBadRequest, *resp)
+			return
+		}
 	}
 
 	contentBlocks, _, fileIDs, inputError := createChatInputFromParts(ctx, api.Database, req.Content, "content")
@@ -6735,6 +6762,22 @@ func createChatInputFromRequest(ctx context.Context, db database.Store, req code
 		titleSource = chatprompt.TitleText(content, pasteText)
 	}
 	return content, titleSource, fileIDs, nil
+}
+
+// runtimeChatTextOnlyError rejects non-text input parts for chats on
+// external runtimes. Runtime prompt paths forward only text parts to
+// the adapter, so accepting attachments here would silently drop them.
+func runtimeChatTextOnlyError(parts []codersdk.ChatInputPart, fieldName string) *codersdk.Response {
+	for i, part := range parts {
+		if strings.EqualFold(strings.TrimSpace(string(part.Type)), string(codersdk.ChatInputPartTypeText)) {
+			continue
+		}
+		return &codersdk.Response{
+			Message: "Runtime chats support text content only.",
+			Detail:  fmt.Sprintf("%s[%d] has type %q. Attachments are not supported on runtime chats.", fieldName, i, part.Type),
+		}
+	}
+	return nil
 }
 
 // createChatInputFromParts validates input parts and converts them to

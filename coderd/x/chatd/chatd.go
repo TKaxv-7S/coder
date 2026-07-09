@@ -1517,6 +1517,14 @@ func (p *Server) checkUsageLimit(ctx context.Context, store database.Store, owne
 	return nil
 }
 
+// CheckCreateUsageLimit runs the usage-limit admission check that
+// CreateChat applies. Handlers whose side effects (such as runtime
+// workspace provisioning) happen before CreateChat call this first so
+// an admission failure does not orphan those side effects.
+func (p *Server) CheckCreateUsageLimit(ctx context.Context, ownerID uuid.UUID, organizationID uuid.UUID) error {
+	return p.checkUsageLimit(ctx, p.db, ownerID, uuid.NullUUID{UUID: organizationID, Valid: true})
+}
+
 func chatdModelConfigLookupContext(ctx context.Context) context.Context {
 	//nolint:gocritic // Chat message admission needs daemon-scoped
 	// deployment-config reads for model config validation.
