@@ -104,7 +104,6 @@ func setLeafSAN(ps *Pubsub, ip net.IP) {
 	defer ps.clusterTLS.mu.Unlock()
 	ps.clusterTLS.ip = ip
 	ps.clusterTLS.leaf = nil
-	ps.clusterTLS.leafSeq = ""
 }
 
 func numRoutes(t *testing.T, ps *Pubsub) int {

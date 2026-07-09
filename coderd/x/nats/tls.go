@@ -48,10 +48,9 @@ type clusterTLS struct {
 	// embedded as the leaf IP SAN.
 	ca cryptokeys.SigningKeycache
 	ip net.IP
-	// leaf is the cached leaf certificate. leafSeq is the active CA sequence it
-	// was minted under; a change means the CA rotated and the leaf is stale.
-	leaf    *tls.Certificate
-	leafSeq string
+	// leaf is the cached leaf certificate, reused until it expires (its NotAfter
+	// equals the signing CA's) or setCACache clears it on a cache swap.
+	leaf *tls.Certificate
 	// verifyPools caches the root pool used to verify a peer leaf, keyed by the
 	// CA sequence stamped in the leaf. A CA cert is immutable for a given
 	// sequence, so the pool is built once and reused across handshakes. Expired
@@ -98,7 +97,6 @@ func (t *clusterTLS) setCACache(ca cryptokeys.SigningKeycache) {
 	defer t.mu.Unlock()
 	t.ca = ca
 	t.leaf = nil
-	t.leafSeq = ""
 	// Verify pools follow the CA source: drop them so stale roots are not
 	// reused after a swap to a noop or different CA.
 	t.verifyPools = nil
@@ -133,41 +131,35 @@ func (t *clusterTLS) caCache() cryptokeys.SigningKeycache {
 // base VerifyConnection: chain + membership against the known peer set.
 func (t *clusterTLS) tlsConfig() *tls.Config {
 	return &tls.Config{
-		MinVersion:           tls.VersionTLS13,
-		GetCertificate:       func(*tls.ClientHelloInfo) (*tls.Certificate, error) { return t.currentLeafLogged() },
-		GetClientCertificate: func(*tls.CertificateRequestInfo) (*tls.Certificate, error) { return t.currentLeafLogged() },
-		ClientAuth:           tls.RequireAnyClientCert,
-		//nolint:gosec // Not insecure: verifyConnection performs full chain
-		// verification against the live CA cache. Go's static RootCAs cannot
-		// track a rotating CA, so default verification is replaced, not removed.
+		MinVersion: tls.VersionTLS13,
+		GetCertificate: func(*tls.ClientHelloInfo) (*tls.Certificate, error) {
+			leaf, err := t.currentLeaf()
+			if err != nil {
+				t.logger.Warn(t.ctx, "get nats cluster leaf for GetCertificate", slog.Error(err))
+			}
+			return leaf, err
+		},
+		GetClientCertificate: func(*tls.CertificateRequestInfo) (*tls.Certificate, error) {
+			leaf, err := t.currentLeaf()
+			if err != nil {
+				t.logger.Warn(t.ctx, "get nats cluster leaf for GetClientCertificate", slog.Error(err))
+			}
+			return leaf, err
+		},
+		ClientAuth: tls.RequireAnyClientCert,
+		//nolint:gosec // Not insecure: verify performs full chain verification
+		// against the live CA cache. Go's static RootCAs cannot track a rotating
+		// CA, so default verification is replaced, not removed.
 		InsecureSkipVerify: true,
-		VerifyConnection:   func(cs tls.ConnectionState) error { return t.verifyLogged(cs, nil) },
+		VerifyConnection: func(cs tls.ConnectionState) error {
+			err := t.verify(cs, nil)
+			if err != nil {
+				t.logger.Warn(t.ctx, "verify nats cluster peer for VerifyConnection", slog.Error(err))
+			}
+			return err
+		},
 		GetConfigForClient: t.configForClient,
 	}
-}
-
-// verifyLogged runs verify and debug-logs a rejection. The embedded NATS server
-// runs with NoLog set, so it swallows its own TLS handshake errors; logging here
-// gives deployments a way to see why a cluster peer was rejected.
-func (t *clusterTLS) verifyLogged(cs tls.ConnectionState, sourceIP net.IP) error {
-	err := t.verify(cs, sourceIP)
-	if err != nil {
-		t.logger.Debug(t.ctx, "rejected nats cluster peer certificate", slog.Error(err))
-	}
-	return err
-}
-
-// currentLeafLogged mints (or returns the cached) leaf and debug-logs a
-// failure. Like verifyLogged, this exists because the embedded NATS server runs
-// with NoLog: a currentLeaf error (CA cache error, wrong key type, mint failure)
-// is otherwise swallowed by the TLS stack, so a broken CA cache produces zero
-// routes with no diagnostic. Used by the GetCertificate callbacks.
-func (t *clusterTLS) currentLeafLogged() (*tls.Certificate, error) {
-	leaf, err := t.currentLeaf()
-	if err != nil {
-		t.logger.Debug(t.ctx, "failed to mint nats cluster leaf", slog.Error(err))
-	}
-	return leaf, err
 }
 
 // configForClient builds the per-connection config used when accepting a route.
@@ -185,30 +177,51 @@ func (t *clusterTLS) configForClient(chi *tls.ClientHelloInfo) (*tls.Config, err
 		}
 	}
 	cfg := &tls.Config{
-		MinVersion:     tls.VersionTLS13,
-		GetCertificate: func(*tls.ClientHelloInfo) (*tls.Certificate, error) { return t.currentLeafLogged() },
-		ClientAuth:     tls.RequireAnyClientCert,
+		MinVersion: tls.VersionTLS13,
+		GetCertificate: func(*tls.ClientHelloInfo) (*tls.Certificate, error) {
+			leaf, err := t.currentLeaf()
+			if err != nil {
+				t.logger.Warn(t.ctx, "get nats cluster leaf for GetCertificate", slog.Error(err))
+			}
+			return leaf, err
+		},
+		ClientAuth: tls.RequireAnyClientCert,
 		//nolint:gosec // See tlsConfig: verification is performed in VerifyConnection.
 		InsecureSkipVerify: true,
-		VerifyConnection:   func(cs tls.ConnectionState) error { return t.verifyLogged(cs, sourceIP) },
+		VerifyConnection: func(cs tls.ConnectionState) error {
+			err := t.verify(cs, sourceIP)
+			if err != nil {
+				t.logger.Warn(t.ctx, "verify nats cluster peer for VerifyConnection", slog.Error(err))
+			}
+			return err
+		},
 	}
 	return cfg, nil
 }
 
 // currentLeaf returns the cached leaf, re-minting it when it is missing or
-// signed by a CA that is no longer the active, still-valid one (a rotation).
-// A leaf carries no independent lifetime: it is valid exactly as long as its
-// signing CA (see mintLeaf), so re-minting is driven purely by CA rotation.
+// expired. A leaf carries no independent lifetime: its NotAfter equals its
+// signing CA's (see mintLeaf), so re-minting is driven purely by CA rotation.
 //
 // The whole method holds t.mu so the CA cache, IP, and cached leaf are read as
 // a consistent set: a concurrent setCACache cannot swap the CA out from under
-// the IP we mint with. The lock is therefore held across the SigningKey lookup
-// and the (rare) mint. Mints happen only at startup and on CA rotation, so the
-// keygen+sign cost on the lock is acceptable; the SigningKey lookup is normally
-// an in-memory cache hit.
+// the IP we mint with. The lock is held across the SigningKey lookup and the
+// (rare) mint; both are cheap (an in-memory cache hit and, only on a miss, a
+// keygen+sign).
 func (t *clusterTLS) currentLeaf() (*tls.Certificate, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+
+	// Reuse the cached leaf while it is still within its validity window,
+	// before consulting the signing cache. A leaf's NotAfter equals its signing
+	// CA's, and the previous CA stays trusted by peers through the rotation
+	// overlap, so a still-valid cached leaf always chains to a CA peers accept.
+	// A new CA is picked up when the leaf expires (forcing a re-mint) or when
+	// setCACache swaps the cache and clears the leaf.
+	now := t.clock.Now()
+	if t.leaf != nil && now.Before(t.leaf.Leaf.NotAfter) {
+		return t.leaf, nil
+	}
 
 	id, key, err := t.ca.SigningKey(t.ctx)
 	if err != nil {
@@ -219,20 +232,11 @@ func (t *clusterTLS) currentLeaf() (*tls.Certificate, error) {
 		return nil, xerrors.Errorf("unexpected signing key type %T", key)
 	}
 
-	now := t.clock.Now()
-	// Reuse the cached leaf while it was signed by the still-active, still-valid
-	// CA. A CA rotation (sequence change) or the active CA expiring forces a
-	// re-mint; there is no separate leaf lifetime to track.
-	if t.leaf != nil && t.leafSeq == id && now.Before(ca.Cert.NotAfter) {
-		return t.leaf, nil
-	}
-
 	leaf, err := mintLeaf(ca, t.ip, now)
 	if err != nil {
-		return nil, err
+		return nil, xerrors.Errorf("mint leaf: %w", err)
 	}
 	t.leaf = leaf
-	t.leafSeq = id
 	t.logger.Debug(t.ctx, "minted nats cluster leaf", slog.F("ca_sequence", id))
 	return leaf, nil
 }
