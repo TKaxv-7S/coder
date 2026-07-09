@@ -3117,10 +3117,14 @@ func BuildSingleUserChatMessageInsertParams(
 	return params
 }
 
-// The handler uses it to decide whether the chat is owned locally.
+// WorkerID returns the ID of the worker this Server runs as. Callers compare
+// it against a chat's stored worker ID to decide whether the chat is owned
+// by this replica.
 func (p *Server) WorkerID() uuid.UUID { return p.workerID }
 
-// Snapshot is safe to call from any goroutine.
+// Snapshot returns a point-in-time RuntimeSnapshot of this Server's in-memory
+// state for chatID: the local worker ID, the runners handling the chat, and
+// the buffered message-part episodes. It is safe to call from any goroutine.
 func (p *Server) Snapshot(chatID uuid.UUID) RuntimeSnapshot {
 	snap := RuntimeSnapshot{
 		LocalWorkerID: p.workerID,
@@ -3177,6 +3181,9 @@ type Config struct {
 	Auditor               *atomic.Pointer[audit.Auditor]
 }
 
+// RuntimeSnapshot is a point-in-time view of a Server's in-memory state for
+// one chat: the worker ID this Server runs as, the runners handling the chat,
+// and the message-part episodes buffered for it.
 type RuntimeSnapshot struct {
 	LocalWorkerID uuid.UUID
 	Runners       []RunnerSnapshot

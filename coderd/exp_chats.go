@@ -7956,9 +7956,8 @@ func (api *API) getChatDebugSnapshot(rw http.ResponseWriter, r *http.Request) {
 	}
 	chat := httpmw.ChatParam(r)
 
-	// Skip forwarding if this request was already forwarded once, to avoid
-	// bouncing indefinitely if ownership changes between the two replicas'
-	// reads.
+	// Serve locally if this request was already forwarded once (see
+	// ChatDebugForwardedHeader).
 	alreadyForwarded := r.Header.Get(ChatDebugForwardedHeader) != ""
 	if !alreadyForwarded && chat.WorkerID.Valid && chat.WorkerID.UUID != api.chatDaemon.WorkerID() && api.chatDebugProxy != nil {
 		api.chatDebugProxy(rw, r, chat.WorkerID.UUID)
@@ -8062,12 +8061,12 @@ func (api *API) getChatDebugSnapshot(rw http.ResponseWriter, r *http.Request) {
 		MessageBuffers:       rtSnap.Episodes,
 	}
 	if rtSection.Runners == nil {
-		// chatWorker.InspectChat and Server.Snapshot return nil when the
-		// worker or manager isn't running (e.g. ChatWorkerDisabled in
-		// tests), unlike messagePartBuffer.InspectChat which always
-		// returns a non-nil slice. Normalize here so "runners" serializes
-		// as "[]" rather than "null" for a consistent empty-collection
-		// representation.
+		// chatWorker.InspectChat returns nil when the worker's manager
+		// isn't running (e.g. ChatWorkerDisabled in tests), so
+		// Server.Snapshot leaves Runners nil; messagePartBuffer.InspectChat
+		// always returns a non-nil slice. Normalize here so "runners"
+		// serializes as "[]" rather than "null" for a consistent
+		// empty-collection representation.
 		rtSection.Runners = []chatd.RunnerSnapshot{}
 	}
 

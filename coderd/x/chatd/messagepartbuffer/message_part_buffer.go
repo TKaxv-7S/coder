@@ -78,6 +78,9 @@ func (p Part) jsonValue() partJSON {
 	}
 }
 
+// EpisodeInfo summarizes one buffered episode for debugging: its history
+// version and generation attempt, how many parts and bytes are buffered, how
+// many subscribers are attached, and whether the episode is closed.
 type EpisodeInfo struct {
 	HistoryVersion    int64 `json:"history_version"`
 	GenerationAttempt int64 `json:"generation_attempt"`
@@ -561,6 +564,7 @@ func serializedPartBytes(part Part) (int64, error) {
 	return int64(len(data)), nil
 }
 
+// InspectChat returns an EpisodeInfo for each episode buffered for chatID.
 // It holds the buffer lock only briefly, so the returned data may be
 // slightly stale; it is intended for debugging only. Results are sorted by
 // (HistoryVersion, GenerationAttempt) so repeated calls are stable (map

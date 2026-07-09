@@ -11,7 +11,7 @@ import (
 
 // TestChatWorker_InspectChat drives a real chatWorker/runnerManager through a
 // live task (no HTTP, no fake InspectChat) so that removing setActiveTaskKind
-// from runner.go would fail this test, per CRF-22.
+// from runner.go would fail this test.
 func TestChatWorker_InspectChat(t *testing.T) {
 	t.Parallel()
 	f := newWorkerTestFixture(t)
@@ -34,8 +34,8 @@ func TestChatWorker_InspectChat(t *testing.T) {
 }
 
 // TestRunnerManager_InspectChatStableOrder verifies InspectChat's output
-// order is stable across repeated calls, per CRF-23 (map iteration order is
-// not stable on its own).
+// order is stable across repeated calls (map iteration order is not stable
+// on its own).
 func TestRunnerManager_InspectChatStableOrder(t *testing.T) {
 	t.Parallel()
 

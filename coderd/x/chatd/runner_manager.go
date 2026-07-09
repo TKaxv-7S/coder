@@ -95,6 +95,8 @@ func (r *runnerRecord) startCleanup() {
 	r.cancel()
 }
 
+// RunnerSnapshot describes one runner handling a chat: its runner and worker
+// IDs and the kind of task it is currently executing, if any.
 type RunnerSnapshot struct {
 	RunnerID       uuid.UUID `json:"runner_id"`
 	WorkerID       uuid.UUID `json:"worker_id"`

@@ -771,7 +771,7 @@ func chatDebugProxyURL(baseURL, reqURL *url.URL) *url.URL {
 // chatDebugProxyHandler returns a coderd.Options.ChatDebugProxy implementation
 // that forwards a chat debug snapshot request to the replica owning the
 // chat, verbatim. resolveReplicaAddress resolves a replica ID to its relay
-// address, e.g. api's own resolveReplicaAddress closure.
+// address.
 func chatDebugProxyHandler(
 	logger slog.Logger,
 	httpClient *http.Client,
