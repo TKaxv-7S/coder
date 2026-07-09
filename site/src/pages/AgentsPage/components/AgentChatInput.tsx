@@ -410,13 +410,16 @@ export const AgentChatInput: FC<AgentChatInputProps> = ({
 	aiGatewayDisabled,
 }) => {
 	const [chatFullWidth] = useChatFullWidth();
+	// Claude Code chats generate through the runtime agent, so missing
+	// chat models are irrelevant; the AI gateway gate still applies.
 	const showAgentSetupNotice =
 		aiGatewayDisabled ||
-		(canConfigureAgentSetup
-			? providerCount !== undefined &&
-				modelCount !== undefined &&
-				(providerCount === 0 || modelCount === 0)
-			: modelCount !== undefined && modelCount === 0);
+		(!claudeCodeEnabled &&
+			(canConfigureAgentSetup
+				? providerCount !== undefined &&
+					modelCount !== undefined &&
+					(providerCount === 0 || modelCount === 0)
+				: modelCount !== undefined && modelCount === 0));
 	const internalRef = useRef<ChatMessageInputRef>(null);
 	const [previewImage, setPreviewImage] = useState<string | null>(null);
 	const [previewText, setPreviewText] = useState<string | null>(null);

@@ -1288,6 +1288,29 @@ export const ClaudeCodePinned: Story = {
 	},
 };
 
+/**
+ * Claude Code chats need no chat model, so the "set up a model" notice
+ * stays hidden even when the model catalog is empty.
+ */
+export const ClaudeCodeHidesModelSetupNotice: Story = {
+	args: {
+		claudeCodeEnabled: true,
+		onClaudeCodeToggle: fn(),
+		hasModelOptions: false,
+		modelOptions: [],
+		selectedModel: "",
+		canConfigureAgentSetup: false,
+		modelCount: 0,
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		expect(await canvas.findByTestId("claude-code-badge")).toBeVisible();
+		expect(
+			canvas.queryByText(/To chat with Coder Agents/),
+		).not.toBeInTheDocument();
+	},
+};
+
 /** The plus menu offers "Run with Claude Code" when a toggle is wired. */
 export const ClaudeCodeMenuItem: Story = {
 	args: {
