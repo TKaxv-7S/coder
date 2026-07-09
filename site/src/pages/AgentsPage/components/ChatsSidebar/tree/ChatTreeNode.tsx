@@ -73,11 +73,16 @@ export const ChatTreeNode: FC<ChatTreeNodeProps> = ({ chat, isChildNode }) => {
 	const isDelegated = Boolean(getParentChatID(chat));
 	const isDelegatedExecuting =
 		isDelegated && (chat.status === "pending" || chat.status === "running");
-	const modelName = getModelDisplayName(
-		chat.last_model_config_id,
-		modelConfigs,
-		modelOptions,
-	);
+	// Runtime chats are not backed by a chat model config; label them
+	// with the runtime instead.
+	const modelName =
+		chat.runtime === "claude_code"
+			? "Claude Code"
+			: getModelDisplayName(
+					chat.last_model_config_id,
+					modelConfigs,
+					modelOptions,
+				);
 	const errorReason =
 		chat.status === "error"
 			? chatErrorReasons[chat.id] || chat.last_error?.message || undefined

@@ -50,6 +50,10 @@ export type CreateChatOptions = {
 	mcpServerIds?: string[];
 	organizationId: string;
 	planMode?: TypesGen.ChatPlanMode;
+	// runtime selects an external generation runtime. The server
+	// creates and binds a workspace from the admin-configured template,
+	// so workspace, model, MCP, and plan options do not apply.
+	runtime?: TypesGen.ChatRuntime;
 };
 
 /**
@@ -141,6 +145,9 @@ interface AgentCreateFormProps {
 	workspaceOptions: readonly TypesGen.Workspace[];
 	workspacesError: unknown;
 	isWorkspacesLoading: boolean;
+	// Organizations with an enabled claude_code runtime config. The
+	// "Run with Claude Code" option only shows for these orgs.
+	claudeCodeOrgIds?: ReadonlySet<string>;
 }
 
 export const AgentCreateForm: FC<AgentCreateFormProps> = ({
@@ -167,6 +174,7 @@ export const AgentCreateForm: FC<AgentCreateFormProps> = ({
 	workspaceOptions,
 	workspacesError,
 	isWorkspacesLoading,
+	claudeCodeOrgIds,
 }) => {
 	const { organizations, showOrganizations } = useDashboard();
 	const {
@@ -277,6 +285,13 @@ export const AgentCreateForm: FC<AgentCreateFormProps> = ({
 		useState<TypesGen.Organization | null>(null);
 	const organizationId = selectedOrg?.id ?? "";
 	const [planModeEnabled, setPlanModeEnabled] = useState(false);
+	const [claudeCodeSelected, setClaudeCodeSelected] = useState(false);
+	const claudeCodeAvailable = Boolean(
+		organizationId && claudeCodeOrgIds?.has(organizationId),
+	);
+	// The selection is pinned to the org it was made in; switching to an
+	// org without the runtime drops it.
+	const claudeCodeEnabled = claudeCodeSelected && claudeCodeAvailable;
 	const hasModelOptions = modelOptions.length > 0;
 	const hasConfiguredModels = hasConfiguredModelsInCatalog(modelCatalog);
 	const hasUserFixableModelProviders = hasUserFixableProviders(modelCatalog);
@@ -362,18 +377,29 @@ export const AgentCreateForm: FC<AgentCreateFormProps> = ({
 
 	const handleSend = async (message: string, fileIDs?: string[]) => {
 		submitDraft();
-		await onCreateChat({
-			message,
-			fileIDs,
-			workspaceId: effectiveWorkspaceId ?? undefined,
-			model: submittedModel,
-			organizationId,
-			mcpServerIds:
-				effectiveMCPServerIds.length > 0
-					? [...effectiveMCPServerIds]
-					: undefined,
-			planMode: planModeEnabled ? "plan" : undefined,
-		}).catch((err) => {
+		// Runtime chats carry only the message: the server binds a
+		// workspace and the runtime manages its own model, so the
+		// picker-driven options are not sent.
+		const options: CreateChatOptions = claudeCodeEnabled
+			? {
+					message,
+					fileIDs,
+					organizationId,
+					runtime: "claude_code",
+				}
+			: {
+					message,
+					fileIDs,
+					workspaceId: effectiveWorkspaceId ?? undefined,
+					model: submittedModel,
+					organizationId,
+					mcpServerIds:
+						effectiveMCPServerIds.length > 0
+							? [...effectiveMCPServerIds]
+							: undefined,
+					planMode: planModeEnabled ? "plan" : undefined,
+				};
+		await onCreateChat(options).catch((err) => {
 			resetDraft();
 			throw err;
 		});
@@ -518,8 +544,10 @@ export const AgentCreateForm: FC<AgentCreateFormProps> = ({
 							isCreating ||
 							isForbidden ||
 							isPersonalModelOverridesLoading ||
-							!hasModelOptions ||
-							Boolean(aiGatewayDisabled)
+							// Runtime chats need neither the model catalog nor
+							// the AI gateway.
+							(!claudeCodeEnabled &&
+								(!hasModelOptions || Boolean(aiGatewayDisabled)))
 						}
 						isLoading={isCreating}
 						initialValue={initialInputValue}
@@ -531,24 +559,34 @@ export const AgentCreateForm: FC<AgentCreateFormProps> = ({
 						modelSelectorPlaceholder={modelSelectorPlaceholder}
 						isModelCatalogLoading={isModelCatalogLoading}
 						hasModelOptions={hasModelOptions}
-						planModeEnabled={planModeEnabled}
-						onPlanModeToggle={setPlanModeEnabled}
+						planModeEnabled={claudeCodeEnabled ? false : planModeEnabled}
+						onPlanModeToggle={
+							claudeCodeEnabled ? undefined : setPlanModeEnabled
+						}
+						claudeCodeEnabled={claudeCodeEnabled}
+						onClaudeCodeToggle={
+							claudeCodeAvailable ? setClaudeCodeSelected : undefined
+						}
 						attachments={attachments}
-						onAttach={handleAttach}
+						onAttach={claudeCodeEnabled ? undefined : handleAttach}
 						onRemoveAttachment={handleRemoveAttachment}
 						uploadStates={uploadStates}
 						previewUrls={previewUrls}
 						textContents={textContents}
-						mcpServers={mcpServers}
+						mcpServers={claudeCodeEnabled ? undefined : mcpServers}
 						selectedMCPServerIds={effectiveMCPServerIds}
 						onMCPSelectionChange={(ids) => {
 							setUserMCPServerIds(ids);
 							saveMCPSelection(ids);
 						}}
 						onMCPAuthComplete={onMCPAuthComplete}
-						workspaceOptions={filteredWorkspaces}
+						workspaceOptions={
+							claudeCodeEnabled ? undefined : filteredWorkspaces
+						}
 						selectedWorkspaceId={effectiveWorkspaceId}
-						onWorkspaceChange={handleWorkspaceChange}
+						onWorkspaceChange={
+							claudeCodeEnabled ? undefined : handleWorkspaceChange
+						}
 						isWorkspaceLoading={isWorkspacesLoading}
 						canConfigureAgentSetup={canConfigureAgentSetup}
 						providerCount={providerCount}

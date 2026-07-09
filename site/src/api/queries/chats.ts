@@ -731,6 +731,11 @@ export const chat = (chatId: string) => ({
 	queryFn: () => API.experimental.getChat(chatId),
 });
 
+export const chatRuntimeAvailability = () => ({
+	queryKey: [...chatsKey, "runtime-availability"] as const,
+	queryFn: () => API.experimental.getChatRuntimeAvailability(),
+});
+
 export const chatACL = (chatId: string) => ({
 	queryKey: chatACLKey(chatId),
 	queryFn: () => API.experimental.getChatACL(chatId),

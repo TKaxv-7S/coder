@@ -180,6 +180,8 @@ interface ChatPageInputProps {
 	aiGatewayDisabled?: boolean;
 	planModeEnabled?: boolean;
 	onPlanModeToggle?: (enabled: boolean) => void;
+	// Pins the composer to the Claude Code runtime.
+	isClaudeCodeChat?: boolean;
 	isModelCatalogLoading?: boolean;
 	// Imperative editor handle plus the one-time initial draft,
 	// owned by the conversation component.
@@ -251,6 +253,7 @@ export const ChatPageInput: FC<ChatPageInputProps> = ({
 	aiGatewayDisabled,
 	planModeEnabled,
 	onPlanModeToggle,
+	isClaudeCodeChat,
 	isModelCatalogLoading = false,
 	inputRef,
 	initialValue,
@@ -506,6 +509,7 @@ export const ChatPageInput: FC<ChatPageInputProps> = ({
 			modelSelectorPlaceholder={modelSelectorPlaceholder}
 			planModeEnabled={planModeEnabled}
 			onPlanModeToggle={onPlanModeToggle}
+			claudeCodeEnabled={isClaudeCodeChat}
 			isModelCatalogLoading={isModelCatalogLoading}
 			workspaceOptions={workspaceOptions}
 			chatOrganizationId={chatOrganizationId}

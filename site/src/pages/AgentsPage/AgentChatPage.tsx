@@ -982,6 +982,11 @@ const AgentChatPage: FC = () => {
 				}
 			: undefined;
 	const chatLastModelConfigID = chatRecord?.last_model_config_id;
+	// Chats on an external runtime are permanently pinned to it: no
+	// model selection, no workspace switching, no plan mode, and no AI
+	// gateway dependency (the runtime talks to its own provider from
+	// inside the workspace).
+	const isClaudeCodeChat = chatRecord?.runtime === "claude_code";
 
 	// Destructure mutation results directly so the React Compiler
 	// tracks stable primitives/functions instead of the whole result
@@ -1056,7 +1061,7 @@ const AgentChatPage: FC = () => {
 		void trackedSync.catch(() => undefined);
 	};
 
-	const aiGatewayDisabled = !useAIGatewayEnabled();
+	const aiGatewayDisabled = !useAIGatewayEnabled() && !isClaudeCodeChat;
 	const { store, clearStreamError, upsertCacheMessages } = useChatStore({
 		chatID: agentId,
 		chatMessages: chatMessagesList,
@@ -1157,12 +1162,13 @@ const AgentChatPage: FC = () => {
 	const isChatSettingsPending =
 		isUpdateChatPlanModePending || isUpdateChatWorkspacePending;
 	const isInputDisabled =
-		!hasModelOptions ||
+		(!hasModelOptions && !isClaudeCodeChat) ||
 		isArchived ||
 		isChatSettingsPending ||
 		isViewerNotOwner ||
 		aiGatewayDisabled;
-	const canUpdateChatWorkspace = !isArchived && !isViewerNotOwner;
+	const canUpdateChatWorkspace =
+		!isArchived && !isViewerNotOwner && !isClaudeCodeChat;
 	const selectedWorkspaceId = chatQuery.data?.workspace_id ?? null;
 
 	const isWorkspaceLoading =
@@ -1455,7 +1461,10 @@ const AgentChatPage: FC = () => {
 					: undefined;
 			const request: TypesGen.EditChatMessageRequest = {
 				content,
-				model_config_id: editSelectedModelConfigID,
+				// Runtime chats have no model config to override.
+				model_config_id: isClaudeCodeChat
+					? undefined
+					: editSelectedModelConfigID,
 			};
 			const optimisticMessage = originalEditedMessage
 				? buildOptimisticEditedMessage({
@@ -1495,20 +1504,27 @@ const AgentChatPage: FC = () => {
 		}
 
 		const selectedModelConfigID = effectiveSelectedModel || undefined;
-		const request: CreateChatMessageRequestWithClearablePlanMode = {
-			content,
-			model_config_id: selectedModelConfigID,
-			mcp_server_ids:
-				effectiveMCPServerIds.length > 0
-					? [...effectiveMCPServerIds]
-					: undefined,
-			...(planModeSwitch !== undefined
-				? {
-						plan_mode:
-							planModeSwitch === "clear" ? clearChatPlanMode : planModeSwitch,
-					}
-				: {}),
-		};
+		// Runtime chats reject model, MCP, and plan options; they only
+		// carry message content.
+		const request: CreateChatMessageRequestWithClearablePlanMode =
+			isClaudeCodeChat
+				? { content }
+				: {
+						content,
+						model_config_id: selectedModelConfigID,
+						mcp_server_ids:
+							effectiveMCPServerIds.length > 0
+								? [...effectiveMCPServerIds]
+								: undefined,
+						...(planModeSwitch !== undefined
+							? {
+									plan_mode:
+										planModeSwitch === "clear"
+											? clearChatPlanMode
+											: planModeSwitch,
+								}
+							: {}),
+					};
 		clearChatErrorReason(agentId);
 		clearStreamError();
 		scrollToBottomRef.current?.();
@@ -1656,8 +1672,9 @@ const AgentChatPage: FC = () => {
 			aiGatewayDisabled={aiGatewayDisabled}
 			hasModelOptions={hasModelOptions}
 			isModelCatalogLoading={isModelCatalogLoading}
-			planModeEnabled={planModeEnabled}
-			onPlanModeToggle={handlePlanModeToggle}
+			isClaudeCodeChat={isClaudeCodeChat}
+			planModeEnabled={isClaudeCodeChat ? false : planModeEnabled}
+			onPlanModeToggle={isClaudeCodeChat ? undefined : handlePlanModeToggle}
 			compressionThreshold={compressionThreshold}
 			isInputDisabled={isInputDisabled}
 			isSubmissionPending={isSubmissionPending}

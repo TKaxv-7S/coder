@@ -1265,3 +1265,62 @@ export const LongWorkspaceNameMobile: Story = {
 		}
 	},
 };
+
+/**
+ * Claude Code runtime pinned: the model selector is replaced by a
+ * "Claude Code" badge and sending works without model options.
+ */
+export const ClaudeCodePinned: Story = {
+	args: {
+		claudeCodeEnabled: true,
+		onClaudeCodeToggle: fn(),
+		hasModelOptions: false,
+		modelOptions: [],
+		selectedModel: "",
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		const badge = await canvas.findByTestId("claude-code-badge");
+		expect(badge).toBeVisible();
+		expect(badge).toHaveTextContent("Claude Code");
+		// The model selector is hidden while pinned.
+		expect(canvas.queryByText("Select model")).not.toBeInTheDocument();
+	},
+};
+
+/** The plus menu offers "Run with Claude Code" when a toggle is wired. */
+export const ClaudeCodeMenuItem: Story = {
+	args: {
+		onClaudeCodeToggle: fn(),
+	},
+	play: async ({ canvasElement, args }) => {
+		const canvas = within(canvasElement);
+		await userEvent.click(canvas.getByRole("button", { name: "More options" }));
+		const item = await within(document.body).findByRole("menuitemcheckbox", {
+			name: /Run with Claude Code/,
+		});
+		expect(item).toHaveAttribute("aria-checked", "false");
+		await userEvent.click(item);
+		await waitFor(() => {
+			expect(args.onClaudeCodeToggle).toHaveBeenCalledWith(true);
+		});
+	},
+};
+
+/** Dismissing the pinned badge exits Claude Code mode. */
+export const ClaudeCodeBadgeDismiss: Story = {
+	args: {
+		claudeCodeEnabled: true,
+		onClaudeCodeToggle: fn(),
+	},
+	play: async ({ canvasElement, args }) => {
+		const canvas = within(canvasElement);
+		const badge = await canvas.findByTestId("claude-code-badge");
+		await userEvent.click(
+			within(badge).getByRole("button", { name: "Disable Claude Code" }),
+		);
+		await waitFor(() => {
+			expect(args.onClaudeCodeToggle).toHaveBeenCalledWith(false);
+		});
+	},
+};

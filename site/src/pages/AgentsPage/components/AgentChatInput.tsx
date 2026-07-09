@@ -1,6 +1,7 @@
 import {
 	ArrowLeftIcon,
 	ArrowUpIcon,
+	BotIcon,
 	CheckIcon,
 	ChevronRightIcon,
 	MicIcon,
@@ -121,6 +122,12 @@ interface AgentChatInputProps {
 	hasModelOptions: boolean;
 	planModeEnabled?: boolean;
 	onPlanModeToggle?: (enabled: boolean) => void;
+	// Claude Code runtime. When enabled the composer is pinned to the
+	// runtime: the model selector is hidden and model options are not
+	// required to send. The toggle only renders on the landing composer;
+	// existing runtime chats pass claudeCodeEnabled without a toggle.
+	claudeCodeEnabled?: boolean;
+	onClaudeCodeToggle?: (enabled: boolean) => void;
 	isModelCatalogLoading?: boolean;
 	// Streaming controls (optional, for the detail page).
 	isStreaming?: boolean;
@@ -356,6 +363,8 @@ export const AgentChatInput: FC<AgentChatInputProps> = ({
 	hasModelOptions,
 	planModeEnabled = false,
 	onPlanModeToggle,
+	claudeCodeEnabled = false,
+	onClaudeCodeToggle,
 	isModelCatalogLoading = false,
 	isStreaming = false,
 	onInterrupt,
@@ -610,6 +619,13 @@ export const AgentChatInput: FC<AgentChatInputProps> = ({
 	};
 
 	const handleDisablePlanMode = () => onPlanModeToggle?.(false);
+
+	const handleClaudeCodeToggle = () => {
+		onClaudeCodeToggle?.(!claudeCodeEnabled);
+		setPlusMenuOpen(false);
+	};
+
+	const handleDisableClaudeCode = () => onClaudeCodeToggle?.(false);
 
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const [composerElement, setComposerElement] = useState<HTMLDivElement | null>(
@@ -873,7 +889,9 @@ export const AgentChatInput: FC<AgentChatInputProps> = ({
 	const canSend =
 		!isDisabled &&
 		!isLoading &&
-		hasModelOptions &&
+		// Claude Code chats manage their own model, so the model catalog
+		// is not required to send.
+		(hasModelOptions || claudeCodeEnabled) &&
 		hasSendableContent &&
 		!hasActiveUploads;
 	const handleSubmit = () => {
@@ -900,7 +918,7 @@ export const AgentChatInput: FC<AgentChatInputProps> = ({
 			isDisabled ||
 			isLoading ||
 			hasActiveUploads ||
-			!hasModelOptions
+			(!hasModelOptions && !claudeCodeEnabled)
 		) {
 			return;
 		}
@@ -1232,7 +1250,11 @@ export const AgentChatInput: FC<AgentChatInputProps> = ({
 									disabled={
 										isDisabled &&
 										!showAgentSetupNotice &&
-										!canUseWorkspacePicker
+										!canUseWorkspacePicker &&
+										// Claude Code must stay selectable even when the
+										// composer is disabled for missing models or
+										// gateway, since the runtime needs neither.
+										!onClaudeCodeToggle
 									}
 									aria-label="More options"
 								>
@@ -1293,6 +1315,22 @@ export const AgentChatInput: FC<AgentChatInputProps> = ({
 												<PencilIcon className="size-3.5 shrink-0" />
 												<span>Plan first</span>
 												{planModeEnabled && (
+													<CheckIcon className="ml-auto size-icon-sm shrink-0" />
+												)}
+											</button>
+										)}
+										{onClaudeCodeToggle && (
+											<button
+												type="button"
+												role="menuitemcheckbox"
+												aria-checked={claudeCodeEnabled}
+												onClick={handleClaudeCodeToggle}
+												disabled={isLoading}
+												className="group flex h-8 w-full cursor-pointer items-center gap-1.5 border-none bg-transparent px-1 text-xs text-content-secondary shadow-none transition-colors hover:text-content-primary disabled:cursor-not-allowed disabled:opacity-50"
+											>
+												<BotIcon className="size-3.5 shrink-0" />
+												<span>Run with Claude Code</span>
+												{claudeCodeEnabled && (
 													<CheckIcon className="ml-auto size-icon-sm shrink-0" />
 												)}
 											</button>
@@ -1415,7 +1453,22 @@ export const AgentChatInput: FC<AgentChatInputProps> = ({
 								)}
 							</PopoverContent>
 						</Popover>
-						{isModelCatalogLoading ? (
+						{claudeCodeEnabled ? (
+							<span
+								data-testid="claude-code-badge"
+								className="inline-flex shrink-0 items-center gap-1 rounded-full bg-surface-secondary px-2 py-0.5 text-xs font-medium text-content-secondary"
+							>
+								<BotIcon className="size-3" />
+								Claude Code
+								{onClaudeCodeToggle && (
+									<BadgeDismissButton
+										onClick={handleDisableClaudeCode}
+										ariaLabel="Disable Claude Code"
+										isDisabled={isDisabled}
+									/>
+								)}
+							</span>
+						) : isModelCatalogLoading ? (
 							<Skeleton className="h-6 w-24 rounded" />
 						) : (
 							<ModelSelector

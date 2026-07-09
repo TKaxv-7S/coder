@@ -829,3 +829,64 @@ export const PermittedOrgsResolvesToSubset: Story = {
 		expect(options.organizationId).toBe(MockOrganization2.id);
 	},
 };
+
+/**
+ * Selecting "Run with Claude Code" pins the composer to the runtime
+ * and the submission carries runtime instead of workspace/model/plan
+ * options.
+ */
+export const ClaudeCodeRuntimeSubmission: Story = {
+	args: {
+		...defaultArgs,
+		onCreateChat: fn().mockResolvedValue(undefined),
+		claudeCodeOrgIds: new Set([MockDefaultOrganization.id]),
+	},
+	play: async ({ canvasElement, args }) => {
+		const canvas = within(canvasElement);
+		await userEvent.click(canvas.getByRole("button", { name: "More options" }));
+		const item = await screen.findByRole("menuitemcheckbox", {
+			name: /Run with Claude Code/,
+		});
+		await userEvent.click(item);
+
+		// The composer is pinned: badge visible, model selector gone.
+		const badge = await canvas.findByTestId("claude-code-badge");
+		expect(badge).toBeVisible();
+
+		await submitMessage(canvasElement, "build me a server");
+		await waitFor(() => {
+			expect(args.onCreateChat).toHaveBeenCalled();
+		});
+		const options = (args.onCreateChat as ReturnType<typeof fn>).mock
+			.calls[0]?.[0] as
+			| { runtime?: string; model?: string; workspaceId?: string }
+			| undefined;
+		if (!options) {
+			throw new Error("Expected onCreateChat to receive options");
+		}
+		expect(options.runtime).toBe("claude_code");
+		expect(options.model).toBeUndefined();
+		expect(options.workspaceId).toBeUndefined();
+	},
+};
+
+/**
+ * Orgs without an enabled claude_code runtime config never offer the
+ * menu item.
+ */
+export const ClaudeCodeHiddenWithoutOrgConfig: Story = {
+	args: {
+		...defaultArgs,
+		claudeCodeOrgIds: new Set<string>(),
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await userEvent.click(canvas.getByRole("button", { name: "More options" }));
+		await screen.findByRole("menuitemcheckbox", { name: /Plan first/ });
+		expect(
+			screen.queryByRole("menuitemcheckbox", {
+				name: /Run with Claude Code/,
+			}),
+		).not.toBeInTheDocument();
+	},
+};

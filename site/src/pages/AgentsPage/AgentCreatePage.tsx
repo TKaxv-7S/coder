@@ -7,6 +7,7 @@ import {
 	chatModelConfigs,
 	chatModels,
 	chatProviderConfigs,
+	chatRuntimeAvailability,
 	createChat,
 	mcpServerConfigs,
 	userChatPersonalModelOverrides,
@@ -18,6 +19,7 @@ import type * as TypesGen from "#/api/typesGenerated";
 import { useWebpushNotifications } from "#/contexts/useWebpushNotifications";
 import { useAuthenticated } from "#/hooks/useAuthenticated";
 import { useAIGatewayEnabled } from "#/hooks/useEmbeddedMetadata";
+import { useDashboard } from "#/modules/dashboard/useDashboard";
 import {
 	AgentCreateForm,
 	type CreateChatOptions,
@@ -41,9 +43,20 @@ const AgentCreatePage: FC = () => {
 	const location = useLocation();
 	const navigate = useNavigate();
 	const { permissions } = useAuthenticated();
+	const { experiments } = useDashboard();
 	const aiGatewayDisabled = !useAIGatewayEnabled();
+	const claudeCodeExperimentEnabled = experiments.includes("claude-code-chats");
 
 	const chatModelsQuery = useQuery(chatModels());
+	const runtimeAvailabilityQuery = useQuery({
+		...chatRuntimeAvailability(),
+		enabled: claudeCodeExperimentEnabled,
+	});
+	const claudeCodeOrgIds = new Set(
+		(runtimeAvailabilityQuery.data ?? [])
+			.filter((a) => a.runtime === "claude_code")
+			.map((a) => a.organization_id),
+	);
 	const chatModelConfigsQuery = useQuery(chatModelConfigs());
 	const chatProviderConfigsQuery = useQuery({
 		...chatProviderConfigs(),
@@ -91,6 +104,7 @@ const AgentCreatePage: FC = () => {
 		mcpServerIds,
 		organizationId,
 		planMode,
+		runtime,
 	}: CreateChatOptions) => {
 		const content: TypesGen.ChatInputPart[] = [];
 		if (message.trim()) {
@@ -101,16 +115,25 @@ const AgentCreatePage: FC = () => {
 				content.push({ type: "file", file_id: fileID });
 			}
 		}
-		const createRequest: TypesGen.CreateChatRequest = {
-			organization_id: organizationId,
-			content,
-			workspace_id: workspaceId,
-			mcp_server_ids:
-				mcpServerIds && mcpServerIds.length > 0 ? mcpServerIds : undefined,
-			plan_mode: planMode === "plan" ? "plan" : undefined,
-			client_type: "ui",
-			...(model ? { model_config_id: model } : {}),
-		};
+		// Runtime chats: the server rejects workspace, model, plan, and
+		// MCP options because the runtime manages them.
+		const createRequest: TypesGen.CreateChatRequest = runtime
+			? {
+					organization_id: organizationId,
+					content,
+					client_type: "ui",
+					runtime,
+				}
+			: {
+					organization_id: organizationId,
+					content,
+					workspace_id: workspaceId,
+					mcp_server_ids:
+						mcpServerIds && mcpServerIds.length > 0 ? mcpServerIds : undefined,
+					plan_mode: planMode === "plan" ? "plan" : undefined,
+					client_type: "ui",
+					...(model ? { model_config_id: model } : {}),
+				};
 		const createdChat = await createMutation.mutateAsync(createRequest);
 
 		if (model) {
@@ -183,6 +206,9 @@ const AgentCreatePage: FC = () => {
 				workspaceOptions={workspacesQuery.data?.workspaces ?? []}
 				workspacesError={workspacesQuery.error}
 				isWorkspacesLoading={workspacesQuery.isLoading}
+				claudeCodeOrgIds={
+					claudeCodeExperimentEnabled ? claudeCodeOrgIds : undefined
+				}
 			/>{" "}
 		</>
 	);
