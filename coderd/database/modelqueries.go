@@ -77,66 +77,35 @@ type (
 )
 
 func (q *sqlQuerier) GetChatMessageByID(ctx context.Context, id int64) (ChatMessage, error) {
-	row, err := q.GetChatMessageByIDRaw(ctx, id)
-	return ChatMessageRow(row).ChatMessage(), err
+	return q.GetChatMessageByIDRaw(ctx, id)
 }
 
 func (q *sqlQuerier) GetChatMessagesByChatID(ctx context.Context, arg GetChatMessagesByChatIDParams) ([]ChatMessage, error) {
-	rows, err := q.GetChatMessagesByChatIDRaw(ctx, arg)
-	return convertChatMessageRows(rows, err, func(row GetChatMessagesByChatIDRawRow) ChatMessage {
-		return ChatMessageRow(row).ChatMessage()
-	})
+	return q.GetChatMessagesByChatIDRaw(ctx, arg)
 }
 
 func (q *sqlQuerier) GetChatMessagesByRevisionForStream(ctx context.Context, arg GetChatMessagesByRevisionForStreamParams) ([]ChatMessage, error) {
-	rows, err := q.GetChatMessagesByRevisionForStreamRaw(ctx, arg)
-	return convertChatMessageRows(rows, err, func(row GetChatMessagesByRevisionForStreamRawRow) ChatMessage {
-		return ChatMessageRow(row).ChatMessage()
-	})
+	return q.GetChatMessagesByRevisionForStreamRaw(ctx, arg)
 }
 
 func (q *sqlQuerier) GetChatMessagesByChatIDAscPaginated(ctx context.Context, arg GetChatMessagesByChatIDAscPaginatedParams) ([]ChatMessage, error) {
-	rows, err := q.GetChatMessagesByChatIDAscPaginatedRaw(ctx, arg)
-	return convertChatMessageRows(rows, err, func(row GetChatMessagesByChatIDAscPaginatedRawRow) ChatMessage {
-		return ChatMessageRow(row).ChatMessage()
-	})
+	return q.GetChatMessagesByChatIDAscPaginatedRaw(ctx, arg)
 }
 
 func (q *sqlQuerier) GetChatMessagesByChatIDDescPaginated(ctx context.Context, arg GetChatMessagesByChatIDDescPaginatedParams) ([]ChatMessage, error) {
-	rows, err := q.GetChatMessagesByChatIDDescPaginatedRaw(ctx, arg)
-	return convertChatMessageRows(rows, err, func(row GetChatMessagesByChatIDDescPaginatedRawRow) ChatMessage {
-		return ChatMessageRow(row).ChatMessage()
-	})
+	return q.GetChatMessagesByChatIDDescPaginatedRaw(ctx, arg)
 }
 
 func (q *sqlQuerier) GetChatMessagesForPromptByChatID(ctx context.Context, chatID uuid.UUID) ([]ChatMessage, error) {
-	rows, err := q.GetChatMessagesForPromptByChatIDRaw(ctx, chatID)
-	return convertChatMessageRows(rows, err, func(row GetChatMessagesForPromptByChatIDRawRow) ChatMessage {
-		return ChatMessageRow(row).ChatMessage()
-	})
+	return q.GetChatMessagesForPromptByChatIDRaw(ctx, chatID)
 }
 
 func (q *sqlQuerier) GetLastChatMessageByRole(ctx context.Context, arg GetLastChatMessageByRoleParams) (ChatMessage, error) {
-	row, err := q.GetLastChatMessageByRoleRaw(ctx, arg)
-	return ChatMessageRow(row).ChatMessage(), err
+	return q.GetLastChatMessageByRoleRaw(ctx, arg)
 }
 
 func (q *sqlQuerier) InsertChatMessages(ctx context.Context, arg InsertChatMessagesParams) ([]ChatMessage, error) {
-	rows, err := q.InsertChatMessagesRaw(ctx, arg)
-	return convertChatMessageRows(rows, err, func(row InsertChatMessagesRawRow) ChatMessage {
-		return ChatMessageRow(row).ChatMessage()
-	})
-}
-
-func convertChatMessageRows[T any](rows []T, err error, convert func(T) ChatMessage) ([]ChatMessage, error) {
-	if err != nil {
-		return nil, err
-	}
-	messages := make([]ChatMessage, len(rows))
-	for i, row := range rows {
-		messages[i] = convert(row)
-	}
-	return messages, nil
+	return q.InsertChatMessagesRaw(ctx, arg)
 }
 
 type templateQuerier interface {

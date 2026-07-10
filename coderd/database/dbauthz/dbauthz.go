@@ -3356,14 +3356,14 @@ func (q *querier) GetChatIncludeDefaultSystemPrompt(ctx context.Context) (bool, 
 	return q.db.GetChatIncludeDefaultSystemPrompt(ctx)
 }
 
-func (q *querier) GetChatMessageByIDRaw(ctx context.Context, id int64) (database.GetChatMessageByIDRawRow, error) {
+func (q *querier) GetChatMessageByIDRaw(ctx context.Context, id int64) (database.ChatMessage, error) {
 	msg, err := q.db.GetChatMessageByIDRaw(ctx, id)
 	if err != nil {
-		return database.GetChatMessageByIDRawRow{}, err
+		return database.ChatMessage{}, err
 	}
 	_, err = q.GetChatByID(ctx, msg.ChatID)
 	if err != nil {
-		return database.GetChatMessageByIDRawRow{}, err
+		return database.ChatMessage{}, err
 	}
 	return msg, nil
 }
@@ -3376,7 +3376,7 @@ func (q *querier) GetChatMessageSummariesPerChat(ctx context.Context, createdAft
 	return q.db.GetChatMessageSummariesPerChat(ctx, createdAfter)
 }
 
-func (q *querier) GetChatMessagesByChatIDAscPaginatedRaw(ctx context.Context, arg database.GetChatMessagesByChatIDAscPaginatedRawParams) ([]database.GetChatMessagesByChatIDAscPaginatedRawRow, error) {
+func (q *querier) GetChatMessagesByChatIDAscPaginatedRaw(ctx context.Context, arg database.GetChatMessagesByChatIDAscPaginatedRawParams) ([]database.ChatMessage, error) {
 	_, err := q.GetChatByID(ctx, arg.ChatID)
 	if err != nil {
 		return nil, err
@@ -3384,7 +3384,7 @@ func (q *querier) GetChatMessagesByChatIDAscPaginatedRaw(ctx context.Context, ar
 	return q.db.GetChatMessagesByChatIDAscPaginatedRaw(ctx, arg)
 }
 
-func (q *querier) GetChatMessagesByChatIDDescPaginatedRaw(ctx context.Context, arg database.GetChatMessagesByChatIDDescPaginatedRawParams) ([]database.GetChatMessagesByChatIDDescPaginatedRawRow, error) {
+func (q *querier) GetChatMessagesByChatIDDescPaginatedRaw(ctx context.Context, arg database.GetChatMessagesByChatIDDescPaginatedRawParams) ([]database.ChatMessage, error) {
 	_, err := q.GetChatByID(ctx, arg.ChatID)
 	if err != nil {
 		return nil, err
@@ -3392,7 +3392,7 @@ func (q *querier) GetChatMessagesByChatIDDescPaginatedRaw(ctx context.Context, a
 	return q.db.GetChatMessagesByChatIDDescPaginatedRaw(ctx, arg)
 }
 
-func (q *querier) GetChatMessagesByChatIDRaw(ctx context.Context, arg database.GetChatMessagesByChatIDRawParams) ([]database.GetChatMessagesByChatIDRawRow, error) {
+func (q *querier) GetChatMessagesByChatIDRaw(ctx context.Context, arg database.GetChatMessagesByChatIDRawParams) ([]database.ChatMessage, error) {
 	_, err := q.GetChatByID(ctx, arg.ChatID)
 	if err != nil {
 		return nil, err
@@ -3400,7 +3400,7 @@ func (q *querier) GetChatMessagesByChatIDRaw(ctx context.Context, arg database.G
 	return q.db.GetChatMessagesByChatIDRaw(ctx, arg)
 }
 
-func (q *querier) GetChatMessagesByRevisionForStreamRaw(ctx context.Context, arg database.GetChatMessagesByRevisionForStreamRawParams) ([]database.GetChatMessagesByRevisionForStreamRawRow, error) {
+func (q *querier) GetChatMessagesByRevisionForStreamRaw(ctx context.Context, arg database.GetChatMessagesByRevisionForStreamRawParams) ([]database.ChatMessage, error) {
 	_, err := q.GetChatByID(ctx, arg.ChatID)
 	if err != nil {
 		return nil, err
@@ -3408,7 +3408,7 @@ func (q *querier) GetChatMessagesByRevisionForStreamRaw(ctx context.Context, arg
 	return q.db.GetChatMessagesByRevisionForStreamRaw(ctx, arg)
 }
 
-func (q *querier) GetChatMessagesForPromptByChatIDRaw(ctx context.Context, chatID uuid.UUID) ([]database.GetChatMessagesForPromptByChatIDRawRow, error) {
+func (q *querier) GetChatMessagesForPromptByChatIDRaw(ctx context.Context, chatID uuid.UUID) ([]database.ChatMessage, error) {
 	_, err := q.GetChatByID(ctx, chatID)
 	if err != nil {
 		return nil, err
@@ -3455,23 +3455,23 @@ func (q *querier) GetChatPlanModeInstructions(ctx context.Context) (string, erro
 	return q.db.GetChatPlanModeInstructions(ctx)
 }
 
-func (q *querier) GetChatQueuedMessageByID(ctx context.Context, arg database.GetChatQueuedMessageByIDParams) (database.GetChatQueuedMessageByIDRow, error) {
+func (q *querier) GetChatQueuedMessageByID(ctx context.Context, arg database.GetChatQueuedMessageByIDParams) (database.ChatQueuedMessage, error) {
 	_, err := q.GetChatByID(ctx, arg.ChatID)
 	if err != nil {
-		return database.GetChatQueuedMessageByIDRow{}, err
+		return database.ChatQueuedMessage{}, err
 	}
 	return q.db.GetChatQueuedMessageByID(ctx, arg)
 }
 
-func (q *querier) GetChatQueuedMessageHead(ctx context.Context, chatID uuid.UUID) (database.GetChatQueuedMessageHeadRow, error) {
+func (q *querier) GetChatQueuedMessageHead(ctx context.Context, chatID uuid.UUID) (database.ChatQueuedMessage, error) {
 	_, err := q.GetChatByID(ctx, chatID)
 	if err != nil {
-		return database.GetChatQueuedMessageHeadRow{}, err
+		return database.ChatQueuedMessage{}, err
 	}
 	return q.db.GetChatQueuedMessageHead(ctx, chatID)
 }
 
-func (q *querier) GetChatQueuedMessages(ctx context.Context, chatID uuid.UUID) ([]database.GetChatQueuedMessagesRow, error) {
+func (q *querier) GetChatQueuedMessages(ctx context.Context, chatID uuid.UUID) ([]database.ChatQueuedMessage, error) {
 	_, err := q.GetChatByID(ctx, chatID)
 	if err != nil {
 		return nil, err
@@ -3479,7 +3479,7 @@ func (q *querier) GetChatQueuedMessages(ctx context.Context, chatID uuid.UUID) (
 	return q.db.GetChatQueuedMessages(ctx, chatID)
 }
 
-func (q *querier) GetChatQueuedMessagesByPosition(ctx context.Context, chatID uuid.UUID) ([]database.GetChatQueuedMessagesByPositionRow, error) {
+func (q *querier) GetChatQueuedMessagesByPosition(ctx context.Context, chatID uuid.UUID) ([]database.ChatQueuedMessage, error) {
 	_, err := q.GetChatByID(ctx, chatID)
 	if err != nil {
 		return nil, err
@@ -3928,10 +3928,10 @@ func (q *querier) GetInboxNotificationsByUserID(ctx context.Context, userID data
 	return fetchWithPostFilter(q.auth, policy.ActionRead, q.db.GetInboxNotificationsByUserID)(ctx, userID)
 }
 
-func (q *querier) GetLastChatMessageByRoleRaw(ctx context.Context, arg database.GetLastChatMessageByRoleRawParams) (database.GetLastChatMessageByRoleRawRow, error) {
+func (q *querier) GetLastChatMessageByRoleRaw(ctx context.Context, arg database.GetLastChatMessageByRoleRawParams) (database.ChatMessage, error) {
 	_, err := q.GetChatByID(ctx, arg.ChatID)
 	if err != nil {
-		return database.GetLastChatMessageByRoleRawRow{}, err
+		return database.ChatMessage{}, err
 	}
 	return q.db.GetLastChatMessageByRoleRaw(ctx, arg)
 }
@@ -5978,7 +5978,7 @@ func (q *querier) InsertChatFile(ctx context.Context, arg database.InsertChatFil
 	return insert(q.log, q.auth, rbac.ResourceChat.WithOwner(arg.OwnerID.String()).InOrg(arg.OrganizationID), q.db.InsertChatFile)(ctx, arg)
 }
 
-func (q *querier) InsertChatMessagesRaw(ctx context.Context, arg database.InsertChatMessagesRawParams) ([]database.InsertChatMessagesRawRow, error) {
+func (q *querier) InsertChatMessagesRaw(ctx context.Context, arg database.InsertChatMessagesRawParams) ([]database.ChatMessage, error) {
 	chat, err := q.db.GetChatByID(ctx, arg.ChatID)
 	if err != nil {
 		return nil, err
@@ -5996,24 +5996,24 @@ func (q *querier) InsertChatModelConfig(ctx context.Context, arg database.Insert
 	return q.db.InsertChatModelConfig(ctx, arg)
 }
 
-func (q *querier) InsertChatQueuedMessage(ctx context.Context, arg database.InsertChatQueuedMessageParams) (database.InsertChatQueuedMessageRow, error) {
+func (q *querier) InsertChatQueuedMessage(ctx context.Context, arg database.InsertChatQueuedMessageParams) (database.ChatQueuedMessage, error) {
 	chat, err := q.db.GetChatByID(ctx, arg.ChatID)
 	if err != nil {
-		return database.InsertChatQueuedMessageRow{}, err
+		return database.ChatQueuedMessage{}, err
 	}
 	if err := q.authorizeContext(ctx, policy.ActionUpdate, chat); err != nil {
-		return database.InsertChatQueuedMessageRow{}, err
+		return database.ChatQueuedMessage{}, err
 	}
 	return q.db.InsertChatQueuedMessage(ctx, arg)
 }
 
-func (q *querier) InsertChatQueuedMessageWithCreator(ctx context.Context, arg database.InsertChatQueuedMessageWithCreatorParams) (database.InsertChatQueuedMessageWithCreatorRow, error) {
+func (q *querier) InsertChatQueuedMessageWithCreator(ctx context.Context, arg database.InsertChatQueuedMessageWithCreatorParams) (database.ChatQueuedMessage, error) {
 	chat, err := q.db.GetChatByID(ctx, arg.ChatID)
 	if err != nil {
-		return database.InsertChatQueuedMessageWithCreatorRow{}, err
+		return database.ChatQueuedMessage{}, err
 	}
 	if err := q.authorizeContext(ctx, policy.ActionUpdate, chat); err != nil {
-		return database.InsertChatQueuedMessageWithCreatorRow{}, err
+		return database.ChatQueuedMessage{}, err
 	}
 	_ = chat
 	return q.db.InsertChatQueuedMessageWithCreator(ctx, arg)
@@ -6945,13 +6945,13 @@ func (q *querier) PinChatByID(ctx context.Context, id uuid.UUID) error {
 	return q.db.PinChatByID(ctx, id)
 }
 
-func (q *querier) PopNextQueuedMessage(ctx context.Context, chatID uuid.UUID) (database.PopNextQueuedMessageRow, error) {
+func (q *querier) PopNextQueuedMessage(ctx context.Context, chatID uuid.UUID) (database.ChatQueuedMessage, error) {
 	chat, err := q.db.GetChatByID(ctx, chatID)
 	if err != nil {
-		return database.PopNextQueuedMessageRow{}, err
+		return database.ChatQueuedMessage{}, err
 	}
 	if err := q.authorizeContext(ctx, policy.ActionUpdate, chat); err != nil {
-		return database.PopNextQueuedMessageRow{}, err
+		return database.ChatQueuedMessage{}, err
 	}
 	return q.db.PopNextQueuedMessage(ctx, chatID)
 }
