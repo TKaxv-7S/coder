@@ -1610,6 +1610,8 @@ export interface Chat {
 	readonly last_reasoning_effort?: string;
 	readonly title: string;
 	readonly status: ChatStatus;
+	readonly history_version?: number;
+	readonly generation_attempt?: number;
 	readonly plan_mode?: ChatPlanMode;
 	readonly last_error?: ChatError;
 	readonly last_turn_summary: string | null;
@@ -3126,6 +3128,8 @@ export interface ChatStreamRetry {
  */
 export interface ChatStreamStatus {
 	readonly status: ChatStatus;
+	readonly history_version?: number;
+	readonly generation_attempt?: number;
 }
 
 // From codersdk/chats.go

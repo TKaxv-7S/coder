@@ -710,6 +710,8 @@ func TestChat_AllFieldsPopulated(t *testing.T) {
 		LastReasoningEffort: database.NullChatReasoningEffort{ChatReasoningEffort: database.ChatReasoningEffortHigh, Valid: true},
 		Title:               "all-fields-test",
 		Status:              database.ChatStatusRunning,
+		HistoryVersion:      7,
+		GenerationAttempt:   2,
 		ClientType:          database.ChatClientTypeUi,
 		LastError:           pqtype.NullRawMessage{RawMessage: lastErrorRaw, Valid: true},
 		LastTurnSummary:     sql.NullString{String: "turn completed", Valid: true},

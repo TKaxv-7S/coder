@@ -85,9 +85,8 @@ export const useChatStore = (
 	// the current chat. Once true, the WS is the authoritative
 	// source for chatStatus and the REST-fetched chatRecord.status
 	// must not overwrite it. Without this guard, a React Query
-	// refetch (e.g. on window focus) can regress chatStatus to a
-	// stale value like "waiting", causing shouldApplyMessagePart()
-	// to drop all incoming parts.
+	// refetch (for example, on window focus) can regress chatStatus
+	// to a stale value like "waiting".
 	const wsStatusReceivedRef = useRef(false);
 	const activeChatIDRef = useRef<string | null>(null);
 	const prevChatIDRef = useRef<string | undefined>(chatID);
@@ -217,7 +216,10 @@ export const useChatStore = (
 			if (prevChatIDRef.current !== chatID) {
 				prevChatIDRef.current = chatID;
 				lastSyncedMessagesRef.current = [];
-				store.replaceMessages([]);
+				queuedMessagesHydratedChatIDRef.current = null;
+				wsQueueUpdateReceivedRef.current = false;
+				wsStatusReceivedRef.current = false;
+				store.resetForChatChange();
 			}
 			// Merge REST-fetched messages into the store, preserving
 			// any messages the WebSocket delivered that haven't
@@ -260,28 +262,21 @@ export const useChatStore = (
 	}, [chatID, chatMessages, store]);
 
 	useEffect(() => {
-		// Only hydrate from REST when the WebSocket hasn't delivered
-		// a status event yet. Once the WS is the authoritative
-		// source, a stale REST refetch must not overwrite the
-		// fresher WS-delivered value.
+		store.updateServerEpisodeFloor(
+			chatRecord?.history_version,
+			chatRecord?.generation_attempt,
+		);
+		// Only hydrate status from REST when the WebSocket hasn't delivered
+		// a status event yet. The episode floor is independently monotonic.
 		if (!wsStatusReceivedRef.current) {
 			store.setChatStatus(chatRecord?.status ?? null);
 		}
-	}, [chatRecord?.status, store]);
-
-	useEffect(() => {
-		queuedMessagesHydratedChatIDRef.current = null;
-		wsQueueUpdateReceivedRef.current = false;
-		wsStatusReceivedRef.current = false;
-		store.setQueuedMessages([]);
-		// Suppression entries are scoped to the current chat; clear
-		// them on chat change so a stale promote suppression doesn't
-		// hide queued messages in another chat.
-		store.clearSuppressedQueuedMessageIDs();
-		if (!chatID) {
-			return;
-		}
-	}, [chatID, store]);
+	}, [
+		chatRecord?.generation_attempt,
+		chatRecord?.history_version,
+		chatRecord?.status,
+		store,
+	]);
 
 	useEffect(() => {
 		if (!chatID || !chatMessagesData) {
@@ -299,7 +294,7 @@ export const useChatStore = (
 			return;
 		}
 		queuedMessagesHydratedChatIDRef.current = chatID;
-		store.applyAuthoritativeQueuedMessages(chatQueuedMessages);
+		store.setQueuedMessages(chatQueuedMessages);
 	}, [chatMessagesData, chatID, chatQueuedMessages, store]);
 
 	useEffect(() => {
@@ -374,7 +369,7 @@ export const useChatStore = (
 		// across WebSocket messages. A rAF-based flush coalesces
 		// parts from multiple WS messages into a single render,
 		// capping stream renders to once per animation frame.
-		const partsBuf: TypesGen.ChatMessagePart[] = [];
+		const partsBuf: TypesGen.ChatStreamMessagePart[] = [];
 		let partsFlushTimer: ReturnType<typeof setTimeout> | null = null;
 
 		// History replacement state lives at the effect scope because
@@ -387,10 +382,6 @@ export const useChatStore = (
 		let historyResetPending = false;
 		const historyReplacementBuf: TypesGen.ChatMessage[] = [];
 
-		const shouldApplyMessagePart = (): boolean => {
-			return store.getSnapshot().chatStatus !== "waiting";
-		};
-
 		const schedulePartsFlush = () => {
 			if (partsFlushTimer !== null || partsBuf.length === 0) {
 				return;
@@ -401,10 +392,9 @@ export const useChatStore = (
 					return;
 				}
 				const parts = partsBuf.splice(0);
-				if (parts.length === 0 || !shouldApplyMessagePart()) {
-					return;
+				if (parts.length > 0) {
+					store.applyMessageParts(parts);
 				}
-				store.applyMessageParts(parts);
 			}, 0);
 		};
 
@@ -420,10 +410,9 @@ export const useChatStore = (
 				partsFlushTimer = null;
 			}
 			const parts = partsBuf.splice(0);
-			if (activeChatIDRef.current !== chatID || !shouldApplyMessagePart()) {
-				return;
+			if (activeChatIDRef.current === chatID) {
+				store.applyMessageParts(parts);
 			}
-			store.applyMessageParts(parts);
 		};
 
 		// Discard buffered parts without applying them. Used when
@@ -485,13 +474,10 @@ export const useChatStore = (
 							continue;
 						}
 						commitHistoryReplacement();
-						if (!shouldApplyMessagePart()) {
-							continue;
-						}
-						const part = streamEvent.message_part?.part;
-						if (part) {
+						const messagePart = streamEvent.message_part;
+						if (messagePart?.part) {
 							store.clearRetryState();
-							partsBuf.push(part);
+							partsBuf.push(messagePart);
 						}
 						continue;
 					}
@@ -569,23 +555,23 @@ export const useChatStore = (
 						}
 						case "queue_update":
 							wsQueueUpdateReceivedRef.current = true;
-							store.applyAuthoritativeQueuedMessages(
-								streamEvent.queued_messages,
-							);
+							store.setQueuedMessages(streamEvent.queued_messages);
 							updateChatQueuedMessages(streamEvent.queued_messages);
 							continue;
 						case "status": {
-							const nextStatus = streamEvent.status?.status;
+							const status = streamEvent.status;
+							const nextStatus = status?.status;
 							if (!nextStatus) {
 								continue;
 							}
 
 							wsStatusReceivedRef.current = true;
 							store.clearRetryState();
+							store.updateServerEpisodeFloor(
+								status.history_version,
+								status.generation_attempt,
+							);
 							store.setChatStatus(nextStatus);
-							if (nextStatus === "waiting") {
-								discardBufferedParts();
-							}
 							if (nextStatus !== "error") {
 								clearChatErrorReasonEvent(chatID);
 							}
@@ -656,9 +642,7 @@ export const useChatStore = (
 							partsFlushTimer = null;
 						}
 						const nextParts = partsBuf.splice(0);
-						if (shouldApplyMessagePart()) {
-							store.applyMessageParts(nextParts);
-						}
+						store.applyMessageParts(nextParts);
 					}
 				}
 			});

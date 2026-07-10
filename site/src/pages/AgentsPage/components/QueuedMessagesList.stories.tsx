@@ -46,6 +46,18 @@ export const SingleMessage: Story = {
 	},
 };
 
+export const PromotingMessage: Story = {
+	args: {
+		messages: [buildMessage(1, textContent("Run the test suite"))],
+		promoteInFlightIDs: new Set([1]),
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		expect(canvas.getByText("Promoting...")).toBeVisible();
+		expect(canvas.queryByText("Run the test suite")).not.toBeInTheDocument();
+	},
+};
+
 // Several messages queued up at once.
 export const SeveralMessages: Story = {
 	args: {

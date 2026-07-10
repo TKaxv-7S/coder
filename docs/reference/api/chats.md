@@ -92,7 +92,9 @@ Experimental: this endpoint is subject to change.
         "owner_id": "8826ee2e-7933-4665-aef2-2393f84a0d05"
       }
     ],
+    "generation_attempt": 0,
     "has_unread": true,
+    "history_version": 0,
     "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
     "labels": {
       "property1": "string",
@@ -193,7 +195,9 @@ Status Code **200**
 | `»» name`                 | string                                                                             | false    |              |                                                                                                                                                                                                                                                                            |
 | `»» organization_id`      | string(uuid)                                                                       | false    |              |                                                                                                                                                                                                                                                                            |
 | `»» owner_id`             | string(uuid)                                                                       | false    |              |                                                                                                                                                                                                                                                                            |
+| `» generation_attempt`    | integer                                                                            | false    |              |                                                                                                                                                                                                                                                                            |
 | `» has_unread`            | boolean                                                                            | false    |              | Has unread is true when assistant messages exist beyond the owner's read cursor, which updates on stream connect and disconnect.                                                                                                                                           |
+| `» history_version`       | integer                                                                            | false    |              |                                                                                                                                                                                                                                                                            |
 | `» id`                    | string(uuid)                                                                       | false    |              |                                                                                                                                                                                                                                                                            |
 | `» labels`                | object                                                                             | false    |              |                                                                                                                                                                                                                                                                            |
 | `»» [any property]`       | string                                                                             | false    |              |                                                                                                                                                                                                                                                                            |
@@ -367,7 +371,9 @@ Experimental: this endpoint is subject to change.
           "owner_id": "8826ee2e-7933-4665-aef2-2393f84a0d05"
         }
       ],
+      "generation_attempt": 0,
       "has_unread": true,
+      "history_version": 0,
       "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
       "labels": {
         "property1": "string",
@@ -460,7 +466,9 @@ Experimental: this endpoint is subject to change.
       "owner_id": "8826ee2e-7933-4665-aef2-2393f84a0d05"
     }
   ],
+  "generation_attempt": 0,
   "has_unread": true,
+  "history_version": 0,
   "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
   "labels": {
     "property1": "string",
@@ -710,7 +718,9 @@ Experimental: this endpoint is subject to change.
         "owner_id": "8826ee2e-7933-4665-aef2-2393f84a0d05"
       }
     ],
+    "generation_attempt": 0,
     "has_unread": true,
+    "history_version": 0,
     "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
     "labels": {
       "property1": "string",
@@ -857,7 +867,9 @@ Experimental: this endpoint is subject to change.
           "owner_id": "8826ee2e-7933-4665-aef2-2393f84a0d05"
         }
       ],
+      "generation_attempt": 0,
       "has_unread": true,
+      "history_version": 0,
       "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
       "labels": {
         "property1": "string",
@@ -950,7 +962,9 @@ Experimental: this endpoint is subject to change.
       "owner_id": "8826ee2e-7933-4665-aef2-2393f84a0d05"
     }
   ],
+  "generation_attempt": 0,
   "has_unread": true,
+  "history_version": 0,
   "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
   "labels": {
     "property1": "string",
@@ -1134,7 +1148,9 @@ Experimental: this endpoint is subject to change.
           "owner_id": "8826ee2e-7933-4665-aef2-2393f84a0d05"
         }
       ],
+      "generation_attempt": 0,
       "has_unread": true,
+      "history_version": 0,
       "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
       "labels": {
         "property1": "string",
@@ -1227,7 +1243,9 @@ Experimental: this endpoint is subject to change.
       "owner_id": "8826ee2e-7933-4665-aef2-2393f84a0d05"
     }
   ],
+  "generation_attempt": 0,
   "has_unread": true,
+  "history_version": 0,
   "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
   "labels": {
     "property1": "string",
@@ -1409,7 +1427,9 @@ Experimental: this endpoint is subject to change.
           "owner_id": "8826ee2e-7933-4665-aef2-2393f84a0d05"
         }
       ],
+      "generation_attempt": 0,
       "has_unread": true,
+      "history_version": 0,
       "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
       "labels": {
         "property1": "string",
@@ -1502,7 +1522,9 @@ Experimental: this endpoint is subject to change.
       "owner_id": "8826ee2e-7933-4665-aef2-2393f84a0d05"
     }
   ],
+  "generation_attempt": 0,
   "has_unread": true,
+  "history_version": 0,
   "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
   "labels": {
     "property1": "string",
@@ -2253,7 +2275,9 @@ Experimental: this endpoint is subject to change.
           "owner_id": "8826ee2e-7933-4665-aef2-2393f84a0d05"
         }
       ],
+      "generation_attempt": 0,
       "has_unread": true,
+      "history_version": 0,
       "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
       "labels": {
         "property1": "string",
@@ -2346,7 +2370,9 @@ Experimental: this endpoint is subject to change.
       "owner_id": "8826ee2e-7933-4665-aef2-2393f84a0d05"
     }
   ],
+  "generation_attempt": 0,
   "has_unread": true,
+  "history_version": 0,
   "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
   "labels": {
     "property1": "string",
@@ -2669,6 +2695,8 @@ Experimental: this endpoint is subject to change.
     "status_code": 0
   },
   "status": {
+    "generation_attempt": 0,
+    "history_version": 0,
     "status": "waiting"
   },
   "type": "message_part"
@@ -2853,7 +2881,9 @@ Experimental: this endpoint is subject to change.
           "owner_id": "8826ee2e-7933-4665-aef2-2393f84a0d05"
         }
       ],
+      "generation_attempt": 0,
       "has_unread": true,
+      "history_version": 0,
       "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
       "labels": {
         "property1": "string",
@@ -2946,7 +2976,9 @@ Experimental: this endpoint is subject to change.
       "owner_id": "8826ee2e-7933-4665-aef2-2393f84a0d05"
     }
   ],
+  "generation_attempt": 0,
   "has_unread": true,
+  "history_version": 0,
   "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
   "labels": {
     "property1": "string",

@@ -869,16 +869,19 @@ The stream loop powers the `GET /api/experimental/chats/{chat}/stream` endpoint.
 
 The following chat stream events, delivered to the client over WebSocket, are supported:
 
-- `message_part`: a streaming message part emitted by the chat worker.
-    - compared to the current implementation, these should additionally include the `history_version` and `generation_attempt` fields, so a client knows which episode a message part comes from
+- `message_part`: a streaming message part emitted by the chat worker. Its payload includes `history_version`, `generation_attempt`, and `seq`, which identify the part's episode and position.
 - `message`: a committed chat message present in the database.
-- `status`: the chat's status.
+- `status`: the chat's status plus the current `history_version` and `generation_attempt`. Clients can use this tuple as a lower bound when rejecting stale parts.
 - `error`: the chat's persisted error payload.
 - `queue_update`: the full current queued-message list.
 - `action_required`: a dynamic tool call was issued by the chat worker, the client must execute it and submit the result.
 - `retry`: emitted when the chat worker is waiting before retrying a failed generation attempt.
 - `preview_reset`: a reset of the stream's preview state (message parts), emitted when the worker's LLM call fails mid-way for whatever reason.
 - `history_reset`: a reset of the stream's history state (committed messages), emitted when the message history is edited and some messages are removed from the history.
+
+Database-derived events from one `Sync` are emitted in the application order described below, including `message` before `queue_update` before `status`. Relayed `message_part` events are multiplexed independently, so there is no total ordering between parts and database-derived events.
+
+The single-chat REST response exposes the same `history_version` and `generation_attempt` tuple as status events. A pure status transition advances `snapshot_version` but keeps this tuple stable, so it must not fence out parts from the active episode. A history change advances `history_version` and resets `generation_attempt` to `0`; the next generation starts at the same history version with a higher attempt.
 
 ## Endpoint lifecycle
 
@@ -1079,7 +1082,7 @@ Status sync happens inside `Sync`.
 Flow:
 
 1. Compare database status to local status.
-2. If they differ, emit `status`.
+2. If they differ, emit `status` with `db.status`, `db.history_version`, and `db.generation_attempt`.
 
 ### Error synchronization
 

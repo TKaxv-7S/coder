@@ -16729,9 +16729,15 @@ const docTemplate = `{
                         "$ref": "#/definitions/codersdk.ChatFileMetadata"
                     }
                 },
+                "generation_attempt": {
+                    "type": "integer"
+                },
                 "has_unread": {
                     "description": "HasUnread is true when assistant messages exist beyond\nthe owner's read cursor, which updates on stream\nconnect and disconnect.",
                     "type": "boolean"
+                },
+                "history_version": {
+                    "type": "integer"
                 },
                 "id": {
                     "type": "string",
@@ -17841,6 +17847,12 @@ const docTemplate = `{
         "codersdk.ChatStreamStatus": {
             "type": "object",
             "properties": {
+                "generation_attempt": {
+                    "type": "integer"
+                },
+                "history_version": {
+                    "type": "integer"
+                },
                 "status": {
                     "$ref": "#/definitions/codersdk.ChatStatus"
                 }

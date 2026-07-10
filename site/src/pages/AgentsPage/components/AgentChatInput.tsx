@@ -143,6 +143,7 @@ interface AgentChatInputProps {
 	isWorkspaceLoading?: boolean;
 	// Queued user messages rendered above the textarea.
 	queuedMessages?: readonly ChatQueuedMessage[];
+	promoteInFlightIDs?: ReadonlySet<number>;
 	onDeleteQueuedMessage?: (id: number) => Promise<void> | void;
 	onPromoteQueuedMessage?: (id: number) => Promise<void> | void;
 	// Queue editing state, owned by the parent.
@@ -370,6 +371,7 @@ export const AgentChatInput: FC<AgentChatInputProps> = ({
 	chatOrganizationId,
 	isWorkspaceLoading,
 	queuedMessages = [],
+	promoteInFlightIDs,
 	onDeleteQueuedMessage,
 	onPromoteQueuedMessage,
 	editingQueuedMessageID = null,
@@ -1064,6 +1066,7 @@ export const AgentChatInput: FC<AgentChatInputProps> = ({
 			{queuedMessages.length > 0 && (
 				<QueuedMessagesList
 					messages={queuedMessages}
+					promoteInFlightIDs={promoteInFlightIDs}
 					onDelete={(id) => {
 						if (id === editingQueuedMessageID) {
 							onCancelQueueEdit?.();

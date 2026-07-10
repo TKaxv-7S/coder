@@ -119,6 +119,8 @@ type Chat struct {
 	LastReasoningEffort *string         `json:"last_reasoning_effort,omitempty"`
 	Title               string          `json:"title"`
 	Status              ChatStatus      `json:"status"`
+	HistoryVersion      int64           `json:"history_version,omitempty"`
+	GenerationAttempt   int64           `json:"generation_attempt,omitempty"`
 	PlanMode            ChatPlanMode    `json:"plan_mode,omitempty"`
 	LastError           *ChatError      `json:"last_error,omitempty"`
 	LastTurnSummary     *string         `json:"last_turn_summary"`
@@ -1649,7 +1651,9 @@ type ChatStreamMessagePart struct {
 
 // ChatStreamStatus represents an updated chat status.
 type ChatStreamStatus struct {
-	Status ChatStatus `json:"status"`
+	Status            ChatStatus `json:"status"`
+	HistoryVersion    int64      `json:"history_version,omitempty"`
+	GenerationAttempt int64      `json:"generation_attempt,omitempty"`
 }
 
 // ChatErrorKind classifies chat errors for consistent client rendering.

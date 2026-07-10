@@ -212,6 +212,24 @@ const buildChat = (chatID: string): TypesGen.Chat => ({
 	updated_at: "2025-01-01T00:00:00.000Z",
 });
 
+const buildPartEvent = (
+	chatID: string,
+	text: string,
+	historyVersion: number,
+	generationAttempt: number,
+	seq: number,
+): TypesGen.ChatStreamEvent => ({
+	type: "message_part",
+	chat_id: chatID,
+	message_part: {
+		role: "assistant",
+		part: { type: "text", text },
+		history_version: historyVersion,
+		generation_attempt: generationAttempt,
+		seq,
+	},
+});
+
 const buildMessage = (
 	chatID: string,
 	id: number,
@@ -1221,18 +1239,15 @@ describe("useChatStore", () => {
 		});
 	});
 
-	it("ignores message_part updates while chat is waiting", async () => {
+	it("accepts a newer episode before status catches up from waiting", async () => {
 		immediateAnimationFrame();
 
-		const chatID = "chat-1";
+		const chatID = "chat-waiting-episode";
 		const existingMessage = buildMessage(chatID, 1, "user", "hello");
 		const mockSocket = createMockSocket();
 		mockWatchChatReturn(mockSocket);
-
 		const queryClient = createTestQueryClient();
 		const wrapper = createWrapper(queryClient);
-		const setChatErrorReason = vi.fn();
-		const clearChatErrorReason = vi.fn();
 
 		const { result } = renderHook(
 			() => {
@@ -1246,8 +1261,8 @@ describe("useChatStore", () => {
 						has_more: false,
 					},
 					chatQueuedMessages: [],
-					setChatErrorReason,
-					clearChatErrorReason,
+					setChatErrorReason: vi.fn(),
+					clearChatErrorReason: vi.fn(),
 				});
 				return {
 					streamState: useChatSelector(store, selectStreamState),
@@ -1260,20 +1275,7 @@ describe("useChatStore", () => {
 			expect(watchChat).toHaveBeenCalledWith(chatID, 1);
 		});
 
-		act(() => {
-			mockSocket.emitData({
-				type: "message_part",
-				chat_id: chatID,
-				message_part: {
-					role: "assistant",
-					part: {
-						type: "text",
-						text: "first",
-					},
-				},
-			});
-		});
-
+		act(() => mockSocket.emitData(buildPartEvent(chatID, "first", 1, 1, 1)));
 		await waitFor(() => {
 			expect(result.current.streamState?.blocks).toEqual([
 				{ type: "response", text: "first" },
@@ -1284,41 +1286,23 @@ describe("useChatStore", () => {
 			mockSocket.emitData({
 				type: "status",
 				chat_id: chatID,
-				status: { status: "waiting" },
-			});
-		});
-
-		await waitFor(() => {
-			// Stream state is preserved after status=waiting (the
-			// durable message event handles cleanup via
-			// needsStreamReset). Only new message_parts should be
-			// blocked by the shouldApplyMessagePart gate.
-			expect(result.current.streamState).not.toBeNull();
-			expect(result.current.streamState?.blocks).toEqual([
-				{ type: "response", text: "first" },
-			]);
-		});
-
-		act(() => {
-			mockSocket.emitData({
-				type: "message_part",
-				chat_id: chatID,
-				message_part: {
-					role: "assistant",
-					part: {
-						type: "text",
-						text: "late",
-					},
+				status: {
+					status: "waiting",
+					history_version: 2,
+					generation_attempt: 0,
 				},
 			});
 		});
 
+		// Status raises the episode floor without clearing the active preview.
+		expect(result.current.streamState?.blocks).toEqual([
+			{ type: "response", text: "first" },
+		]);
+
+		act(() => mockSocket.emitData(buildPartEvent(chatID, "new", 2, 1, 1)));
 		await waitFor(() => {
-			// The late message_part should not be applied because
-			// shouldApplyMessagePart gates on waiting.
-			// Stream state still shows the original "first".
 			expect(result.current.streamState?.blocks).toEqual([
-				{ type: "response", text: "first" },
+				{ type: "response", text: "new" },
 			]);
 		});
 	});
@@ -2147,17 +2131,14 @@ describe("useChatStore", () => {
 		expect(result.current.queuedMessages).toEqual([]);
 	});
 
-	it("does not apply message parts after status changes to waiting", async () => {
+	it("drops buffered parts below the status episode floor", async () => {
 		immediateAnimationFrame();
 
-		const chatID = "chat-status-guard";
+		const chatID = "chat-status-floor";
 		const mockSocket = createMockSocket();
 		mockWatchChatReturn(mockSocket);
-
 		const queryClient = createTestQueryClient();
 		const wrapper = createWrapper(queryClient);
-		const setChatErrorReason = vi.fn();
-		const clearChatErrorReason = vi.fn();
 
 		const { result } = renderHook(
 			() => {
@@ -2171,8 +2152,8 @@ describe("useChatStore", () => {
 						has_more: false,
 					},
 					chatQueuedMessages: [],
-					setChatErrorReason,
-					clearChatErrorReason,
+					setChatErrorReason: vi.fn(),
+					clearChatErrorReason: vi.fn(),
 				});
 				return {
 					streamState: useChatSelector(store, selectStreamState),
@@ -2185,33 +2166,162 @@ describe("useChatStore", () => {
 			expect(watchChat).toHaveBeenCalledWith(chatID, undefined);
 		});
 
-		// Emit a batch with message_parts followed by a status change
-		// to "waiting". The status handler clears stream state
-		// synchronously, and the startTransition guard should prevent
-		// the deferred applyMessageParts from re-populating it.
 		act(() => {
 			mockSocket.emitDataBatch([
-				{
-					type: "message_part",
-					chat_id: chatID,
-					message_part: {
-						role: "assistant",
-						part: { type: "text", text: "should be discarded" },
-					},
-				},
+				buildPartEvent(chatID, "stale", 1, 1, 1),
 				{
 					type: "status",
 					chat_id: chatID,
-					status: { status: "waiting" },
+					status: {
+						status: "waiting",
+						history_version: 2,
+						generation_attempt: 0,
+					},
 				},
 			]);
 		});
 
-		// Stream state should be null — the status change cleared it,
-		// and the deferred applyMessageParts should not have
-		// re-populated it.
+		await act(async () => {
+			await new Promise((resolve) => setTimeout(resolve, 0));
+		});
+		expect(result.current.streamState).toBeNull();
+	});
+
+	it("accepts a newer episode before status and drops a late old episode", async () => {
+		immediateAnimationFrame();
+
+		const chatID = "chat-episode-ordering";
+		const mockSocket = createMockSocket();
+		mockWatchChatReturn(mockSocket);
+		const queryClient = createTestQueryClient();
+		const wrapper = createWrapper(queryClient);
+
+		const { result } = renderHook(
+			() => {
+				const { store } = useChatStore({
+					chatID,
+					chatMessages: [],
+					chatRecord: {
+						...buildChat(chatID),
+						status: "interrupting",
+						history_version: 1,
+						generation_attempt: 1,
+					},
+					chatMessagesData: {
+						messages: [],
+						queued_messages: [],
+						has_more: false,
+					},
+					chatQueuedMessages: [],
+					setChatErrorReason: vi.fn(),
+					clearChatErrorReason: vi.fn(),
+				});
+				return {
+					store,
+					streamState: useChatSelector(store, selectStreamState),
+				};
+			},
+			{ wrapper },
+		);
+
 		await waitFor(() => {
-			expect(result.current.streamState).toBeNull();
+			expect(watchChat).toHaveBeenCalledWith(chatID, undefined);
+		});
+
+		act(() => mockSocket.emitData(buildPartEvent(chatID, "old", 1, 1, 1)));
+		await waitFor(() => {
+			expect(result.current.streamState?.blocks).toEqual([
+				{ type: "response", text: "old" },
+			]);
+		});
+
+		act(() => mockSocket.emitData(buildPartEvent(chatID, "new", 2, 1, 1)));
+		await waitFor(() => {
+			expect(result.current.streamState?.blocks).toEqual([
+				{ type: "response", text: "new" },
+			]);
+		});
+
+		act(() => {
+			mockSocket.emitData({
+				type: "status",
+				chat_id: chatID,
+				status: {
+					status: "running",
+					history_version: 2,
+					generation_attempt: 1,
+				},
+			});
+			mockSocket.emitData(buildPartEvent(chatID, " stale", 1, 1, 2));
+		});
+
+		await act(async () => {
+			await new Promise((resolve) => setTimeout(resolve, 0));
+		});
+		expect(result.current.streamState?.blocks).toEqual([
+			{ type: "response", text: "new" },
+		]);
+	});
+
+	it("uses status as a floor without rejecting the next generation attempt", async () => {
+		immediateAnimationFrame();
+
+		const chatID = "chat-episode-floor";
+		const mockSocket = createMockSocket();
+		mockWatchChatReturn(mockSocket);
+		const queryClient = createTestQueryClient();
+		const wrapper = createWrapper(queryClient);
+
+		const { result } = renderHook(
+			() => {
+				const { store } = useChatStore({
+					chatID,
+					chatMessages: [],
+					chatRecord: {
+						...buildChat(chatID),
+						status: "interrupting",
+					},
+					chatMessagesData: {
+						messages: [],
+						queued_messages: [],
+						has_more: false,
+					},
+					chatQueuedMessages: [],
+					setChatErrorReason: vi.fn(),
+					clearChatErrorReason: vi.fn(),
+				});
+				return {
+					store,
+					streamState: useChatSelector(store, selectStreamState),
+				};
+			},
+			{ wrapper },
+		);
+
+		await waitFor(() => {
+			expect(watchChat).toHaveBeenCalledWith(chatID, undefined);
+		});
+
+		act(() => {
+			mockSocket.emitDataBatch([
+				{
+					type: "status",
+					chat_id: chatID,
+					status: {
+						status: "running",
+						history_version: 5,
+						generation_attempt: 0,
+					},
+				},
+				buildPartEvent(chatID, "current", 5, 1, 1),
+				buildPartEvent(chatID, "stale", 4, 9, 1),
+			]);
+		});
+
+		await waitFor(() => {
+			expect(result.current.streamState?.blocks).toEqual([
+				{ type: "response", text: "current" },
+			]);
 		});
 	});
 
@@ -3926,9 +4036,7 @@ describe("thinking indicator event ordering", () => {
 			expect(watchChat).toHaveBeenCalledWith(chatID, 1);
 		});
 
-		// Server sends message_part then immediately transitions to
-		// waiting. The buffered parts must be discarded (not applied)
-		// because waiting status clears stream state.
+		// The status floor must apply before buffered parts flush.
 		act(() => {
 			mockSocket.emitDataBatch([
 				{
@@ -3936,12 +4044,19 @@ describe("thinking indicator event ordering", () => {
 					chat_id: chatID,
 					message_part: {
 						part: { type: "text", text: "partial response" },
+						history_version: 1,
+						generation_attempt: 1,
+						seq: 1,
 					},
 				},
 				{
 					type: "status",
 					chat_id: chatID,
-					status: { status: "waiting" },
+					status: {
+						status: "waiting",
+						history_version: 2,
+						generation_attempt: 0,
+					},
 				},
 			]);
 		});

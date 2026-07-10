@@ -154,13 +154,8 @@ export const restoreOptimisticRequestSnapshot = (
 };
 
 /**
- * Runs the optimistic queued-message promotion flow.
- *
- * The promote endpoint returns 202 Accepted with no message body, so the
- * actual user message is delivered via SSE or the messages REST endpoint.
- * Suppress the promoted ID so the transient reordered queue published by
- * the running-case backend does not flash the message back into the
- * visible queue. Roll back queue, status, and suppression on API error.
+ * Requests queued-message promotion without fabricating server state.
+ * The row remains visible until an authoritative queue update removes it.
  *
  * @internal Exported for testing.
  */
@@ -168,49 +163,26 @@ export const runPromoteQueuedMessage = async (params: {
 	id: number;
 	store: Pick<
 		ChatStore,
-		| "batch"
+		| "clearPromoteInFlight"
 		| "clearStreamError"
-		| "clearStreamState"
 		| "getSnapshot"
-		| "setChatStatus"
-		| "setQueuedMessages"
-		| "setStreamError"
-		| "setStreamState"
-		| "suppressQueuedMessageID"
-		| "unsuppressQueuedMessageID"
+		| "markPromoteInFlight"
 	>;
 	promoteQueuedMessage: (id: number) => Promise<void>;
-	agentId: string | undefined;
-	clearChatErrorReason: (chatID: string) => void;
 	handleUsageLimitError: (error: unknown) => void;
 }): Promise<void> => {
-	const {
-		id,
-		store,
-		promoteQueuedMessage,
-		agentId,
-		clearChatErrorReason,
-		handleUsageLimitError,
-	} = params;
-	const previousSnapshot = store.getSnapshot();
-	store.batch(() => {
-		store.suppressQueuedMessageID(id);
-		store.setQueuedMessages(
-			previousSnapshot.queuedMessages.filter((message) => message.id !== id),
-		);
-		store.clearStreamState();
-		store.clearStreamError();
-		store.setChatStatus("running");
-	});
-	if (agentId) {
-		clearChatErrorReason(agentId);
+	const { id, store, promoteQueuedMessage, handleUsageLimitError } = params;
+	if (store.getSnapshot().promoteInFlightIDs.has(id)) {
+		return;
 	}
+	store.markPromoteInFlight(id);
+	store.clearStreamError();
 	try {
 		await promoteQueuedMessage(id);
 	} catch (error) {
-		store.unsuppressQueuedMessageID(id);
-		restoreOptimisticRequestSnapshot(store, previousSnapshot);
+		store.clearPromoteInFlight(id);
 		handleUsageLimitError(error);
+		toast.error(getErrorMessage(error, "Failed to send queued message."));
 		throw error;
 	}
 };
@@ -1254,15 +1226,17 @@ const AgentChatPage: FC = () => {
 		}
 	};
 
-	const handlePromoteQueuedMessage = (id: number) =>
-		runPromoteQueuedMessage({
+	const handlePromoteQueuedMessage = (id: number) => {
+		if (agentId) {
+			clearChatErrorReason(agentId);
+		}
+		return runPromoteQueuedMessage({
 			id,
 			store,
 			promoteQueuedMessage,
-			agentId,
-			clearChatErrorReason,
 			handleUsageLimitError,
 		});
+	};
 
 	const editing = useConversationEditingState({
 		chatID: agentId,

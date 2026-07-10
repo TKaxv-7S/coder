@@ -34,6 +34,20 @@ const makeQueuedMessage = (
 		content: [{ type: "text", text }],
 	}) as TypesGen.ChatQueuedMessage;
 
+const makeStreamPart = (
+	text: string,
+	historyVersion?: number,
+	generationAttempt?: number,
+	seq?: number,
+): TypesGen.ChatStreamMessagePart => ({
+	part: { type: "text", text },
+	...(historyVersion === undefined ? {} : { history_version: historyVersion }),
+	...(generationAttempt === undefined
+		? {}
+		: { generation_attempt: generationAttempt }),
+	...(seq === undefined ? {} : { seq }),
+});
+
 // ---------------------------------------------------------------------------
 // replaceMessages
 // ---------------------------------------------------------------------------
@@ -197,7 +211,7 @@ describe("setChatStatus", () => {
 describe("setStreamState", () => {
 	it("does not notify when setting the same stream state reference", () => {
 		const store = createChatStore();
-		store.applyMessagePart({ type: "text", text: "hello" });
+		store.applyMessagePart(makeStreamPart("hello"));
 		const streamState = store.getSnapshot().streamState;
 		expect(streamState).not.toBeNull();
 
@@ -425,70 +439,37 @@ describe("setQueuedMessages", () => {
 });
 
 // ---------------------------------------------------------------------------
-// suppressQueuedMessageID / applyAuthoritativeQueuedMessages
+// queued-message promotion state
 // ---------------------------------------------------------------------------
 
-describe("suppressQueuedMessageID / applyAuthoritativeQueuedMessages", () => {
-	it("filters suppressed IDs from authoritative writes and auto-clears", () => {
+describe("queued-message promotion state", () => {
+	it("keeps a promoting ID through a reordered queue and clears it when removed", () => {
 		const store = createChatStore();
 		const a = makeQueuedMessage(1, "A");
 		const b = makeQueuedMessage(2, "B");
 		const c = makeQueuedMessage(3, "C");
 
 		store.setQueuedMessages([a, b, c]);
-		store.suppressQueuedMessageID(b.id);
-		expect(store.getSnapshot().suppressedQueuedMessageIDs.has(b.id)).toBe(true);
+		store.markPromoteInFlight(b.id);
+		store.setQueuedMessages([b, a, c]);
 
-		// Transient reordered queue from the running-case backend
-		// must not surface the suppressed message.
-		store.applyAuthoritativeQueuedMessages([b, a, c]);
 		expect(
 			store.getSnapshot().queuedMessages.map((message) => message.id),
-		).toEqual([a.id, c.id]);
-		expect(store.getSnapshot().suppressedQueuedMessageIDs.has(b.id)).toBe(true);
+		).toEqual([b.id, a.id, c.id]);
+		expect(store.getSnapshot().promoteInFlightIDs.has(b.id)).toBe(true);
 
-		store.applyAuthoritativeQueuedMessages([a, c]);
-		expect(store.getSnapshot().suppressedQueuedMessageIDs.has(b.id)).toBe(
-			false,
-		);
-		expect(
-			store.getSnapshot().queuedMessages.map((message) => message.id),
-		).toEqual([a.id, c.id]);
+		store.setQueuedMessages([a, c]);
+
+		expect(store.getSnapshot().promoteInFlightIDs.has(b.id)).toBe(false);
 	});
 
-	it("filters suppressed IDs from REST hydration via applyAuthoritativeQueuedMessages", () => {
+	it("can clear a promotion marker after an API error", () => {
 		const store = createChatStore();
-		const a = makeQueuedMessage(1, "A");
-		const b = makeQueuedMessage(2, "B");
-		const c = makeQueuedMessage(3, "C");
 
-		store.suppressQueuedMessageID(b.id);
-		// REST hydration delivers the unfiltered queue [B, A, C].
-		store.applyAuthoritativeQueuedMessages([b, a, c]);
-		expect(
-			store.getSnapshot().queuedMessages.map((message) => message.id),
-		).toEqual([a.id, c.id]);
-	});
+		store.markPromoteInFlight(42);
+		store.clearPromoteInFlight(42);
 
-	it("unsuppressQueuedMessageID removes IDs from the suppression set", () => {
-		const store = createChatStore();
-		store.suppressQueuedMessageID(42);
-		expect(store.getSnapshot().suppressedQueuedMessageIDs.has(42)).toBe(true);
-		store.unsuppressQueuedMessageID(42);
-		expect(store.getSnapshot().suppressedQueuedMessageIDs.has(42)).toBe(false);
-	});
-
-	it("setQueuedMessages does not auto-clear suppression", () => {
-		const store = createChatStore();
-		const a = makeQueuedMessage(1, "A");
-
-		store.suppressQueuedMessageID(99);
-		// setQueuedMessages is the optimistic path: it must not
-		// touch the suppression set, otherwise the optimistic write
-		// would lift suppression before the authoritative reordered
-		// queue arrives.
-		store.setQueuedMessages([a]);
-		expect(store.getSnapshot().suppressedQueuedMessageIDs.has(99)).toBe(true);
+		expect(store.getSnapshot().promoteInFlightIDs.size).toBe(0);
 	});
 });
 
@@ -500,12 +481,27 @@ describe("clearStreamState", () => {
 	it("clears stream state to null", () => {
 		const store = createChatStore();
 		// Build up some stream state via applyMessagePart.
-		store.applyMessagePart({ type: "text", text: "hello" });
+		store.applyMessagePart(makeStreamPart("hello"));
 		expect(store.getSnapshot().streamState).not.toBeNull();
 
 		store.clearStreamState();
 
 		expect(store.getSnapshot().streamState).toBeNull();
+	});
+
+	it("preserves episode fencing when clearing visual stream state", () => {
+		const store = createChatStore();
+		store.applyMessagePart(makeStreamPart("hello", 2, 1, 1));
+
+		store.clearStreamState();
+
+		const state = store.getSnapshot();
+		expect(state.streamState).toBeNull();
+		expect(state.streamEpisode).toEqual({
+			historyVersion: 2,
+			generationAttempt: 1,
+		});
+		expect(state.lastStreamPartSeq).toBe(1);
 	});
 
 	it("is a no-op when stream state is already null", () => {
@@ -526,32 +522,107 @@ describe("clearStreamState", () => {
 // ---------------------------------------------------------------------------
 
 describe("applyMessagePart / applyMessageParts", () => {
-	it("creates stream state from a text part", () => {
+	it("accepts legacy parts only before versioned context exists", () => {
 		const store = createChatStore();
 
-		store.applyMessagePart({ type: "text", text: "hello" });
+		store.applyMessagePart(makeStreamPart("legacy"));
+		store.applyMessagePart(makeStreamPart(" versioned", 1, 1, 1));
+		store.applyMessagePart(makeStreamPart(" ignored"));
 
 		expect(store.getSnapshot().streamState?.blocks).toEqual([
-			{ type: "response", text: "hello" },
+			{ type: "response", text: " versioned" },
 		]);
 	});
 
-	it("appends to existing stream state", () => {
+	it("adopts a newer episode before any status event", () => {
 		const store = createChatStore();
-		store.applyMessagePart({ type: "text", text: "hello" });
-		store.applyMessagePart({ type: "text", text: " world" });
+		store.applyMessagePart(makeStreamPart("old", 1, 1, 1));
 
+		store.applyMessagePart(makeStreamPart("new", 2, 1, 1));
+
+		expect(store.getSnapshot().streamEpisode).toEqual({
+			historyVersion: 2,
+			generationAttempt: 1,
+		});
 		expect(store.getSnapshot().streamState?.blocks).toEqual([
-			{ type: "response", text: "hello world" },
+			{ type: "response", text: "new" },
 		]);
 	});
 
-	it("applies multiple parts in a single batch", () => {
+	it("drops parts older than the server floor or rendered episode", () => {
 		const store = createChatStore();
+		store.applyMessagePart(makeStreamPart("current", 4, 2, 1));
+		store.updateServerEpisodeFloor(5, 0);
 
 		store.applyMessageParts([
-			{ type: "text", text: "one" },
-			{ type: "text", text: " two" },
+			makeStreamPart(" old history", 4, 3, 1),
+			makeStreamPart(" old attempt", 4, 1, 2),
+		]);
+
+		expect(store.getSnapshot().streamState?.blocks).toEqual([
+			{ type: "response", text: "current" },
+		]);
+	});
+
+	it("replaces the stream for a higher generation attempt", () => {
+		const store = createChatStore();
+		store.applyMessageParts([
+			makeStreamPart("first", 7, 1, 1),
+			makeStreamPart(" attempt", 7, 1, 2),
+			makeStreamPart("retry", 7, 2, 1),
+		]);
+
+		expect(store.getSnapshot().streamEpisode).toEqual({
+			historyVersion: 7,
+			generationAttempt: 2,
+		});
+		expect(store.getSnapshot().streamState?.blocks).toEqual([
+			{ type: "response", text: "retry" },
+		]);
+	});
+
+	it("accepts equal and greater tuples while rejecting parts below the floor", () => {
+		const store = createChatStore();
+		store.updateServerEpisodeFloor(9, 0);
+
+		store.applyMessagePart(makeStreamPart("stale", 8, 4, 1));
+		store.applyMessagePart(makeStreamPart("current", 9, 1, 1));
+		store.updateServerEpisodeFloor(9, 1);
+		store.applyMessagePart(makeStreamPart(" equal", 9, 1, 2));
+
+		expect(store.getSnapshot().streamState?.blocks).toEqual([
+			{ type: "response", text: "current equal" },
+		]);
+	});
+
+	it("deduplicates by sequence and rebuilds the same episode after reconnect", () => {
+		const store = createChatStore();
+		store.applyMessageParts([
+			makeStreamPart("one", 3, 1, 1),
+			makeStreamPart(" two", 3, 1, 2),
+			makeStreamPart(" duplicate", 3, 1, 2),
+		]);
+		expect(store.getSnapshot().streamState?.blocks).toEqual([
+			{ type: "response", text: "one two" },
+		]);
+
+		store.resetTransportReplayState();
+		store.applyMessageParts([
+			makeStreamPart("one", 3, 1, 1),
+			makeStreamPart(" two", 3, 1, 2),
+		]);
+
+		expect(store.getSnapshot().streamState?.blocks).toEqual([
+			{ type: "response", text: "one two" },
+		]);
+	});
+
+	it("does not advance across a sequence gap", () => {
+		const store = createChatStore();
+		store.applyMessageParts([
+			makeStreamPart("one", 3, 1, 1),
+			makeStreamPart(" gap", 3, 1, 3),
+			makeStreamPart(" two", 3, 1, 2),
 		]);
 
 		expect(store.getSnapshot().streamState?.blocks).toEqual([
@@ -561,11 +632,11 @@ describe("applyMessagePart / applyMessageParts", () => {
 
 	it("is a no-op for an empty parts array", () => {
 		const store = createChatStore();
-
 		let notified = false;
 		store.subscribe(() => {
 			notified = true;
 		});
+
 		store.applyMessageParts([]);
 
 		expect(notified).toBe(false);
@@ -577,9 +648,9 @@ describe("applyMessagePart / applyMessageParts", () => {
 // ---------------------------------------------------------------------------
 
 describe("resetTransientState", () => {
-	it("clears streamState, streamError, retryState, reconnectState, and subagentOverrides", () => {
+	it("clears transient stream state and subagent overrides", () => {
 		const store = createChatStore();
-		store.applyMessagePart({ type: "text", text: "stream" });
+		store.applyMessagePart(makeStreamPart("stream"));
 		store.setStreamError({
 			kind: "generic",
 			message: "oops",
@@ -635,6 +706,29 @@ describe("resetTransientState", () => {
 		store.resetTransientState();
 
 		expect(notified).toBe(false);
+	});
+});
+
+describe("resetForChatChange", () => {
+	it("clears state scoped to the previous chat", () => {
+		const store = createChatStore();
+		store.replaceMessages([makeMessage(1, "user", "hello")]);
+		store.setQueuedMessages([makeQueuedMessage(1, "queued")]);
+		store.markPromoteInFlight(1);
+		store.updateServerEpisodeFloor(4, 0);
+		store.applyMessagePart(makeStreamPart("stream", 4, 1, 1));
+
+		store.resetForChatChange();
+
+		const state = store.getSnapshot();
+		expect(state.messagesByID.size).toBe(0);
+		expect(state.orderedMessageIDs).toEqual([]);
+		expect(state.streamState).toBeNull();
+		expect(state.streamEpisode).toBeNull();
+		expect(state.serverEpisodeFloor).toBeNull();
+		expect(state.lastStreamPartSeq).toBe(0);
+		expect(state.queuedMessages).toEqual([]);
+		expect(state.promoteInFlightIDs.size).toBe(0);
 	});
 });
 
@@ -702,7 +796,7 @@ describe("selectIsAwaitingFirstStreamChunk", () => {
 		const store = createChatStore();
 		store.setChatStatus("running");
 		store.upsertDurableMessage(makeMessage(1, "user", "hello"));
-		store.applyMessagePart({ type: "text", text: "response" });
+		store.applyMessagePart(makeStreamPart("response"));
 
 		expect(selectIsAwaitingFirstStreamChunk(store.getSnapshot())).toBe(false);
 	});

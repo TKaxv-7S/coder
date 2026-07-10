@@ -252,7 +252,11 @@ func (l *streamLoop) applyDBSnapshot(snapshot streamDBSnapshot) []codersdk.ChatS
 		events = append(events, codersdk.ChatStreamEvent{
 			Type:   codersdk.ChatStreamEventTypeStatus,
 			ChatID: l.chatID,
-			Status: &codersdk.ChatStreamStatus{Status: codersdk.ChatStatus(chat.Status)},
+			Status: &codersdk.ChatStreamStatus{
+				Status:            codersdk.ChatStatus(chat.Status),
+				HistoryVersion:    chat.HistoryVersion,
+				GenerationAttempt: chat.GenerationAttempt,
+			},
 		})
 	}
 

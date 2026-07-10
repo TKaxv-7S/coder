@@ -27,6 +27,7 @@ import {
 	selectIsAwaitingFirstStreamChunk,
 	selectMessagesByID,
 	selectOrderedMessageIDs,
+	selectPromoteInFlightIDs,
 	selectQueuedMessages,
 	useChatSelector,
 	type useChatStore,
@@ -290,6 +291,7 @@ export const ChatPageInput: FC<ChatPageInputProps> = ({
 	const hasStreamState = useChatSelector(store, selectHasStreamState);
 	const chatStatus = useChatSelector(store, selectChatStatus);
 	const queuedMessages = useChatSelector(store, selectQueuedMessages);
+	const promoteInFlightIDs = useChatSelector(store, selectPromoteInFlightIDs);
 
 	const messages = orderedMessageIDs
 		.map((messageID) => {
@@ -486,6 +488,7 @@ export const ChatPageInput: FC<ChatPageInputProps> = ({
 			remountKey={remountKey}
 			onContentChange={onContentChange}
 			queuedMessages={queuedMessages}
+			promoteInFlightIDs={promoteInFlightIDs}
 			onDeleteQueuedMessage={onDeleteQueuedMessage}
 			onPromoteQueuedMessage={onPromoteQueuedMessage}
 			editingQueuedMessageID={editingQueuedMessageID}

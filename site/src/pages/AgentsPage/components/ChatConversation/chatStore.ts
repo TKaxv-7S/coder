@@ -144,20 +144,24 @@ export const isActiveChatStatus = (
 	status: TypesGen.ChatStatus | null,
 ): boolean => status === "running" || status === "interrupting";
 
+type StreamEpisode = {
+	historyVersion: number;
+	generationAttempt: number;
+};
+
 export type ChatStoreState = {
 	messagesByID: Map<number, TypesGen.ChatMessage>;
 	orderedMessageIDs: readonly number[];
 	streamState: StreamState | null;
+	streamEpisode: StreamEpisode | null;
+	serverEpisodeFloor: StreamEpisode | null;
+	lastStreamPartSeq: number;
 	chatStatus: TypesGen.ChatStatus | null;
 	streamError: ChatDetailError | null;
 	retryState: RetryState | null;
 	reconnectState: ReconnectState | null;
 	queuedMessages: readonly TypesGen.ChatQueuedMessage[];
-	// Hides queued IDs from the visible queue while the backend is
-	// in a transient state that would briefly include them. Used by
-	// the running-case promote, where the backend reorders the
-	// queued message to the front before auto-promoting it.
-	suppressedQueuedMessageIDs: ReadonlySet<number>;
+	promoteInFlightIDs: ReadonlySet<number>;
 	subagentStatusOverrides: Map<string, TypesGen.ChatStatus>;
 };
 
@@ -173,21 +177,17 @@ export type ChatStore = {
 		changed: boolean;
 	};
 	upsertDurableMessages: (messages: readonly TypesGen.ChatMessage[]) => void;
-	applyMessagePart: (part: TypesGen.ChatMessagePart) => void;
-	applyMessageParts: (parts: readonly TypesGen.ChatMessagePart[]) => void;
+	applyMessagePart: (part: TypesGen.ChatStreamMessagePart) => void;
+	applyMessageParts: (parts: readonly TypesGen.ChatStreamMessagePart[]) => void;
 	setQueuedMessages: (
 		queuedMessages: readonly TypesGen.ChatQueuedMessage[] | undefined,
 	) => void;
-	// Server-truthful queue snapshot, filtered through the
-	// suppression set. Use for SSE queue_update and REST hydration;
-	// optimistic writes go through setQueuedMessages so they don't
-	// lift suppression.
-	applyAuthoritativeQueuedMessages: (
-		queuedMessages: readonly TypesGen.ChatQueuedMessage[] | undefined,
+	markPromoteInFlight: (id: number) => void;
+	clearPromoteInFlight: (id: number) => void;
+	updateServerEpisodeFloor: (
+		historyVersion: number | undefined,
+		generationAttempt: number | undefined,
 	) => void;
-	suppressQueuedMessageID: (id: number) => void;
-	unsuppressQueuedMessageID: (id: number) => void;
-	clearSuppressedQueuedMessageIDs: () => void;
 	setChatStatus: (status: TypesGen.ChatStatus | null) => void;
 	setStreamState: (streamState: StreamState | null) => void;
 	setStreamError: (reason: ChatDetailError | null) => void;
@@ -198,6 +198,7 @@ export type ChatStore = {
 	clearReconnectState: () => void;
 	clearStreamState: () => void;
 	resetTransportReplayState: () => void;
+	resetForChatChange: () => void;
 	setSubagentStatusOverride: (
 		chatID: string,
 		status: TypesGen.ChatStatus,
@@ -209,12 +210,15 @@ const createInitialState = (): ChatStoreState => ({
 	messagesByID: new Map(),
 	orderedMessageIDs: [],
 	streamState: null,
+	streamEpisode: null,
+	serverEpisodeFloor: null,
+	lastStreamPartSeq: 0,
 	chatStatus: null,
 	streamError: null,
 	retryState: null,
 	reconnectState: null,
 	queuedMessages: [],
-	suppressedQueuedMessageIDs: new Set(),
+	promoteInFlightIDs: new Set(),
 	subagentStatusOverrides: new Map(),
 });
 
@@ -319,9 +323,7 @@ export const createChatStore = (): ChatStore => {
 			const nextMessagesByID = new Map(current.messagesByID);
 			nextMessagesByID.set(message.id, message);
 
-			const curIsDuplicate = current.messagesByID.has(message.id);
-			const needsReorder =
-				!curIsDuplicate || nextMessagesByID.size !== current.messagesByID.size;
+			const needsReorder = !current.messagesByID.has(message.id);
 			const nextOrderedMessageIDs = needsReorder
 				? buildOrderedMessageIDs(Array.from(nextMessagesByID.values()))
 				: current.orderedMessageIDs;
@@ -335,8 +337,7 @@ export const createChatStore = (): ChatStore => {
 		return { isDuplicate, changed: actuallyChanged };
 	};
 
-	// Bulk variant that applies all messages in a single pass —
-	// one Map copy and one sort instead of N copies and N sorts.
+	// Bulk variant applies all messages with one Map copy and one sort.
 	const upsertDurableMessages = (
 		messages: readonly TypesGen.ChatMessage[],
 	): void => {
@@ -372,22 +373,81 @@ export const createChatStore = (): ChatStore => {
 		});
 	};
 
-	const applyMessageParts = (parts: readonly TypesGen.ChatMessagePart[]) => {
+	const compareEpisodes = (left: StreamEpisode, right: StreamEpisode): number =>
+		left.historyVersion - right.historyVersion ||
+		left.generationAttempt - right.generationAttempt;
+
+	const applyMessageParts = (
+		parts: readonly TypesGen.ChatStreamMessagePart[],
+	) => {
 		if (parts.length === 0) {
 			return;
 		}
 
 		setState((current) => {
-			let nextStreamState: StreamState | null = current.streamState;
-			for (const part of parts) {
-				nextStreamState = applyMessagePartToStreamState(nextStreamState, part);
+			let nextStreamState = current.streamState;
+			let nextStreamEpisode = current.streamEpisode;
+			let nextLastStreamPartSeq = current.lastStreamPartSeq;
+
+			for (const messagePart of parts) {
+				const historyVersion = messagePart.history_version ?? 0;
+				const generationAttempt = messagePart.generation_attempt ?? 0;
+				const seq = messagePart.seq ?? 0;
+				if (historyVersion <= 0 || generationAttempt <= 0 || seq <= 0) {
+					if (nextStreamEpisode || current.serverEpisodeFloor) {
+						continue;
+					}
+					nextStreamState = applyMessagePartToStreamState(
+						nextStreamState,
+						messagePart.part,
+					);
+					continue;
+				}
+
+				const episode = { historyVersion, generationAttempt };
+				if (
+					current.serverEpisodeFloor &&
+					compareEpisodes(episode, current.serverEpisodeFloor) < 0
+				) {
+					continue;
+				}
+				if (nextStreamEpisode) {
+					const comparison = compareEpisodes(episode, nextStreamEpisode);
+					if (comparison < 0) {
+						continue;
+					}
+					if (comparison > 0) {
+						nextStreamState = null;
+						nextStreamEpisode = episode;
+						nextLastStreamPartSeq = 0;
+					}
+				} else {
+					nextStreamState = null;
+					nextStreamEpisode = episode;
+					nextLastStreamPartSeq = 0;
+				}
+				if (seq !== nextLastStreamPartSeq + 1) {
+					continue;
+				}
+				nextStreamState = applyMessagePartToStreamState(
+					nextStreamState,
+					messagePart.part,
+				);
+				nextLastStreamPartSeq = seq;
 			}
-			if (nextStreamState === current.streamState) {
+
+			if (
+				nextStreamState === current.streamState &&
+				nextStreamEpisode === current.streamEpisode &&
+				nextLastStreamPartSeq === current.lastStreamPartSeq
+			) {
 				return current;
 			}
 			return {
 				...current,
 				streamState: nextStreamState,
+				streamEpisode: nextStreamEpisode,
+				lastStreamPartSeq: nextLastStreamPartSeq,
 			};
 		});
 	};
@@ -409,84 +469,82 @@ export const createChatStore = (): ChatStore => {
 		setQueuedMessages: (queuedMessages) => {
 			const nextQueuedMessages = queuedMessages ?? [];
 			setState((current) => {
-				if (
-					chatQueuedMessagesEqualByID(
-						current.queuedMessages,
-						nextQueuedMessages,
-					)
-				) {
-					return current;
-				}
-				return { ...current, queuedMessages: nextQueuedMessages };
-			});
-		},
-		applyAuthoritativeQueuedMessages: (queuedMessages) => {
-			const incoming = queuedMessages ?? [];
-			setState((current) => {
-				let nextSuppressed = current.suppressedQueuedMessageIDs;
-				if (current.suppressedQueuedMessageIDs.size > 0) {
-					const incomingIDs = new Set(incoming.map((message) => message.id));
-					let copy: Set<number> | null = null;
-					for (const id of current.suppressedQueuedMessageIDs) {
-						if (!incomingIDs.has(id)) {
-							if (!copy) {
-								copy = new Set(current.suppressedQueuedMessageIDs);
-							}
-							copy.delete(id);
+				let nextPromoteInFlightIDs: ReadonlySet<number> =
+					current.promoteInFlightIDs;
+				let mutablePromoteInFlightIDs: Set<number> | null = null;
+				if (current.promoteInFlightIDs.size > 0) {
+					const queuedIDs = new Set(
+						nextQueuedMessages.map((message) => message.id),
+					);
+					for (const id of current.promoteInFlightIDs) {
+						if (queuedIDs.has(id)) {
+							continue;
 						}
-					}
-					if (copy) {
-						nextSuppressed = copy;
+						if (!mutablePromoteInFlightIDs) {
+							mutablePromoteInFlightIDs = new Set(current.promoteInFlightIDs);
+							nextPromoteInFlightIDs = mutablePromoteInFlightIDs;
+						}
+						mutablePromoteInFlightIDs.delete(id);
 					}
 				}
-				const filtered =
-					nextSuppressed.size === 0
-						? incoming
-						: incoming.filter((message) => !nextSuppressed.has(message.id));
 				const sameQueue = chatQueuedMessagesEqualByID(
 					current.queuedMessages,
-					filtered,
+					nextQueuedMessages,
 				);
-				const sameSuppressed =
-					nextSuppressed === current.suppressedQueuedMessageIDs;
-				if (sameQueue && sameSuppressed) {
+				if (
+					sameQueue &&
+					nextPromoteInFlightIDs === current.promoteInFlightIDs
+				) {
 					return current;
 				}
 				return {
 					...current,
-					queuedMessages: sameQueue ? current.queuedMessages : filtered,
-					suppressedQueuedMessageIDs: nextSuppressed,
+					queuedMessages: sameQueue
+						? current.queuedMessages
+						: nextQueuedMessages,
+					promoteInFlightIDs: nextPromoteInFlightIDs,
 				};
 			});
 		},
-		suppressQueuedMessageID: (id) => {
+		markPromoteInFlight: (id) => {
 			setState((current) => {
-				if (current.suppressedQueuedMessageIDs.has(id)) {
+				if (current.promoteInFlightIDs.has(id)) {
 					return current;
 				}
-				const next = new Set(current.suppressedQueuedMessageIDs);
+				const next = new Set(current.promoteInFlightIDs);
 				next.add(id);
-				return { ...current, suppressedQueuedMessageIDs: next };
+				return { ...current, promoteInFlightIDs: next };
 			});
 		},
-		unsuppressQueuedMessageID: (id) => {
+		clearPromoteInFlight: (id) => {
 			setState((current) => {
-				if (!current.suppressedQueuedMessageIDs.has(id)) {
+				if (!current.promoteInFlightIDs.has(id)) {
 					return current;
 				}
-				const next = new Set(current.suppressedQueuedMessageIDs);
+				const next = new Set(current.promoteInFlightIDs);
 				next.delete(id);
-				return { ...current, suppressedQueuedMessageIDs: next };
+				return { ...current, promoteInFlightIDs: next };
 			});
 		},
-		clearSuppressedQueuedMessageIDs: () => {
+		updateServerEpisodeFloor: (historyVersion, generationAttempt) => {
+			if (!historyVersion || historyVersion <= 0) {
+				return;
+			}
+			const nextFloor = {
+				historyVersion,
+				generationAttempt: Math.max(0, generationAttempt ?? 0),
+			};
 			setState((current) => {
-				if (current.suppressedQueuedMessageIDs.size === 0) {
+				if (
+					current.serverEpisodeFloor &&
+					compareEpisodes(nextFloor, current.serverEpisodeFloor) <= 0
+				) {
 					return current;
 				}
-				return { ...current, suppressedQueuedMessageIDs: new Set() };
+				return { ...current, serverEpisodeFloor: nextFloor };
 			});
 		},
+
 		setChatStatus: (status) => {
 			if (state.chatStatus === status) {
 				return;
@@ -583,7 +641,8 @@ export const createChatStore = (): ChatStore => {
 			if (
 				state.reconnectState === null &&
 				state.streamState === null &&
-				state.streamError === null
+				state.streamError === null &&
+				state.lastStreamPartSeq === 0
 			) {
 				return;
 			}
@@ -592,7 +651,11 @@ export const createChatStore = (): ChatStore => {
 				reconnectState: null,
 				streamState: null,
 				streamError: null,
+				lastStreamPartSeq: 0,
 			}));
+		},
+		resetForChatChange: () => {
+			setState(() => createInitialState());
 		},
 		setSubagentStatusOverride: (chatID, status) => {
 			if (state.subagentStatusOverrides.get(chatID) === status) {
@@ -639,6 +702,8 @@ export const selectChatStatus = (state: ChatStoreState) => state.chatStatus;
 export const selectStreamError = (state: ChatStoreState) => state.streamError;
 export const selectQueuedMessages = (state: ChatStoreState) =>
 	state.queuedMessages;
+export const selectPromoteInFlightIDs = (state: ChatStoreState) =>
+	state.promoteInFlightIDs;
 export const selectSubagentStatusOverrides = (state: ChatStoreState) =>
 	state.subagentStatusOverrides;
 export const selectRetryState = (state: ChatStoreState) => state.retryState;

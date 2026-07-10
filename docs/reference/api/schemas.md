@@ -2090,7 +2090,9 @@ AuthorizationObject can represent a "set" of objects, such as: all workspaces in
           "owner_id": "8826ee2e-7933-4665-aef2-2393f84a0d05"
         }
       ],
+      "generation_attempt": 0,
       "has_unread": true,
+      "history_version": 0,
       "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
       "labels": {
         "property1": "string",
@@ -2183,7 +2185,9 @@ AuthorizationObject can represent a "set" of objects, such as: all workspaces in
       "owner_id": "8826ee2e-7933-4665-aef2-2393f84a0d05"
     }
   ],
+  "generation_attempt": 0,
   "has_unread": true,
+  "history_version": 0,
   "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
   "labels": {
     "property1": "string",
@@ -2235,7 +2239,9 @@ AuthorizationObject can represent a "set" of objects, such as: all workspaces in
 | `created_at`            | string                                                          | false    |              |                                                                                                                                                                                                                                                                            |
 | `diff_status`           | [codersdk.ChatDiffStatus](#codersdkchatdiffstatus)              | false    |              |                                                                                                                                                                                                                                                                            |
 | `files`                 | array of [codersdk.ChatFileMetadata](#codersdkchatfilemetadata) | false    |              |                                                                                                                                                                                                                                                                            |
+| `generation_attempt`    | integer                                                         | false    |              |                                                                                                                                                                                                                                                                            |
 | `has_unread`            | boolean                                                         | false    |              | Has unread is true when assistant messages exist beyond the owner's read cursor, which updates on stream connect and disconnect.                                                                                                                                           |
+| `history_version`       | integer                                                         | false    |              |                                                                                                                                                                                                                                                                            |
 | `id`                    | string                                                          | false    |              |                                                                                                                                                                                                                                                                            |
 | `labels`                | object                                                          | false    |              |                                                                                                                                                                                                                                                                            |
 | » `[any property]`      | string                                                          | false    |              |                                                                                                                                                                                                                                                                            |
@@ -3683,6 +3689,8 @@ AuthorizationObject can represent a "set" of objects, such as: all workspaces in
     "status_code": 0
   },
   "status": {
+    "generation_attempt": 0,
+    "history_version": 0,
     "status": "waiting"
   },
   "type": "message_part"
@@ -3830,15 +3838,19 @@ AuthorizationObject can represent a "set" of objects, such as: all workspaces in
 
 ```json
 {
+  "generation_attempt": 0,
+  "history_version": 0,
   "status": "waiting"
 }
 ```
 
 ### Properties
 
-| Name     | Type                                       | Required | Restrictions | Description |
-|----------|--------------------------------------------|----------|--------------|-------------|
-| `status` | [codersdk.ChatStatus](#codersdkchatstatus) | false    |              |             |
+| Name                 | Type                                       | Required | Restrictions | Description |
+|----------------------|--------------------------------------------|----------|--------------|-------------|
+| `generation_attempt` | integer                                    | false    |              |             |
+| `history_version`    | integer                                    | false    |              |             |
+| `status`             | [codersdk.ChatStatus](#codersdkchatstatus) | false    |              |             |
 
 ## codersdk.ChatStreamToolCall
 
@@ -3968,7 +3980,9 @@ AuthorizationObject can represent a "set" of objects, such as: all workspaces in
         "owner_id": "8826ee2e-7933-4665-aef2-2393f84a0d05"
       }
     ],
+    "generation_attempt": 0,
     "has_unread": true,
+    "history_version": 0,
     "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
     "labels": {
       "property1": "string",

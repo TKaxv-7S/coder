@@ -186,7 +186,9 @@ describe("restoreOptimisticRequestSnapshot", () => {
 			},
 		]);
 		store.setChatStatus("running");
-		store.applyMessagePart({ type: "text", text: "partial response" });
+		store.applyMessagePart({
+			part: { type: "text", text: "partial response" },
+		});
 		store.setStreamError({ kind: "generic", message: "old error" });
 		const previousSnapshot = store.getSnapshot();
 
@@ -221,66 +223,92 @@ describe("runPromoteQueuedMessage", () => {
 		content: [{ type: "text", text }],
 	});
 
-	it("suppresses the promoted ID and removes it optimistically", async () => {
-		const store = createChatStore();
-		const a = buildQueuedMessage(1, "A");
-		const b = buildQueuedMessage(2, "B");
-		const c = buildQueuedMessage(3, "C");
-		store.setQueuedMessages([a, b, c]);
-		store.setChatStatus("running");
-
-		const promote = vi.fn(async (_id: number) => undefined);
-		const clearChatErrorReason = vi.fn();
-		const handleUsageLimitError = vi.fn();
-
-		await runPromoteQueuedMessage({
-			id: b.id,
-			store,
-			promoteQueuedMessage: promote,
-			agentId: "chat-1",
-			clearChatErrorReason,
-			handleUsageLimitError,
-		});
-
-		expect(promote).toHaveBeenCalledWith(b.id);
-
-		const snapshot = store.getSnapshot();
-		expect(snapshot.queuedMessages.map((m) => m.id)).toEqual([a.id, c.id]);
-		expect(snapshot.suppressedQueuedMessageIDs.has(b.id)).toBe(true);
-		expect(snapshot.chatStatus).toBe("running");
-	});
-
-	it("rolls back queue and status, clears suppression, and rethrows on API error", async () => {
+	it("keeps server-derived state and marks the row until the queue removes it", async () => {
 		const store = createChatStore();
 		const a = buildQueuedMessage(1, "A");
 		const b = buildQueuedMessage(2, "B");
 		store.setQueuedMessages([a, b]);
-		store.setChatStatus("waiting");
+		store.setChatStatus("interrupting");
+		store.applyMessagePart({
+			part: { type: "text", text: "partial response" },
+			history_version: 4,
+			generation_attempt: 1,
+			seq: 1,
+		});
+		store.setStreamError({ kind: "generic", message: "old error" });
+		const before = store.getSnapshot();
+		const deferred = createDeferred<void>();
+		const promote = vi.fn(() => deferred.promise);
+		const handleUsageLimitError = vi.fn();
 
+		const promotion = runPromoteQueuedMessage({
+			id: b.id,
+			store,
+			promoteQueuedMessage: promote,
+			handleUsageLimitError,
+		});
+
+		expect(promote).toHaveBeenCalledWith(b.id);
+		const snapshot = store.getSnapshot();
+		expect(snapshot.queuedMessages).toBe(before.queuedMessages);
+		expect(snapshot.chatStatus).toBe(before.chatStatus);
+		expect(snapshot.streamState).toBe(before.streamState);
+		expect(snapshot.streamError).toBeNull();
+		expect(snapshot.promoteInFlightIDs.has(b.id)).toBe(true);
+
+		deferred.resolve();
+		await promotion;
+		expect(store.getSnapshot().promoteInFlightIDs.has(b.id)).toBe(true);
+
+		store.setQueuedMessages([a]);
+		expect(store.getSnapshot().promoteInFlightIDs.has(b.id)).toBe(false);
+	});
+
+	it("clears the marker, reports the error, and preserves chat state", async () => {
+		const store = createChatStore();
+		const queued = buildQueuedMessage(2, "B");
+		store.setQueuedMessages([queued]);
+		store.setChatStatus("waiting");
+		const before = store.getSnapshot();
 		const apiError = new Error("boom");
-		const promote = vi.fn(async (_id: number) => {
+		const promote = vi.fn(async () => {
 			throw apiError;
 		});
-		const clearChatErrorReason = vi.fn();
 		const handleUsageLimitError = vi.fn();
 
 		await expect(
 			runPromoteQueuedMessage({
-				id: b.id,
+				id: queued.id,
 				store,
 				promoteQueuedMessage: promote,
-				agentId: "chat-1",
-				clearChatErrorReason,
 				handleUsageLimitError,
 			}),
 		).rejects.toBe(apiError);
 
 		expect(handleUsageLimitError).toHaveBeenCalledWith(apiError);
-
 		const snapshot = store.getSnapshot();
-		expect(snapshot.queuedMessages.map((m) => m.id)).toEqual([a.id, b.id]);
-		expect(snapshot.chatStatus).toBe("waiting");
-		expect(snapshot.suppressedQueuedMessageIDs.has(b.id)).toBe(false);
+		expect(snapshot.queuedMessages).toBe(before.queuedMessages);
+		expect(snapshot.chatStatus).toBe(before.chatStatus);
+		expect(snapshot.promoteInFlightIDs.has(queued.id)).toBe(false);
+	});
+
+	it("ignores duplicate requests while the same promotion is in flight", async () => {
+		const store = createChatStore();
+		const deferred = createDeferred<void>();
+		const promote = vi.fn(() => deferred.promise);
+		const params = {
+			id: 7,
+			store,
+			promoteQueuedMessage: promote,
+			handleUsageLimitError: vi.fn(),
+		};
+
+		const first = runPromoteQueuedMessage(params);
+		await runPromoteQueuedMessage(params);
+		expect(promote).toHaveBeenCalledTimes(1);
+
+		deferred.resolve();
+		await first;
 	});
 });
 

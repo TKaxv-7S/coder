@@ -20,6 +20,7 @@ interface QueuedMessagesListProps {
 	messages: readonly ChatQueuedMessage[];
 	onDelete: (id: number) => Promise<void> | void;
 	onPromote: (id: number) => Promise<void> | void;
+	promoteInFlightIDs?: ReadonlySet<number>;
 	onEdit?: (
 		id: number,
 		text: string,
@@ -69,6 +70,7 @@ export const QueuedMessagesList: FC<QueuedMessagesListProps> = ({
 	messages,
 	onDelete,
 	onPromote,
+	promoteInFlightIDs,
 	onEdit,
 	editingMessageID = null,
 	className,
@@ -150,12 +152,11 @@ export const QueuedMessagesList: FC<QueuedMessagesListProps> = ({
 
 	const handlePromote = async (id: number) => {
 		setBusyItem({ id, action: "promote" });
-		hideItemOptimistically(id);
 		try {
 			await onPromote(id);
 			setBusyItem((current) => (current?.id === id ? null : current));
 		} catch {
-			restoreHiddenItem(id);
+			// The caller owns promotion error feedback.
 			setBusyItem((current) => (current?.id === id ? null : current));
 		}
 	};
@@ -168,7 +169,7 @@ export const QueuedMessagesList: FC<QueuedMessagesListProps> = ({
 		return null;
 	}
 
-	const isBusy = busyItem !== null;
+	const isBusy = busyItem !== null || (promoteInFlightIDs?.size ?? 0) > 0;
 
 	return (
 		<div
@@ -181,11 +182,25 @@ export const QueuedMessagesList: FC<QueuedMessagesListProps> = ({
 				const isEditing = item.id === editingMessageID;
 				const isFirst = index === 0;
 				const isItemBusy = busyItem !== null && busyItem.id === item.id;
+				const isPromoting =
+					promoteInFlightIDs?.has(item.id) === true ||
+					(isItemBusy && busyItem.action === "promote");
 				const isHovered = hoveredID === item.id;
 				// Show actions when: first and nothing else hovered,
 				// or this item is hovered, or being edited.
 				const showActions =
 					isEditing || isHovered || (isFirst && hoveredID === null);
+
+				if (isPromoting) {
+					return (
+						<div key={item.id} className="my-1 opacity-80">
+							<div className="flex items-center gap-2 rounded-lg border border-solid border-border-default bg-surface-secondary px-3 py-2 font-sans text-sm leading-relaxed text-content-secondary shadow-sm">
+								<Spinner className="h-3.5 w-3.5" loading />
+								<span aria-live="polite">Promoting...</span>
+							</div>
+						</div>
+					);
+				}
 
 				return (
 					<div

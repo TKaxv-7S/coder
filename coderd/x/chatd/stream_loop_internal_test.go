@@ -213,6 +213,8 @@ func TestStreamLoopQueueStatusRetryErrorActionRequiredAndPreviewReset(t *testing
 		codersdk.ChatStreamEventTypeRetry,
 		codersdk.ChatStreamEventTypePreviewReset,
 	)
+	require.Equal(t, int64(2), events[1].Status.HistoryVersion)
+	require.Equal(t, int64(2), events[1].Status.GenerationAttempt)
 	require.Equal(t, chatError.Message, events[2].Error.Message)
 	require.Equal(t, retry.Attempt, events[3].Retry.Attempt)
 
@@ -231,7 +233,98 @@ func TestStreamLoopQueueStatusRetryErrorActionRequiredAndPreviewReset(t *testing
 		codersdk.ChatStreamEventTypeActionRequired,
 		codersdk.ChatStreamEventTypePreviewReset,
 	)
+	require.Equal(t, int64(1), actionEvents[0].Status.HistoryVersion)
+	require.Zero(t, actionEvents[0].Status.GenerationAttempt)
 	require.Equal(t, "call-1", actionEvents[1].ActionRequired.ToolCalls[0].ToolCallID)
+}
+
+func TestStreamLoopStatusCarriesPartConsistentEpisode(t *testing.T) {
+	t.Parallel()
+
+	chatID := uuid.New()
+	loop := newStreamLoop(database.Chat{ID: chatID}, nil, slogtest.Make(t, nil), 0)
+	loop.state.snapshotVersion = 10
+	loop.state.historyVersion = 7
+	loop.state.generationAttempt = 1
+	loop.state.status = database.ChatStatusRunning
+
+	// A pure status transition must keep the active part episode even though
+	// snapshot_version advances.
+	events := loop.applyDBSnapshot(streamDBSnapshot{chat: database.Chat{
+		ID:                chatID,
+		Status:            database.ChatStatusInterrupting,
+		SnapshotVersion:   11,
+		HistoryVersion:    7,
+		GenerationAttempt: 1,
+	}})
+	requireEventTypes(t, events, codersdk.ChatStreamEventTypeStatus)
+	require.Equal(t, int64(7), events[0].Status.HistoryVersion)
+	require.Equal(t, int64(1), events[0].Status.GenerationAttempt)
+	_, accepted, err := loop.part(StreamPart{
+		HistoryVersion:    7,
+		GenerationAttempt: 1,
+		Seq:               1,
+		Part:              codersdk.ChatMessageText("draining"),
+	})
+	require.NoError(t, err)
+	require.True(t, accepted)
+
+	// History changes reset the attempt; retries advance it within that history.
+	events = loop.applyDBSnapshot(streamDBSnapshot{chat: database.Chat{
+		ID:                chatID,
+		Status:            database.ChatStatusRunning,
+		SnapshotVersion:   12,
+		HistoryVersion:    12,
+		GenerationAttempt: 0,
+	}})
+	requireEventTypes(t, events,
+		codersdk.ChatStreamEventTypeStatus,
+		codersdk.ChatStreamEventTypePreviewReset,
+	)
+	require.Equal(t, int64(12), events[0].Status.HistoryVersion)
+	require.Zero(t, events[0].Status.GenerationAttempt)
+
+	events = loop.applyDBSnapshot(streamDBSnapshot{chat: database.Chat{
+		ID:                chatID,
+		Status:            database.ChatStatusRunning,
+		SnapshotVersion:   13,
+		HistoryVersion:    12,
+		GenerationAttempt: 1,
+	}})
+	requireEventTypes(t, events, codersdk.ChatStreamEventTypePreviewReset)
+	_, accepted, err = loop.part(StreamPart{
+		HistoryVersion:    12,
+		GenerationAttempt: 1,
+		Seq:               1,
+		Part:              codersdk.ChatMessageText("new turn"),
+	})
+	require.NoError(t, err)
+	require.True(t, accepted)
+
+	events = loop.applyDBSnapshot(streamDBSnapshot{chat: database.Chat{
+		ID:                chatID,
+		Status:            database.ChatStatusRunning,
+		SnapshotVersion:   14,
+		HistoryVersion:    12,
+		GenerationAttempt: 2,
+	}})
+	requireEventTypes(t, events, codersdk.ChatStreamEventTypePreviewReset)
+	_, accepted, err = loop.part(StreamPart{
+		HistoryVersion:    12,
+		GenerationAttempt: 1,
+		Seq:               2,
+		Part:              codersdk.ChatMessageText("stale retry"),
+	})
+	require.NoError(t, err)
+	require.False(t, accepted)
+	_, accepted, err = loop.part(StreamPart{
+		HistoryVersion:    12,
+		GenerationAttempt: 2,
+		Seq:               1,
+		Part:              codersdk.ChatMessageText("retry"),
+	})
+	require.NoError(t, err)
+	require.True(t, accepted)
 }
 
 func TestStreamLoopActionRequiredFromHistory(t *testing.T) {
