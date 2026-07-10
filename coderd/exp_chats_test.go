@@ -12022,7 +12022,7 @@ func TestChatModelOverrides(t *testing.T) {
 		require.Equal(t, "Invalid chat model override context.", sdkErr.Message)
 		require.Equal(
 			t,
-			`Expected one of general, explore, title_generation. Got "not-a-context".`,
+			`Expected one of general, explore, title_generation, compaction. Got "not-a-context".`,
 			sdkErr.Detail,
 		)
 
@@ -12031,7 +12031,7 @@ func TestChatModelOverrides(t *testing.T) {
 		require.Equal(t, "Invalid chat model override context.", sdkErr.Message)
 		require.Equal(
 			t,
-			`Expected one of general, explore, title_generation. Got "not-a-context".`,
+			`Expected one of general, explore, title_generation, compaction. Got "not-a-context".`,
 			sdkErr.Detail,
 		)
 	})
