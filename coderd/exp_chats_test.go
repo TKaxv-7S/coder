@@ -13054,7 +13054,7 @@ func TestUserChatPersonalModelOverrides(t *testing.T) {
 
 		resp, err := memberClient.GetUserChatPersonalModelOverrides(ctx)
 		require.NoError(t, err)
-		assertOverride(resp, codersdk.ChatPersonalModelOverrideContextRoot, codersdk.ChatPersonalModelOverrideModeChatDefault, "", true, true)
+		assertOverride(resp, codersdk.ChatPersonalModelOverrideContextRoot, codersdk.ChatPersonalModelOverrideModeDeploymentDefault, "", true, true)
 	})
 }
 
@@ -13165,6 +13165,12 @@ func TestCreateChatPersonalModelOverrideRoot(t *testing.T) {
 	t.Run("MalformedRootFallsBackToDefault", func(t *testing.T) {
 		upsertRootRaw(firstUser.UserID, "garbage")
 		chat := createChat(adminClient, "malformed root falls back", nil)
+		require.Equal(t, defaultModel.ID, chat.LastModelConfigID)
+	})
+
+	t.Run("RootDeploymentDefaultFallsBackToDefault", func(t *testing.T) {
+		upsertRootRaw(firstUser.UserID, string(codersdk.ChatPersonalModelOverrideModeDeploymentDefault))
+		chat := createChat(adminClient, "root deployment default falls back", nil)
 		require.Equal(t, defaultModel.ID, chat.LastModelConfigID)
 	})
 

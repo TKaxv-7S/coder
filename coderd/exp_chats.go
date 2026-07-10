@@ -807,6 +807,10 @@ func chatPersonalModelOverrideResponse(
 	isSet bool,
 ) codersdk.ChatPersonalModelOverride {
 	parsed := parseChatPersonalModelOverrideValue(raw, overrideContext)
+	if overrideContext == codersdk.ChatPersonalModelOverrideContextRoot &&
+		strings.TrimSpace(raw) == string(codersdk.ChatPersonalModelOverrideModeDeploymentDefault) {
+		parsed.Mode = codersdk.ChatPersonalModelOverrideModeDeploymentDefault
+	}
 	modelConfigID := ""
 	var reasoningEffort *string
 	if parsed.Mode == codersdk.ChatPersonalModelOverrideModeModel {
