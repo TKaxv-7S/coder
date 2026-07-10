@@ -1362,7 +1362,6 @@ export const ClaudeCodeModelPicker: Story = {
 	play: async ({ canvasElement, args }) => {
 		const canvas = within(canvasElement);
 		expect(await canvas.findByTestId("claude-code-badge")).toBeVisible();
-		// No selection: the trigger shows the Default row's label.
 		const trigger = canvas.getByRole("combobox", { name: "Default" });
 		await userEvent.click(trigger);
 		const body = within(document.body);

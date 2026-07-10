@@ -1728,8 +1728,6 @@ func (p *Server) EditMessage(
 		// foreign-key error from the message-insert path.
 		var modelOverride uuid.NullUUID
 		if opts.ModelConfigID != uuid.Nil {
-			// A non-zero requested ID goes through the same
-			// runtime-specific validation as the send path.
 			if _, err := resolveSendMessageModelConfigID(
 				ctx, store, lockedChat, opts.ModelConfigID,
 			); err != nil {

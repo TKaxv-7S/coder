@@ -1136,13 +1136,10 @@ const AgentChatPage: FC = () => {
 	// back to the chat's last model or the first available option.
 	const effectiveSelectedModel = (() => {
 		if (isClaudeCodeChat) {
-			// An explicit pick wins and an explicit clear stays on
-			// Default; otherwise restore the chat's last pick while it
-			// is still selectable. No first-option fallback: empty
-			// means the runtime default chain (admin pin, then adapter
-			// default). Known quirk: clearing does not null
-			// last_model_config_id, so a fresh window preselects the
-			// old pick again.
+			// No first-option fallback: empty means the runtime
+			// default chain (admin pin, then adapter default). Known
+			// quirk: clearing does not null last_model_config_id, so a
+			// fresh window preselects the old pick again.
 			const resolvedSelectedModel = resolveModelOptionId(
 				selectedModel,
 				selectableModelOptions,

@@ -46,8 +46,7 @@ interface ModelSelectorProps {
 	enableMobileFullWidthDropdown?: boolean;
 	// defaultOptionLabel, when set, prepends an explicit row mapping to
 	// the empty value so an active pick can be cleared back to the
-	// runtime default. The trigger shows this label while no option is
-	// selected.
+	// runtime default.
 	defaultOptionLabel?: string;
 }
 

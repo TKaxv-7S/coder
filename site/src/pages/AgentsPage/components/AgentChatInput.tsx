@@ -123,12 +123,10 @@ interface AgentChatInputProps {
 	planModeEnabled?: boolean;
 	onPlanModeToggle?: (enabled: boolean) => void;
 	// Claude Code runtime. When enabled the composer is pinned to the
-	// runtime and model options are not required to send. Callers pass
+	// runtime and model options are not required to send; callers pass
 	// Anthropic-only modelOptions (the runtime injects Anthropic
-	// credentials); a non-empty list renders a picker with an explicit
-	// Default row next to the badge. The toggle only renders on the
-	// landing composer; existing runtime chats pass claudeCodeEnabled
-	// without a toggle.
+	// credentials). The toggle only renders on the landing composer;
+	// existing runtime chats pass claudeCodeEnabled without a toggle.
 	claudeCodeEnabled?: boolean;
 	onClaudeCodeToggle?: (enabled: boolean) => void;
 	isModelCatalogLoading?: boolean;
