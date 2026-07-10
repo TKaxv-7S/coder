@@ -83,9 +83,8 @@ RETURNING *;
 
 -- name: UpdateChatAgentDeletedByID :exec
 -- Soft delete keeps the row so attribution lookups on existing chats
--- (GetChatAgentsByIDs) still resolve the agent's identity. There is no
--- foreign key from chats because chats may reference in-memory builtin
--- agents.
+-- (GetChatAgentsByIDs) still resolve the agent's identity and the
+-- foreign key from chats.chat_agent_id remains satisfied.
 UPDATE
     chat_agents
 SET
@@ -96,8 +95,8 @@ WHERE
 
 -- name: CountChatAgentsByPersonaID :one
 -- Counts non-deleted agents referencing a persona. Used to block
--- persona deletion while agents still depend on it; there is no
--- foreign key because agents may reference in-memory builtin personas.
+-- persona deletion while agents still depend on it; the foreign key
+-- alone cannot enforce this because deletion is a soft delete.
 SELECT
     COUNT(*)
 FROM
@@ -105,3 +104,49 @@ FROM
 WHERE
     persona_id = @persona_id::uuid
     AND deleted = FALSE;
+
+-- name: UpsertBuiltinChatAgent :exec
+-- Seeds or refreshes a builtin agent row at coderd startup. Builtin
+-- rows carry the canonical in-repo values, are always enabled and
+-- undeleted, and have no creator.
+INSERT INTO chat_agents (
+    id,
+    organization_id,
+    slug,
+    name,
+    description,
+    icon,
+    persona_id,
+    prompt_append,
+    model_config_id,
+    enabled,
+    deleted,
+    builtin,
+    created_by
+)
+VALUES (
+    @id,
+    NULL,
+    @slug,
+    @name,
+    @description,
+    @icon,
+    @persona_id,
+    @prompt_append,
+    NULL,
+    TRUE,
+    FALSE,
+    TRUE,
+    NULL
+)
+ON CONFLICT (id) DO UPDATE SET
+    slug = EXCLUDED.slug,
+    name = EXCLUDED.name,
+    description = EXCLUDED.description,
+    icon = EXCLUDED.icon,
+    persona_id = EXCLUDED.persona_id,
+    prompt_append = EXCLUDED.prompt_append,
+    enabled = TRUE,
+    deleted = FALSE,
+    builtin = TRUE,
+    updated_at = now();

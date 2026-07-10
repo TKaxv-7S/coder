@@ -498,6 +498,7 @@ var auditableResourcesTypes = map[any]map[string]Action{
 		"model_config_id": ActionTrack,
 		"enabled":         ActionTrack,
 		"deleted":         ActionIgnore, // Implicit when a delete event is fired.
+		"builtin":         ActionIgnore, // Set only by the startup seeder.
 		"created_by":      ActionTrack,
 		"created_at":      ActionIgnore, // Never changes.
 		"updated_at":      ActionIgnore, // Bumped on every mutation.
@@ -514,6 +515,7 @@ var auditableResourcesTypes = map[any]map[string]Action{
 		"model_config_id": ActionTrack,
 		"enabled":         ActionTrack,
 		"deleted":         ActionIgnore, // Implicit when a delete event is fired.
+		"builtin":         ActionIgnore, // Set only by the startup seeder.
 		"created_by":      ActionTrack,
 		"created_at":      ActionIgnore, // Never changes.
 		"updated_at":      ActionIgnore, // Bumped on every mutation.

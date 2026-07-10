@@ -12,8 +12,8 @@ import (
 )
 
 // ChatPersona bundles a system prompt with a preferred model. Builtin
-// personas are served from an in-memory catalog; deployment and
-// organization personas are stored in the database. A nil
+// personas are seeded at coderd startup and are immutable; deployment
+// and organization personas are managed by admins. A nil
 // OrganizationID means the persona is deployment-scoped.
 type ChatPersona struct {
 	ID             uuid.UUID  `json:"id" format:"uuid"`
@@ -50,8 +50,8 @@ type ChatAgent struct {
 }
 
 // ChatAgentSummary identifies the chat agent a chat was created as,
-// for display attribution. Builtin reports whether the agent is an
-// in-memory builtin catalog entry rather than a database row.
+// for display attribution. Builtin reports whether the agent is a
+// seeded builtin catalog entry.
 type ChatAgentSummary struct {
 	ID      uuid.UUID `json:"id" format:"uuid"`
 	Slug    string    `json:"slug,omitempty"`

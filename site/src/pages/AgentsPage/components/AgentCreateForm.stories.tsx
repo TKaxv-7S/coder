@@ -349,9 +349,13 @@ export const SubmitsReasoningEffort: Story = {
 		// "medium" is the fourth of seven selectable efforts.
 		expect(slider).toHaveAttribute("aria-valuenow", "3");
 
-		// Bump the effort to "high" with the keyboard, then close.
-		await userEvent.tab();
-		expect(slider).toHaveFocus();
+		// Bump the effort to "high" with the keyboard, then close. The
+		// slider is focused directly because tab order inside the popover
+		// includes the reasoning-effort info button before the slider.
+		slider.focus();
+		await waitFor(() => {
+			expect(slider).toHaveFocus();
+		});
 		await userEvent.keyboard("{ArrowRight}");
 		await waitFor(() => {
 			expect(slider).toHaveAttribute("aria-valuenow", "4");

@@ -54,13 +54,13 @@ func TestCreateChatWithPersona(t *testing.T) {
 	persona := dbgen.ChatPersona(t, db, database.ChatPersona{
 		Slug:         "docs-persona",
 		SystemPrompt: personaPrompt,
-		CreatedBy:    user.ID,
+		CreatedBy:    uuid.NullUUID{UUID: user.ID, Valid: true},
 	})
 	agent := dbgen.ChatAgent(t, db, database.ChatAgent{
 		Slug:         "docs-agent",
 		PersonaID:    persona.ID,
 		PromptAppend: promptAppend,
-		CreatedBy:    user.ID,
+		CreatedBy:    uuid.NullUUID{UUID: user.ID, Valid: true},
 	})
 
 	chat, err := server.CreateChat(ctx, CreateOptions{
@@ -142,7 +142,7 @@ func TestSpawnAgentChatAgentType(t *testing.T) {
 	persona := dbgen.ChatPersona(t, db, database.ChatPersona{
 		Slug:         "spawn-persona",
 		SystemPrompt: personaPrompt,
-		CreatedBy:    user.ID,
+		CreatedBy:    uuid.NullUUID{UUID: user.ID, Valid: true},
 	})
 	agent := dbgen.ChatAgent(t, db, database.ChatAgent{
 		OrganizationID: uuid.NullUUID{UUID: org.ID, Valid: true},
@@ -150,7 +150,7 @@ func TestSpawnAgentChatAgentType(t *testing.T) {
 		PersonaID:      persona.ID,
 		PromptAppend:   promptAppend,
 		ModelConfigID:  uuid.NullUUID{UUID: overrideModel.ID, Valid: true},
-		CreatedBy:      user.ID,
+		CreatedBy:      uuid.NullUUID{UUID: user.ID, Valid: true},
 	})
 
 	parentChat := createInternalParentChat(
@@ -193,7 +193,7 @@ func TestSpawnAgentChatAgentTypeRejections(t *testing.T) {
 
 	disabledAgent := dbgen.ChatAgent(t, db, database.ChatAgent{
 		Slug:      "disabled-spawn-agent",
-		CreatedBy: user.ID,
+		CreatedBy: uuid.NullUUID{UUID: user.ID, Valid: true},
 	}, func(params *database.InsertChatAgentParams) {
 		params.Enabled = false
 	})
@@ -201,7 +201,7 @@ func TestSpawnAgentChatAgentTypeRejections(t *testing.T) {
 	foreignAgent := dbgen.ChatAgent(t, db, database.ChatAgent{
 		OrganizationID: uuid.NullUUID{UUID: otherOrg.ID, Valid: true},
 		Slug:           "foreign-spawn-agent",
-		CreatedBy:      user.ID,
+		CreatedBy:      uuid.NullUUID{UUID: user.ID, Valid: true},
 	})
 
 	parentChat := createInternalParentChat(
@@ -265,7 +265,7 @@ func TestBuildSpawnAgentDescriptionListsChatAgents(t *testing.T) {
 		Slug:           "catalog-agent",
 		Name:           "Catalog Agent",
 		Description:    "Reviews catalog entries.",
-		CreatedBy:      user.ID,
+		CreatedBy:      uuid.NullUUID{UUID: user.ID, Valid: true},
 	})
 	parentChat := createInternalParentChat(
 		ctx, t, server, db, org.ID, user.ID, model.ID, "parent-catalog",
@@ -297,12 +297,12 @@ func TestCreateChatWithPersonaIgnoresIncludeDefaultToggle(t *testing.T) {
 	persona := dbgen.ChatPersona(t, db, database.ChatPersona{
 		Slug:         "toggle-persona",
 		SystemPrompt: personaPrompt,
-		CreatedBy:    user.ID,
+		CreatedBy:    uuid.NullUUID{UUID: user.ID, Valid: true},
 	})
 	agent := dbgen.ChatAgent(t, db, database.ChatAgent{
 		Slug:      "toggle-agent",
 		PersonaID: persona.ID,
-		CreatedBy: user.ID,
+		CreatedBy: uuid.NullUUID{UUID: user.ID, Valid: true},
 	})
 
 	chat, err := server.CreateChat(ctx, CreateOptions{
@@ -366,14 +366,14 @@ func TestSpawnAgentCatalogCapAndResolution(t *testing.T) {
 			OrganizationID: uuid.NullUUID{UUID: org.ID, Valid: true},
 			Slug:           fmt.Sprintf("cap-agent-%02d", i),
 			Name:           fmt.Sprintf("Cap Agent %02d", i),
-			CreatedBy:      user.ID,
+			CreatedBy:      uuid.NullUUID{UUID: user.ID, Valid: true},
 		})
 	}
 	overshoot := dbgen.ChatAgent(t, db, database.ChatAgent{
 		OrganizationID: uuid.NullUUID{UUID: org.ID, Valid: true},
 		Slug:           "zzz-agent",
 		Name:           "Zzz Agent",
-		CreatedBy:      user.ID,
+		CreatedBy:      uuid.NullUUID{UUID: user.ID, Valid: true},
 	})
 	parentChat := createInternalParentChat(
 		ctx, t, server, db, org.ID, user.ID, model.ID, "parent-cap",
@@ -406,13 +406,13 @@ func TestSpawnAgentSlugScopePrecedence(t *testing.T) {
 	dbgen.ChatAgent(t, db, database.ChatAgent{
 		Slug:      "shared-slug",
 		Name:      "Deployment Shared",
-		CreatedBy: user.ID,
+		CreatedBy: uuid.NullUUID{UUID: user.ID, Valid: true},
 	})
 	orgAgent := dbgen.ChatAgent(t, db, database.ChatAgent{
 		OrganizationID: uuid.NullUUID{UUID: org.ID, Valid: true},
 		Slug:           "shared-slug",
 		Name:           "Org Shared",
-		CreatedBy:      user.ID,
+		CreatedBy:      uuid.NullUUID{UUID: user.ID, Valid: true},
 	})
 	parentChat := createInternalParentChat(
 		ctx, t, server, db, org.ID, user.ID, model.ID, "parent-precedence",

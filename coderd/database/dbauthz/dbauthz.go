@@ -8778,6 +8778,24 @@ func (q *querier) UpsertBoundaryUsageStats(ctx context.Context, arg database.Ups
 	return q.db.UpsertBoundaryUsageStats(ctx, arg)
 }
 
+func (q *querier) UpsertBuiltinChatAgent(ctx context.Context, arg database.UpsertBuiltinChatAgentParams) error {
+	// Builtin catalog rows are seeded by coderd at startup under the
+	// system context; they are not writable through user requests.
+	if err := q.authorizeContext(ctx, policy.ActionUpdate, rbac.ResourceSystem); err != nil {
+		return err
+	}
+	return q.db.UpsertBuiltinChatAgent(ctx, arg)
+}
+
+func (q *querier) UpsertBuiltinChatPersona(ctx context.Context, arg database.UpsertBuiltinChatPersonaParams) error {
+	// Builtin catalog rows are seeded by coderd at startup under the
+	// system context; they are not writable through user requests.
+	if err := q.authorizeContext(ctx, policy.ActionUpdate, rbac.ResourceSystem); err != nil {
+		return err
+	}
+	return q.db.UpsertBuiltinChatPersona(ctx, arg)
+}
+
 func (q *querier) UpsertChatAdvisorConfig(ctx context.Context, value string) error {
 	if err := q.authorizeContext(ctx, policy.ActionUpdate, rbac.ResourceDeploymentConfig); err != nil {
 		return err

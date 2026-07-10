@@ -5042,7 +5042,7 @@ type ChatAgent struct {
 	Name           string        `db:"name" json:"name"`
 	Description    string        `db:"description" json:"description"`
 	Icon           string        `db:"icon" json:"icon"`
-	// The persona supplying the base system prompt for chats created with this agent. May reference an in-memory builtin persona, so no foreign key exists.
+	// The persona supplying the base system prompt for chats created with this agent.
 	PersonaID uuid.UUID `db:"persona_id" json:"persona_id"`
 	// Additional system prompt text appended after the persona prompt.
 	PromptAppend string `db:"prompt_append" json:"prompt_append"`
@@ -5050,9 +5050,12 @@ type ChatAgent struct {
 	ModelConfigID uuid.NullUUID `db:"model_config_id" json:"model_config_id"`
 	Enabled       bool          `db:"enabled" json:"enabled"`
 	Deleted       bool          `db:"deleted" json:"deleted"`
-	CreatedBy     uuid.UUID     `db:"created_by" json:"created_by"`
-	CreatedAt     time.Time     `db:"created_at" json:"created_at"`
-	UpdatedAt     time.Time     `db:"updated_at" json:"updated_at"`
+	// Builtin rows are seeded at startup from the in-repo catalog and are immutable through the API.
+	Builtin bool `db:"builtin" json:"builtin"`
+	// NULL for builtin rows seeded at startup.
+	CreatedBy uuid.NullUUID `db:"created_by" json:"created_by"`
+	CreatedAt time.Time     `db:"created_at" json:"created_at"`
+	UpdatedAt time.Time     `db:"updated_at" json:"updated_at"`
 }
 
 // Per-chat pinned copy of the agent context resources a chat is hydrated against. Copied from workspace_agent_context_resources at chat hydration and context refresh; survives agent replacement and workspace rebuilds.
@@ -5223,9 +5226,12 @@ type ChatPersona struct {
 	ModelConfigID uuid.NullUUID `db:"model_config_id" json:"model_config_id"`
 	Enabled       bool          `db:"enabled" json:"enabled"`
 	Deleted       bool          `db:"deleted" json:"deleted"`
-	CreatedBy     uuid.UUID     `db:"created_by" json:"created_by"`
-	CreatedAt     time.Time     `db:"created_at" json:"created_at"`
-	UpdatedAt     time.Time     `db:"updated_at" json:"updated_at"`
+	// Builtin rows are seeded at startup from the in-repo catalog and are immutable through the API.
+	Builtin bool `db:"builtin" json:"builtin"`
+	// NULL for builtin rows seeded at startup.
+	CreatedBy uuid.NullUUID `db:"created_by" json:"created_by"`
+	CreatedAt time.Time     `db:"created_at" json:"created_at"`
+	UpdatedAt time.Time     `db:"updated_at" json:"updated_at"`
 }
 
 type ChatQueuedMessage struct {
@@ -5292,7 +5298,7 @@ type ChatTable struct {
 	ContextError string `db:"context_error" json:"context_error"`
 	// Stores the most recent message effort once per-turn selection is wired.
 	LastReasoningEffort NullChatReasoningEffort `db:"last_reasoning_effort" json:"last_reasoning_effort"`
-	// The chat agent the chat was created as, if any. Distinct from agent_id, which is the workspace agent. May reference an in-memory builtin agent, so no foreign key exists.
+	// The chat agent the chat was created as, if any. Distinct from agent_id, which is the workspace agent.
 	ChatAgentID uuid.NullUUID `db:"chat_agent_id" json:"chat_agent_id"`
 }
 

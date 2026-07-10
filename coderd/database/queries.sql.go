@@ -4216,8 +4216,8 @@ WHERE
 `
 
 // Counts non-deleted agents referencing a persona. Used to block
-// persona deletion while agents still depend on it; there is no
-// foreign key because agents may reference in-memory builtin personas.
+// persona deletion while agents still depend on it; the foreign key
+// alone cannot enforce this because deletion is a soft delete.
 func (q *sqlQuerier) CountChatAgentsByPersonaID(ctx context.Context, personaID uuid.UUID) (int64, error) {
 	row := q.db.QueryRowContext(ctx, countChatAgentsByPersonaID, personaID)
 	var count int64
@@ -4227,7 +4227,7 @@ func (q *sqlQuerier) CountChatAgentsByPersonaID(ctx context.Context, personaID u
 
 const getChatAgentByID = `-- name: GetChatAgentByID :one
 SELECT
-    id, organization_id, slug, name, description, icon, persona_id, prompt_append, model_config_id, enabled, deleted, created_by, created_at, updated_at
+    id, organization_id, slug, name, description, icon, persona_id, prompt_append, model_config_id, enabled, deleted, builtin, created_by, created_at, updated_at
 FROM
     chat_agents
 WHERE
@@ -4250,6 +4250,7 @@ func (q *sqlQuerier) GetChatAgentByID(ctx context.Context, id uuid.UUID) (ChatAg
 		&i.ModelConfigID,
 		&i.Enabled,
 		&i.Deleted,
+		&i.Builtin,
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -4259,7 +4260,7 @@ func (q *sqlQuerier) GetChatAgentByID(ctx context.Context, id uuid.UUID) (ChatAg
 
 const getChatAgents = `-- name: GetChatAgents :many
 SELECT
-    id, organization_id, slug, name, description, icon, persona_id, prompt_append, model_config_id, enabled, deleted, created_by, created_at, updated_at
+    id, organization_id, slug, name, description, icon, persona_id, prompt_append, model_config_id, enabled, deleted, builtin, created_by, created_at, updated_at
 FROM
     chat_agents
 WHERE
@@ -4299,6 +4300,7 @@ func (q *sqlQuerier) GetChatAgents(ctx context.Context, organizationID uuid.UUID
 			&i.ModelConfigID,
 			&i.Enabled,
 			&i.Deleted,
+			&i.Builtin,
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -4318,7 +4320,7 @@ func (q *sqlQuerier) GetChatAgents(ctx context.Context, organizationID uuid.UUID
 
 const getChatAgentsByIDs = `-- name: GetChatAgentsByIDs :many
 SELECT
-    id, organization_id, slug, name, description, icon, persona_id, prompt_append, model_config_id, enabled, deleted, created_by, created_at, updated_at
+    id, organization_id, slug, name, description, icon, persona_id, prompt_append, model_config_id, enabled, deleted, builtin, created_by, created_at, updated_at
 FROM
     chat_agents
 WHERE
@@ -4348,6 +4350,7 @@ func (q *sqlQuerier) GetChatAgentsByIDs(ctx context.Context, ids []uuid.UUID) ([
 			&i.ModelConfigID,
 			&i.Enabled,
 			&i.Deleted,
+			&i.Builtin,
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -4390,7 +4393,7 @@ VALUES (
     $9,
     $10
 )
-RETURNING id, organization_id, slug, name, description, icon, persona_id, prompt_append, model_config_id, enabled, deleted, created_by, created_at, updated_at
+RETURNING id, organization_id, slug, name, description, icon, persona_id, prompt_append, model_config_id, enabled, deleted, builtin, created_by, created_at, updated_at
 `
 
 type InsertChatAgentParams struct {
@@ -4403,7 +4406,7 @@ type InsertChatAgentParams struct {
 	PromptAppend   string        `db:"prompt_append" json:"prompt_append"`
 	ModelConfigID  uuid.NullUUID `db:"model_config_id" json:"model_config_id"`
 	Enabled        bool          `db:"enabled" json:"enabled"`
-	CreatedBy      uuid.UUID     `db:"created_by" json:"created_by"`
+	CreatedBy      uuid.NullUUID `db:"created_by" json:"created_by"`
 }
 
 func (q *sqlQuerier) InsertChatAgent(ctx context.Context, arg InsertChatAgentParams) (ChatAgent, error) {
@@ -4432,6 +4435,7 @@ func (q *sqlQuerier) InsertChatAgent(ctx context.Context, arg InsertChatAgentPar
 		&i.ModelConfigID,
 		&i.Enabled,
 		&i.Deleted,
+		&i.Builtin,
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -4454,7 +4458,7 @@ SET
 WHERE
     id = $8::uuid
     AND deleted = FALSE
-RETURNING id, organization_id, slug, name, description, icon, persona_id, prompt_append, model_config_id, enabled, deleted, created_by, created_at, updated_at
+RETURNING id, organization_id, slug, name, description, icon, persona_id, prompt_append, model_config_id, enabled, deleted, builtin, created_by, created_at, updated_at
 `
 
 type UpdateChatAgentParams struct {
@@ -4492,6 +4496,7 @@ func (q *sqlQuerier) UpdateChatAgent(ctx context.Context, arg UpdateChatAgentPar
 		&i.ModelConfigID,
 		&i.Enabled,
 		&i.Deleted,
+		&i.Builtin,
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -4510,11 +4515,80 @@ WHERE
 `
 
 // Soft delete keeps the row so attribution lookups on existing chats
-// (GetChatAgentsByIDs) still resolve the agent's identity. There is no
-// foreign key from chats because chats may reference in-memory builtin
-// agents.
+// (GetChatAgentsByIDs) still resolve the agent's identity and the
+// foreign key from chats.chat_agent_id remains satisfied.
 func (q *sqlQuerier) UpdateChatAgentDeletedByID(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.ExecContext(ctx, updateChatAgentDeletedByID, id)
+	return err
+}
+
+const upsertBuiltinChatAgent = `-- name: UpsertBuiltinChatAgent :exec
+INSERT INTO chat_agents (
+    id,
+    organization_id,
+    slug,
+    name,
+    description,
+    icon,
+    persona_id,
+    prompt_append,
+    model_config_id,
+    enabled,
+    deleted,
+    builtin,
+    created_by
+)
+VALUES (
+    $1,
+    NULL,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6,
+    $7,
+    NULL,
+    TRUE,
+    FALSE,
+    TRUE,
+    NULL
+)
+ON CONFLICT (id) DO UPDATE SET
+    slug = EXCLUDED.slug,
+    name = EXCLUDED.name,
+    description = EXCLUDED.description,
+    icon = EXCLUDED.icon,
+    persona_id = EXCLUDED.persona_id,
+    prompt_append = EXCLUDED.prompt_append,
+    enabled = TRUE,
+    deleted = FALSE,
+    builtin = TRUE,
+    updated_at = now()
+`
+
+type UpsertBuiltinChatAgentParams struct {
+	ID           uuid.UUID `db:"id" json:"id"`
+	Slug         string    `db:"slug" json:"slug"`
+	Name         string    `db:"name" json:"name"`
+	Description  string    `db:"description" json:"description"`
+	Icon         string    `db:"icon" json:"icon"`
+	PersonaID    uuid.UUID `db:"persona_id" json:"persona_id"`
+	PromptAppend string    `db:"prompt_append" json:"prompt_append"`
+}
+
+// Seeds or refreshes a builtin agent row at coderd startup. Builtin
+// rows carry the canonical in-repo values, are always enabled and
+// undeleted, and have no creator.
+func (q *sqlQuerier) UpsertBuiltinChatAgent(ctx context.Context, arg UpsertBuiltinChatAgentParams) error {
+	_, err := q.db.ExecContext(ctx, upsertBuiltinChatAgent,
+		arg.ID,
+		arg.Slug,
+		arg.Name,
+		arg.Description,
+		arg.Icon,
+		arg.PersonaID,
+		arg.PromptAppend,
+	)
 	return err
 }
 
@@ -5921,7 +5995,7 @@ func (q *sqlQuerier) UpdateChatModelConfig(ctx context.Context, arg UpdateChatMo
 
 const getChatPersonaByID = `-- name: GetChatPersonaByID :one
 SELECT
-    id, organization_id, slug, name, description, icon, system_prompt, model_config_id, enabled, deleted, created_by, created_at, updated_at
+    id, organization_id, slug, name, description, icon, system_prompt, model_config_id, enabled, deleted, builtin, created_by, created_at, updated_at
 FROM
     chat_personas
 WHERE
@@ -5943,6 +6017,7 @@ func (q *sqlQuerier) GetChatPersonaByID(ctx context.Context, id uuid.UUID) (Chat
 		&i.ModelConfigID,
 		&i.Enabled,
 		&i.Deleted,
+		&i.Builtin,
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -5952,7 +6027,7 @@ func (q *sqlQuerier) GetChatPersonaByID(ctx context.Context, id uuid.UUID) (Chat
 
 const getChatPersonas = `-- name: GetChatPersonas :many
 SELECT
-    id, organization_id, slug, name, description, icon, system_prompt, model_config_id, enabled, deleted, created_by, created_at, updated_at
+    id, organization_id, slug, name, description, icon, system_prompt, model_config_id, enabled, deleted, builtin, created_by, created_at, updated_at
 FROM
     chat_personas
 WHERE
@@ -5991,6 +6066,7 @@ func (q *sqlQuerier) GetChatPersonas(ctx context.Context, organizationID uuid.UU
 			&i.ModelConfigID,
 			&i.Enabled,
 			&i.Deleted,
+			&i.Builtin,
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -6031,7 +6107,7 @@ VALUES (
     $8,
     $9
 )
-RETURNING id, organization_id, slug, name, description, icon, system_prompt, model_config_id, enabled, deleted, created_by, created_at, updated_at
+RETURNING id, organization_id, slug, name, description, icon, system_prompt, model_config_id, enabled, deleted, builtin, created_by, created_at, updated_at
 `
 
 type InsertChatPersonaParams struct {
@@ -6043,7 +6119,7 @@ type InsertChatPersonaParams struct {
 	SystemPrompt   string        `db:"system_prompt" json:"system_prompt"`
 	ModelConfigID  uuid.NullUUID `db:"model_config_id" json:"model_config_id"`
 	Enabled        bool          `db:"enabled" json:"enabled"`
-	CreatedBy      uuid.UUID     `db:"created_by" json:"created_by"`
+	CreatedBy      uuid.NullUUID `db:"created_by" json:"created_by"`
 }
 
 func (q *sqlQuerier) InsertChatPersona(ctx context.Context, arg InsertChatPersonaParams) (ChatPersona, error) {
@@ -6070,6 +6146,7 @@ func (q *sqlQuerier) InsertChatPersona(ctx context.Context, arg InsertChatPerson
 		&i.ModelConfigID,
 		&i.Enabled,
 		&i.Deleted,
+		&i.Builtin,
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -6091,7 +6168,7 @@ SET
 WHERE
     id = $7::uuid
     AND deleted = FALSE
-RETURNING id, organization_id, slug, name, description, icon, system_prompt, model_config_id, enabled, deleted, created_by, created_at, updated_at
+RETURNING id, organization_id, slug, name, description, icon, system_prompt, model_config_id, enabled, deleted, builtin, created_by, created_at, updated_at
 `
 
 type UpdateChatPersonaParams struct {
@@ -6126,6 +6203,7 @@ func (q *sqlQuerier) UpdateChatPersona(ctx context.Context, arg UpdateChatPerson
 		&i.ModelConfigID,
 		&i.Enabled,
 		&i.Deleted,
+		&i.Builtin,
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -6143,12 +6221,77 @@ WHERE
     id = $1::uuid
 `
 
-// Soft delete keeps the row so historical references stay resolvable.
-// There are no foreign keys from chat_agents or chats because those
-// columns may reference in-memory builtin personas and agents; the API
-// layer blocks deletion while non-deleted agents reference the persona.
+// Soft delete keeps the row so historical references stay resolvable
+// and the foreign keys from chat_agents and chats remain satisfied.
+// The API layer blocks deletion while non-deleted agents reference the
+// persona.
 func (q *sqlQuerier) UpdateChatPersonaDeletedByID(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.ExecContext(ctx, updateChatPersonaDeletedByID, id)
+	return err
+}
+
+const upsertBuiltinChatPersona = `-- name: UpsertBuiltinChatPersona :exec
+INSERT INTO chat_personas (
+    id,
+    organization_id,
+    slug,
+    name,
+    description,
+    icon,
+    system_prompt,
+    model_config_id,
+    enabled,
+    deleted,
+    builtin,
+    created_by
+)
+VALUES (
+    $1,
+    NULL,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6,
+    NULL,
+    TRUE,
+    FALSE,
+    TRUE,
+    NULL
+)
+ON CONFLICT (id) DO UPDATE SET
+    slug = EXCLUDED.slug,
+    name = EXCLUDED.name,
+    description = EXCLUDED.description,
+    icon = EXCLUDED.icon,
+    system_prompt = EXCLUDED.system_prompt,
+    enabled = TRUE,
+    deleted = FALSE,
+    builtin = TRUE,
+    updated_at = now()
+`
+
+type UpsertBuiltinChatPersonaParams struct {
+	ID           uuid.UUID `db:"id" json:"id"`
+	Slug         string    `db:"slug" json:"slug"`
+	Name         string    `db:"name" json:"name"`
+	Description  string    `db:"description" json:"description"`
+	Icon         string    `db:"icon" json:"icon"`
+	SystemPrompt string    `db:"system_prompt" json:"system_prompt"`
+}
+
+// Seeds or refreshes a builtin persona row at coderd startup. Builtin
+// rows carry the canonical in-repo values, are always enabled and
+// undeleted, and have no creator.
+func (q *sqlQuerier) UpsertBuiltinChatPersona(ctx context.Context, arg UpsertBuiltinChatPersonaParams) error {
+	_, err := q.db.ExecContext(ctx, upsertBuiltinChatPersona,
+		arg.ID,
+		arg.Slug,
+		arg.Name,
+		arg.Description,
+		arg.Icon,
+		arg.SystemPrompt,
+	)
 	return err
 }
 

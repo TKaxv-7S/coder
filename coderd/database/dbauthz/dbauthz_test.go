@@ -1325,6 +1325,16 @@ func (s *MethodTestSuite) TestChats() {
 		dbm.EXPECT().CountChatAgentsByPersonaID(gomock.Any(), personaID).Return(int64(1), nil).AnyTimes()
 		check.Args(personaID).Asserts(rbac.ResourceChatAgent, policy.ActionRead).Returns(int64(1))
 	}))
+	s.Run("UpsertBuiltinChatPersona", s.Mocked(func(dbm *dbmock.MockStore, faker *gofakeit.Faker, check *expects) {
+		arg := testutil.Fake(s.T(), faker, database.UpsertBuiltinChatPersonaParams{})
+		dbm.EXPECT().UpsertBuiltinChatPersona(gomock.Any(), arg).Return(nil).AnyTimes()
+		check.Args(arg).Asserts(rbac.ResourceSystem, policy.ActionUpdate).Returns()
+	}))
+	s.Run("UpsertBuiltinChatAgent", s.Mocked(func(dbm *dbmock.MockStore, faker *gofakeit.Faker, check *expects) {
+		arg := testutil.Fake(s.T(), faker, database.UpsertBuiltinChatAgentParams{})
+		dbm.EXPECT().UpsertBuiltinChatAgent(gomock.Any(), arg).Return(nil).AnyTimes()
+		check.Args(arg).Asserts(rbac.ResourceSystem, policy.ActionUpdate).Returns()
+	}))
 	s.Run("GetChatAgentsByIDs", s.Mocked(func(dbm *dbmock.MockStore, faker *gofakeit.Faker, check *expects) {
 		a1 := testutil.Fake(s.T(), faker, database.ChatAgent{})
 		a2 := testutil.Fake(s.T(), faker, database.ChatAgent{})

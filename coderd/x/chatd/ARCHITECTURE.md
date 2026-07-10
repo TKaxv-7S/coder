@@ -1244,11 +1244,12 @@ The loop should not terminate just because:
 
 Personas bundle a system prompt with an optional preferred model. Agents
 point at a persona and optionally append prompt text or override the
-model. Both come in three tiers: builtin (in-memory catalog entries with
-fixed UUIDs in `builtin_agents.go`, always enabled, never mutable),
-deployment-scoped database rows, and organization-scoped database rows.
-Chats record the agent they were created as in `chats.chat_agent_id`,
-which has no foreign key because builtin agents are not database rows.
+model. Both come in three tiers: builtin (deployment-scoped rows with
+fixed UUIDs, seeded and refreshed at coderd startup by
+`SeedBuiltinChatCatalog` in `builtin_agents.go`, always enabled, never
+mutable through the API), deployment-scoped rows, and
+organization-scoped rows.
+Chats record the agent they were created as in `chats.chat_agent_id`.
 
 Personas and agents hook into the pipeline in three places:
 

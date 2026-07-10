@@ -4,15 +4,17 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"golang.org/x/xerrors"
 
 	"github.com/coder/coder/v2/coderd/database"
 )
 
-// Builtin chat personas and agents are in-memory catalog entries with
-// fixed well-known IDs. They are not stored in the database, are always
-// enabled, and can never be updated or deleted. Deployment and
-// organization entries live in the database and are managed through the
-// chat persona and agent APIs.
+// Builtin chat personas and agents are deployment-scoped database rows
+// with fixed well-known IDs, seeded (and refreshed) at coderd startup
+// from the in-repo catalog below. They are always enabled and can never
+// be updated or deleted through the API. Deployment and organization
+// entries created by admins live alongside them and are managed through
+// the chat persona and agent APIs.
 var (
 	BuiltinChatPersonaSWEID              = uuid.MustParse("c0defade-0000-4000-8000-000000000001")
 	BuiltinChatPersonaGeneralAssistantID = uuid.MustParse("c0defade-0000-4000-8000-000000000002")
@@ -27,94 +29,94 @@ const builtinGeneralAssistantSystemPrompt = `You are a helpful general-purpose a
 
 const builtinCodeReviewerSystemPrompt = `You are a careful code reviewer running inside the Coder product. Review code changes for correctness, security issues, performance problems, and maintainability. Read the surrounding code before judging a change, point at specific lines when raising an issue, explain why each issue matters, and suggest concrete fixes. Distinguish blocking defects from optional style suggestions, and do not invent issues when a change is sound.`
 
-// BuiltinChatPersonas returns the builtin persona rows. A fresh slice
-// of fresh values is returned on every call so callers can safely
-// mutate the results.
-func BuiltinChatPersonas() []database.ChatPersona {
-	return []database.ChatPersona{
+// builtinChatPersonaSeeds returns the canonical builtin persona rows.
+// SeedBuiltinChatCatalog upserts these at startup so prompt changes
+// ship with new releases.
+func builtinChatPersonaSeeds() []database.UpsertBuiltinChatPersonaParams {
+	return []database.UpsertBuiltinChatPersonaParams{
 		{
 			ID:           BuiltinChatPersonaSWEID,
 			Slug:         "swe",
 			Name:         "Software Engineer",
 			Description:  "The default software-engineering persona used by the Coder agent.",
+			Icon:         "",
 			SystemPrompt: DefaultSystemPrompt,
-			Enabled:      true,
 		},
 		{
 			ID:           BuiltinChatPersonaGeneralAssistantID,
 			Slug:         "general-assistant",
 			Name:         "General Assistant",
 			Description:  "A general-purpose assistant for questions, research, and writing.",
+			Icon:         "",
 			SystemPrompt: builtinGeneralAssistantSystemPrompt,
-			Enabled:      true,
 		},
 		{
 			ID:           BuiltinChatPersonaCodeReviewerID,
 			Slug:         "code-reviewer",
 			Name:         "Code Reviewer",
 			Description:  "Reviews code changes for correctness, security, and maintainability.",
+			Icon:         "",
 			SystemPrompt: builtinCodeReviewerSystemPrompt,
-			Enabled:      true,
 		},
 	}
 }
 
-// BuiltinChatAgents returns the builtin agent rows. A fresh slice of
-// fresh values is returned on every call so callers can safely mutate
-// the results.
-func BuiltinChatAgents() []database.ChatAgent {
-	return []database.ChatAgent{
+// builtinChatAgentSeeds returns the canonical builtin agent rows.
+func builtinChatAgentSeeds() []database.UpsertBuiltinChatAgentParams {
+	return []database.UpsertBuiltinChatAgentParams{
 		{
-			ID:          BuiltinChatAgentCoderID,
-			Slug:        "coder",
-			Name:        "Coder",
-			Description: "The default Coder software-engineering agent.",
-			PersonaID:   BuiltinChatPersonaSWEID,
-			Enabled:     true,
+			ID:           BuiltinChatAgentCoderID,
+			Slug:         "coder",
+			Name:         "Coder",
+			Description:  "The default Coder software-engineering agent.",
+			Icon:         "",
+			PersonaID:    BuiltinChatPersonaSWEID,
+			PromptAppend: "",
 		},
 		{
-			ID:          BuiltinChatAgentAssistantID,
-			Slug:        "assistant",
-			Name:        "Assistant",
-			Description: "A general-purpose assistant.",
-			PersonaID:   BuiltinChatPersonaGeneralAssistantID,
-			Enabled:     true,
+			ID:           BuiltinChatAgentAssistantID,
+			Slug:         "assistant",
+			Name:         "Assistant",
+			Description:  "A general-purpose assistant.",
+			Icon:         "",
+			PersonaID:    BuiltinChatPersonaGeneralAssistantID,
+			PromptAppend: "",
 		},
 		{
-			ID:          BuiltinChatAgentReviewerID,
-			Slug:        "reviewer",
-			Name:        "Reviewer",
-			Description: "Reviews code changes.",
-			PersonaID:   BuiltinChatPersonaCodeReviewerID,
-			Enabled:     true,
+			ID:           BuiltinChatAgentReviewerID,
+			Slug:         "reviewer",
+			Name:         "Reviewer",
+			Description:  "Reviews code changes.",
+			Icon:         "",
+			PersonaID:    BuiltinChatPersonaCodeReviewerID,
+			PromptAppend: "",
 		},
 	}
 }
 
-// BuiltinChatPersonaByID returns the builtin persona with the given ID.
-func BuiltinChatPersonaByID(id uuid.UUID) (database.ChatPersona, bool) {
-	for _, persona := range BuiltinChatPersonas() {
-		if persona.ID == id {
-			return persona, true
+// SeedBuiltinChatCatalog upserts the builtin personas and agents into
+// the database, refreshing their canonical values. It runs at coderd
+// startup and is idempotent. Personas seed before agents so the
+// persona_id foreign key is always satisfied.
+func SeedBuiltinChatCatalog(ctx context.Context, db database.Store) error {
+	for _, persona := range builtinChatPersonaSeeds() {
+		if err := db.UpsertBuiltinChatPersona(ctx, persona); err != nil {
+			return xerrors.Errorf("seed builtin chat persona %q: %w", persona.Slug, err)
 		}
 	}
-	return database.ChatPersona{}, false
-}
-
-// BuiltinChatAgentByID returns the builtin agent with the given ID.
-func BuiltinChatAgentByID(id uuid.UUID) (database.ChatAgent, bool) {
-	for _, agent := range BuiltinChatAgents() {
-		if agent.ID == id {
-			return agent, true
+	for _, agent := range builtinChatAgentSeeds() {
+		if err := db.UpsertBuiltinChatAgent(ctx, agent); err != nil {
+			return xerrors.Errorf("seed builtin chat agent %q: %w", agent.Slug, err)
 		}
 	}
-	return database.ChatAgent{}, false
+	return nil
 }
 
 // IsBuiltinChatPersonaSlug reports whether the slug is reserved by a
-// builtin persona.
+// builtin persona. Reservation applies across scopes so organization
+// entries cannot shadow builtins.
 func IsBuiltinChatPersonaSlug(slug string) bool {
-	for _, persona := range BuiltinChatPersonas() {
+	for _, persona := range builtinChatPersonaSeeds() {
 		if persona.Slug == slug {
 			return true
 		}
@@ -123,40 +125,13 @@ func IsBuiltinChatPersonaSlug(slug string) bool {
 }
 
 // IsBuiltinChatAgentSlug reports whether the slug is reserved by a
-// builtin agent.
+// builtin agent. Reservation applies across scopes so organization
+// entries cannot shadow builtins.
 func IsBuiltinChatAgentSlug(slug string) bool {
-	for _, agent := range BuiltinChatAgents() {
+	for _, agent := range builtinChatAgentSeeds() {
 		if agent.Slug == slug {
 			return true
 		}
 	}
 	return false
-}
-
-// ResolveChatPersona returns the persona with the given ID, checking
-// builtins first and falling back to the database. The returned bool
-// reports whether the persona is builtin.
-func ResolveChatPersona(ctx context.Context, db database.Store, id uuid.UUID) (database.ChatPersona, bool, error) {
-	if persona, ok := BuiltinChatPersonaByID(id); ok {
-		return persona, true, nil
-	}
-	persona, err := db.GetChatPersonaByID(ctx, id)
-	if err != nil {
-		return database.ChatPersona{}, false, err
-	}
-	return persona, false, nil
-}
-
-// ResolveChatAgent returns the agent with the given ID, checking
-// builtins first and falling back to the database. The returned bool
-// reports whether the agent is builtin.
-func ResolveChatAgent(ctx context.Context, db database.Store, id uuid.UUID) (database.ChatAgent, bool, error) {
-	if agent, ok := BuiltinChatAgentByID(id); ok {
-		return agent, true, nil
-	}
-	agent, err := db.GetChatAgentByID(ctx, id)
-	if err != nil {
-		return database.ChatAgent{}, false, err
-	}
-	return agent, false, nil
 }

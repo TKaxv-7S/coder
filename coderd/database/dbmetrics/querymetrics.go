@@ -6225,6 +6225,22 @@ func (m queryMetricsStore) UpsertBoundaryUsageStats(ctx context.Context, arg dat
 	return r0, r1
 }
 
+func (m queryMetricsStore) UpsertBuiltinChatAgent(ctx context.Context, arg database.UpsertBuiltinChatAgentParams) error {
+	start := time.Now()
+	r0 := m.s.UpsertBuiltinChatAgent(ctx, arg)
+	m.queryLatencies.WithLabelValues("UpsertBuiltinChatAgent").Observe(time.Since(start).Seconds())
+	m.queryCounts.WithLabelValues(httpmw.ExtractHTTPRoute(ctx), httpmw.ExtractHTTPMethod(ctx), "UpsertBuiltinChatAgent").Inc()
+	return r0
+}
+
+func (m queryMetricsStore) UpsertBuiltinChatPersona(ctx context.Context, arg database.UpsertBuiltinChatPersonaParams) error {
+	start := time.Now()
+	r0 := m.s.UpsertBuiltinChatPersona(ctx, arg)
+	m.queryLatencies.WithLabelValues("UpsertBuiltinChatPersona").Observe(time.Since(start).Seconds())
+	m.queryCounts.WithLabelValues(httpmw.ExtractHTTPRoute(ctx), httpmw.ExtractHTTPMethod(ctx), "UpsertBuiltinChatPersona").Inc()
+	return r0
+}
+
 func (m queryMetricsStore) UpsertChatAdvisorConfig(ctx context.Context, value string) error {
 	start := time.Now()
 	r0 := m.s.UpsertChatAdvisorConfig(ctx, value)

@@ -629,6 +629,13 @@ func New(options *Options) *API {
 		options.Logger.Error(ctx, "failed to seed AI Gateway prices; cost tracking may use stale prices", slog.Error(err))
 	}
 
+	// Seed the builtin chat personas and agents so chat creation and
+	// the persona/agent APIs always have the builtin catalog available.
+	//nolint:gocritic // Startup seeder writes system-owned builtin rows.
+	if err := chatd.SeedBuiltinChatCatalog(dbauthz.AsSystemRestricted(ctx), options.Database); err != nil {
+		options.Logger.Error(ctx, "failed to seed builtin chat personas and agents", slog.Error(err))
+	}
+
 	// AGPL uses a no-op build usage checker as there are no license
 	// entitlements to enforce. This is swapped out in
 	// enterprise/coderd/coderd.go.

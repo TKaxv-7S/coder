@@ -1,5 +1,8 @@
 -- Chat personas bundle a system prompt with a preferred model. A NULL
--- organization_id means the persona is deployment-scoped.
+-- organization_id means the persona is deployment-scoped. Builtin
+-- personas are deployment-scoped rows seeded (and refreshed) at coderd
+-- startup from the in-repo catalog; they have no creator and cannot be
+-- modified or deleted through the API.
 CREATE TABLE chat_personas (
     id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID        REFERENCES organizations(id) ON DELETE CASCADE,
@@ -11,13 +14,16 @@ CREATE TABLE chat_personas (
     model_config_id UUID        REFERENCES chat_model_configs(id),
     enabled         BOOLEAN     NOT NULL DEFAULT TRUE,
     deleted         BOOLEAN     NOT NULL DEFAULT FALSE,
-    created_by      UUID        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    builtin         BOOLEAN     NOT NULL DEFAULT FALSE,
+    created_by      UUID        REFERENCES users(id) ON DELETE RESTRICT,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 COMMENT ON COLUMN chat_personas.organization_id IS 'NULL means the persona is deployment-scoped; otherwise it belongs to the organization.';
 COMMENT ON COLUMN chat_personas.model_config_id IS 'Preferred model for chats created with this persona. NULL falls back to the default model resolution.';
+COMMENT ON COLUMN chat_personas.builtin IS 'Builtin rows are seeded at startup from the in-repo catalog and are immutable through the API.';
+COMMENT ON COLUMN chat_personas.created_by IS 'NULL for builtin rows seeded at startup.';
 
 -- Slugs are unique per scope among non-deleted rows. Deployment scope
 -- (NULL organization_id) needs its own index because NULLs are
@@ -30,11 +36,9 @@ CREATE UNIQUE INDEX idx_chat_personas_deployment_slug
     WHERE NOT deleted AND organization_id IS NULL;
 
 -- Chat agents are named invocable entries that point at a persona and
--- optionally append to its prompt or override its model. persona_id has
--- no foreign key because agents may reference in-memory builtin
--- personas that are not database rows; referential validation for
--- database personas happens at the API layer, which also blocks persona
--- deletion while non-deleted agents reference it.
+-- optionally append to its prompt or override its model. Builtin
+-- agents are deployment-scoped rows seeded at coderd startup, like
+-- builtin personas.
 CREATE TABLE chat_agents (
     id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID        REFERENCES organizations(id) ON DELETE CASCADE,
@@ -42,20 +46,23 @@ CREATE TABLE chat_agents (
     name            TEXT        NOT NULL,
     description     TEXT        NOT NULL DEFAULT '',
     icon            TEXT        NOT NULL DEFAULT '',
-    persona_id      UUID        NOT NULL,
+    persona_id      UUID        NOT NULL REFERENCES chat_personas(id),
     prompt_append   TEXT        NOT NULL DEFAULT '',
     model_config_id UUID        REFERENCES chat_model_configs(id),
     enabled         BOOLEAN     NOT NULL DEFAULT TRUE,
     deleted         BOOLEAN     NOT NULL DEFAULT FALSE,
-    created_by      UUID        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    builtin         BOOLEAN     NOT NULL DEFAULT FALSE,
+    created_by      UUID        REFERENCES users(id) ON DELETE RESTRICT,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 COMMENT ON COLUMN chat_agents.organization_id IS 'NULL means the agent is deployment-scoped; otherwise it belongs to the organization.';
-COMMENT ON COLUMN chat_agents.persona_id IS 'The persona supplying the base system prompt for chats created with this agent. May reference an in-memory builtin persona, so no foreign key exists.';
+COMMENT ON COLUMN chat_agents.persona_id IS 'The persona supplying the base system prompt for chats created with this agent.';
 COMMENT ON COLUMN chat_agents.prompt_append IS 'Additional system prompt text appended after the persona prompt.';
 COMMENT ON COLUMN chat_agents.model_config_id IS 'Overrides the persona model preference when set.';
+COMMENT ON COLUMN chat_agents.builtin IS 'Builtin rows are seeded at startup from the in-repo catalog and are immutable through the API.';
+COMMENT ON COLUMN chat_agents.created_by IS 'NULL for builtin rows seeded at startup.';
 
 CREATE UNIQUE INDEX idx_chat_agents_org_slug
     ON chat_agents (organization_id, slug)
@@ -69,12 +76,10 @@ CREATE UNIQUE INDEX idx_chat_agents_deployment_slug
 DROP VIEW IF EXISTS chats_expanded;
 
 -- The existing chats.agent_id column is the workspace agent, so the
--- chat agent reference uses a distinct name. It has no foreign key
--- because chats may reference in-memory builtin agents that are not
--- database rows.
-ALTER TABLE chats ADD COLUMN chat_agent_id UUID;
+-- chat agent reference uses a distinct name.
+ALTER TABLE chats ADD COLUMN chat_agent_id UUID REFERENCES chat_agents(id);
 
-COMMENT ON COLUMN chats.chat_agent_id IS 'The chat agent the chat was created as, if any. Distinct from agent_id, which is the workspace agent. May reference an in-memory builtin agent, so no foreign key exists.';
+COMMENT ON COLUMN chats.chat_agent_id IS 'The chat agent the chat was created as, if any. Distinct from agent_id, which is the workspace agent.';
 
 CREATE VIEW chats_expanded AS
  SELECT c.id,

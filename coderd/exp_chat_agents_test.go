@@ -59,17 +59,17 @@ func TestListChatPersonas(t *testing.T) {
 		otherOrg := dbgen.Organization(t, db, database.Organization{})
 		deploymentPersona := dbgen.ChatPersona(t, db, database.ChatPersona{
 			Slug:      "deployment-persona",
-			CreatedBy: owner.UserID,
+			CreatedBy: uuid.NullUUID{UUID: owner.UserID, Valid: true},
 		})
 		orgPersona := dbgen.ChatPersona(t, db, database.ChatPersona{
 			OrganizationID: uuid.NullUUID{UUID: owner.OrganizationID, Valid: true},
 			Slug:           "org-persona",
-			CreatedBy:      owner.UserID,
+			CreatedBy:      uuid.NullUUID{UUID: owner.UserID, Valid: true},
 		})
 		otherOrgPersona := dbgen.ChatPersona(t, db, database.ChatPersona{
 			OrganizationID: uuid.NullUUID{UUID: otherOrg.ID, Valid: true},
 			Slug:           "other-org-persona",
-			CreatedBy:      owner.UserID,
+			CreatedBy:      uuid.NullUUID{UUID: owner.UserID, Valid: true},
 		})
 
 		// Without an organization filter, only builtins and
@@ -158,17 +158,17 @@ func TestListChatAgents(t *testing.T) {
 		otherOrg := dbgen.Organization(t, db, database.Organization{})
 		deploymentAgent := dbgen.ChatAgent(t, db, database.ChatAgent{
 			Slug:      "deployment-agent",
-			CreatedBy: owner.UserID,
+			CreatedBy: uuid.NullUUID{UUID: owner.UserID, Valid: true},
 		})
 		orgAgent := dbgen.ChatAgent(t, db, database.ChatAgent{
 			OrganizationID: uuid.NullUUID{UUID: owner.OrganizationID, Valid: true},
 			Slug:           "org-agent",
-			CreatedBy:      owner.UserID,
+			CreatedBy:      uuid.NullUUID{UUID: owner.UserID, Valid: true},
 		})
 		otherOrgAgent := dbgen.ChatAgent(t, db, database.ChatAgent{
 			OrganizationID: uuid.NullUUID{UUID: otherOrg.ID, Valid: true},
 			Slug:           "other-org-agent",
-			CreatedBy:      owner.UserID,
+			CreatedBy:      uuid.NullUUID{UUID: owner.UserID, Valid: true},
 		})
 
 		agents, err := exp.ChatAgents(ctx, uuid.Nil)

@@ -1707,8 +1707,8 @@ export interface ChatAgent {
 // From codersdk/chatagents.go
 /**
  * ChatAgentSummary identifies the chat agent a chat was created as,
- * for display attribution. Builtin reports whether the agent is an
- * in-memory builtin catalog entry rather than a database row.
+ * for display attribution. Builtin reports whether the agent is a
+ * seeded builtin catalog entry.
  */
 export interface ChatAgentSummary {
 	readonly id: string;
@@ -2873,8 +2873,8 @@ export interface ChatModelsResponse {
 // From codersdk/chatagents.go
 /**
  * ChatPersona bundles a system prompt with a preferred model. Builtin
- * personas are served from an in-memory catalog; deployment and
- * organization personas are stored in the database. A nil
+ * personas are seeded at coderd startup and are immutable; deployment
+ * and organization personas are managed by admins. A nil
  * OrganizationID means the persona is deployment-scoped.
  */
 export interface ChatPersona {

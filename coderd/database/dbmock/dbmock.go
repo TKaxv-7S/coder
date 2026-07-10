@@ -11664,6 +11664,34 @@ func (mr *MockStoreMockRecorder) UpsertBoundaryUsageStats(ctx, arg any) *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpsertBoundaryUsageStats", reflect.TypeOf((*MockStore)(nil).UpsertBoundaryUsageStats), ctx, arg)
 }
 
+// UpsertBuiltinChatAgent mocks base method.
+func (m *MockStore) UpsertBuiltinChatAgent(ctx context.Context, arg database.UpsertBuiltinChatAgentParams) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpsertBuiltinChatAgent", ctx, arg)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpsertBuiltinChatAgent indicates an expected call of UpsertBuiltinChatAgent.
+func (mr *MockStoreMockRecorder) UpsertBuiltinChatAgent(ctx, arg any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpsertBuiltinChatAgent", reflect.TypeOf((*MockStore)(nil).UpsertBuiltinChatAgent), ctx, arg)
+}
+
+// UpsertBuiltinChatPersona mocks base method.
+func (m *MockStore) UpsertBuiltinChatPersona(ctx context.Context, arg database.UpsertBuiltinChatPersonaParams) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpsertBuiltinChatPersona", ctx, arg)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpsertBuiltinChatPersona indicates an expected call of UpsertBuiltinChatPersona.
+func (mr *MockStoreMockRecorder) UpsertBuiltinChatPersona(ctx, arg any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpsertBuiltinChatPersona", reflect.TypeOf((*MockStore)(nil).UpsertBuiltinChatPersona), ctx, arg)
+}
+
 // UpsertChatAdvisorConfig mocks base method.
 func (m *MockStore) UpsertChatAdvisorConfig(ctx context.Context, value string) error {
 	m.ctrl.T.Helper()

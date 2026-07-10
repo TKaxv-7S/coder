@@ -113,8 +113,8 @@ func ChatPersona(t testing.TB, db database.Store, seed database.ChatPersona, mun
 	t.Helper()
 
 	createdBy := seed.CreatedBy
-	if createdBy == uuid.Nil {
-		createdBy = User(t, db, database.User{}).ID
+	if !createdBy.Valid {
+		createdBy = uuid.NullUUID{UUID: User(t, db, database.User{}).ID, Valid: true}
 	}
 	params := database.InsertChatPersonaParams{
 		OrganizationID: seed.OrganizationID,
@@ -139,8 +139,8 @@ func ChatAgent(t testing.TB, db database.Store, seed database.ChatAgent, munge .
 	t.Helper()
 
 	createdBy := seed.CreatedBy
-	if createdBy == uuid.Nil {
-		createdBy = User(t, db, database.User{}).ID
+	if !createdBy.Valid {
+		createdBy = uuid.NullUUID{UUID: User(t, db, database.User{}).ID, Valid: true}
 	}
 	personaID := seed.PersonaID
 	if personaID == uuid.Nil {

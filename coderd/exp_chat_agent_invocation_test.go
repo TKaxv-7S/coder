@@ -68,7 +68,7 @@ func TestCreateChatWithAgent(t *testing.T) {
 			OrganizationID: uuid.NullUUID{UUID: firstUser.OrganizationID, Valid: true},
 			Slug:           "invoke-persona",
 			SystemPrompt:   "You are the invocation test persona.",
-			CreatedBy:      firstUser.UserID,
+			CreatedBy:      uuid.NullUUID{UUID: firstUser.UserID, Valid: true},
 		})
 		agent := dbgen.ChatAgent(t, db, database.ChatAgent{
 			OrganizationID: uuid.NullUUID{UUID: firstUser.OrganizationID, Valid: true},
@@ -77,7 +77,7 @@ func TestCreateChatWithAgent(t *testing.T) {
 			Icon:           "/emojis/1f916.png",
 			PersonaID:      persona.ID,
 			PromptAppend:   "Answer briefly.",
-			CreatedBy:      firstUser.UserID,
+			CreatedBy:      uuid.NullUUID{UUID: firstUser.UserID, Valid: true},
 		})
 
 		chat, err := client.CreateChat(ctx, codersdk.CreateChatRequest{
@@ -116,11 +116,11 @@ func TestCreateChatWithAgent(t *testing.T) {
 		foreignAgent := dbgen.ChatAgent(t, db, database.ChatAgent{
 			OrganizationID: uuid.NullUUID{UUID: otherOrg.ID, Valid: true},
 			Slug:           "foreign-invoke-agent",
-			CreatedBy:      firstUser.UserID,
+			CreatedBy:      uuid.NullUUID{UUID: firstUser.UserID, Valid: true},
 		})
 		disabledAgent := dbgen.ChatAgent(t, db, database.ChatAgent{
 			Slug:      "disabled-invoke-agent",
-			CreatedBy: firstUser.UserID,
+			CreatedBy: uuid.NullUUID{UUID: firstUser.UserID, Valid: true},
 		}, func(params *database.InsertChatAgentParams) {
 			params.Enabled = false
 		})
@@ -129,23 +129,23 @@ func TestCreateChatWithAgent(t *testing.T) {
 		// was created must be rejected at invocation time.
 		disabledPersona := dbgen.ChatPersona(t, db, database.ChatPersona{
 			Slug:      "disabled-invoke-persona",
-			CreatedBy: firstUser.UserID,
+			CreatedBy: uuid.NullUUID{UUID: firstUser.UserID, Valid: true},
 		}, func(params *database.InsertChatPersonaParams) {
 			params.Enabled = false
 		})
 		agentWithDisabledPersona := dbgen.ChatAgent(t, db, database.ChatAgent{
 			Slug:      "disabled-persona-invoke-agent",
 			PersonaID: disabledPersona.ID,
-			CreatedBy: firstUser.UserID,
+			CreatedBy: uuid.NullUUID{UUID: firstUser.UserID, Valid: true},
 		})
 		deletedPersona := dbgen.ChatPersona(t, db, database.ChatPersona{
 			Slug:      "deleted-invoke-persona",
-			CreatedBy: firstUser.UserID,
+			CreatedBy: uuid.NullUUID{UUID: firstUser.UserID, Valid: true},
 		})
 		agentWithDeletedPersona := dbgen.ChatAgent(t, db, database.ChatAgent{
 			Slug:      "deleted-persona-invoke-agent",
 			PersonaID: deletedPersona.ID,
-			CreatedBy: firstUser.UserID,
+			CreatedBy: uuid.NullUUID{UUID: firstUser.UserID, Valid: true},
 		})
 		require.NoError(t, db.UpdateChatPersonaDeletedByID(ownerCtx(ctx), deletedPersona.ID))
 
@@ -186,7 +186,7 @@ func TestCreateChatWithAgent(t *testing.T) {
 			Slug:      "deleted-attribution-agent",
 			Name:      "Deleted Attribution Agent",
 			Icon:      "/emojis/1f916.png",
-			CreatedBy: firstUser.UserID,
+			CreatedBy: uuid.NullUUID{UUID: firstUser.UserID, Valid: true},
 		})
 		chat, err := client.CreateChat(ctx, codersdk.CreateChatRequest{
 			OrganizationID: firstUser.OrganizationID,
@@ -256,13 +256,13 @@ func TestCreateChatWithAgent(t *testing.T) {
 		persona := dbgen.ChatPersona(t, db, database.ChatPersona{
 			Slug:          "precedence-persona",
 			ModelConfigID: uuid.NullUUID{UUID: personaModel.ID, Valid: true},
-			CreatedBy:     firstUser.UserID,
+			CreatedBy:     uuid.NullUUID{UUID: firstUser.UserID, Valid: true},
 		})
 		agent := dbgen.ChatAgent(t, db, database.ChatAgent{
 			Slug:          "precedence-agent",
 			PersonaID:     persona.ID,
 			ModelConfigID: uuid.NullUUID{UUID: overrideModel.ID, Valid: true},
-			CreatedBy:     firstUser.UserID,
+			CreatedBy:     uuid.NullUUID{UUID: firstUser.UserID, Valid: true},
 		})
 
 		// The agent's model preference wins over the persona's and the

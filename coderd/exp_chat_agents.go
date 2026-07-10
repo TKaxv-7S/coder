@@ -40,7 +40,7 @@ const (
 	chatCatalogPromptMaxLen      = 32768
 )
 
-func convertChatPersona(persona database.ChatPersona, builtin bool) codersdk.ChatPersona {
+func convertChatPersona(persona database.ChatPersona) codersdk.ChatPersona {
 	out := codersdk.ChatPersona{
 		ID:           persona.ID,
 		Slug:         persona.Slug,
@@ -48,7 +48,7 @@ func convertChatPersona(persona database.ChatPersona, builtin bool) codersdk.Cha
 		Description:  persona.Description,
 		Icon:         persona.Icon,
 		SystemPrompt: persona.SystemPrompt,
-		Builtin:      builtin,
+		Builtin:      persona.Builtin,
 		Enabled:      persona.Enabled,
 		CreatedAt:    persona.CreatedAt,
 		UpdatedAt:    persona.UpdatedAt,
@@ -62,7 +62,7 @@ func convertChatPersona(persona database.ChatPersona, builtin bool) codersdk.Cha
 	return out
 }
 
-func convertChatAgent(agent database.ChatAgent, builtin bool) codersdk.ChatAgent {
+func convertChatAgent(agent database.ChatAgent) codersdk.ChatAgent {
 	out := codersdk.ChatAgent{
 		ID:           agent.ID,
 		Slug:         agent.Slug,
@@ -71,7 +71,7 @@ func convertChatAgent(agent database.ChatAgent, builtin bool) codersdk.ChatAgent
 		Icon:         agent.Icon,
 		PersonaID:    agent.PersonaID,
 		PromptAppend: agent.PromptAppend,
-		Builtin:      builtin,
+		Builtin:      agent.Builtin,
 		Enabled:      agent.Enabled,
 		CreatedAt:    agent.CreatedAt,
 		UpdatedAt:    agent.UpdatedAt,
@@ -178,7 +178,7 @@ func (api *API) validateChatCatalogModelConfigID(rw http.ResponseWriter, r *http
 // and returns false when the reference is invalid.
 func (api *API) validateChatAgentPersona(rw http.ResponseWriter, r *http.Request, personaID uuid.UUID, agentOrgID uuid.NullUUID) bool {
 	ctx := r.Context()
-	persona, _, err := chatd.ResolveChatPersona(ctx, api.Database, personaID)
+	persona, err := api.Database.GetChatPersonaByID(ctx, personaID)
 	if err != nil {
 		if httpapi.Is404Error(err) {
 			httpapi.Write(ctx, rw, http.StatusBadRequest, codersdk.Response{
@@ -233,13 +233,11 @@ func (api *API) listChatPersonas(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	builtins := chatd.BuiltinChatPersonas()
-	resp := make([]codersdk.ChatPersona, 0, len(builtins)+len(rows))
-	for _, persona := range builtins {
-		resp = append(resp, convertChatPersona(persona, true))
-	}
+	// Builtin rows are part of the result set: they are seeded as
+	// deployment-scoped rows at startup.
+	resp := make([]codersdk.ChatPersona, 0, len(rows))
 	for _, persona := range rows {
-		resp = append(resp, convertChatPersona(persona, false))
+		resp = append(resp, convertChatPersona(persona))
 	}
 	httpapi.Write(ctx, rw, http.StatusOK, resp)
 }
@@ -269,13 +267,11 @@ func (api *API) listChatAgents(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	builtins := chatd.BuiltinChatAgents()
-	resp := make([]codersdk.ChatAgent, 0, len(builtins)+len(rows))
-	for _, agent := range builtins {
-		resp = append(resp, convertChatAgent(agent, true))
-	}
+	// Builtin rows are part of the result set: they are seeded as
+	// deployment-scoped rows at startup.
+	resp := make([]codersdk.ChatAgent, 0, len(rows))
 	for _, agent := range rows {
-		resp = append(resp, convertChatAgent(agent, false))
+		resp = append(resp, convertChatAgent(agent))
 	}
 	httpapi.Write(ctx, rw, http.StatusOK, resp)
 }
@@ -375,7 +371,7 @@ func (api *API) CreateChatPersona(rw http.ResponseWriter, r *http.Request) {
 		SystemPrompt:   req.SystemPrompt,
 		ModelConfigID:  modelConfigID,
 		Enabled:        enabled,
-		CreatedBy:      apiKey.UserID,
+		CreatedBy:      uuid.NullUUID{UUID: apiKey.UserID, Valid: true},
 	})
 	if err != nil {
 		switch {
@@ -400,7 +396,7 @@ func (api *API) CreateChatPersona(rw http.ResponseWriter, r *http.Request) {
 	}
 	aReq.New = persona
 
-	httpapi.Write(ctx, rw, http.StatusCreated, convertChatPersona(persona, false))
+	httpapi.Write(ctx, rw, http.StatusCreated, convertChatPersona(persona))
 }
 
 // UpdateChatPersona is registered by enterprise coderd behind a
@@ -424,12 +420,6 @@ func (api *API) UpdateChatPersona(rw http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if _, builtin := chatd.BuiltinChatPersonaByID(personaID); builtin {
-		httpapi.Write(ctx, rw, http.StatusForbidden, codersdk.Response{
-			Message: "Builtin personas cannot be modified.",
-		})
-		return
-	}
 
 	var req codersdk.UpdateChatPersonaRequest
 	if !httpapi.Read(ctx, rw, r, &req) {
@@ -445,6 +435,12 @@ func (api *API) UpdateChatPersona(rw http.ResponseWriter, r *http.Request) {
 		httpapi.Write(ctx, rw, http.StatusInternalServerError, codersdk.Response{
 			Message: "Failed to get chat persona.",
 			Detail:  err.Error(),
+		})
+		return
+	}
+	if existing.Builtin {
+		httpapi.Write(ctx, rw, http.StatusForbidden, codersdk.Response{
+			Message: "Builtin personas cannot be modified.",
 		})
 		return
 	}
@@ -533,7 +529,7 @@ func (api *API) UpdateChatPersona(rw http.ResponseWriter, r *http.Request) {
 	}
 	aReq.New = updated
 
-	httpapi.Write(ctx, rw, http.StatusOK, convertChatPersona(updated, false))
+	httpapi.Write(ctx, rw, http.StatusOK, convertChatPersona(updated))
 }
 
 // DeleteChatPersona is registered by enterprise coderd behind a
@@ -554,12 +550,6 @@ func (api *API) DeleteChatPersona(rw http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if _, builtin := chatd.BuiltinChatPersonaByID(personaID); builtin {
-		httpapi.Write(ctx, rw, http.StatusForbidden, codersdk.Response{
-			Message: "Builtin personas cannot be deleted.",
-		})
-		return
-	}
 
 	existing, err := api.Database.GetChatPersonaByID(ctx, personaID)
 	if err != nil {
@@ -570,6 +560,12 @@ func (api *API) DeleteChatPersona(rw http.ResponseWriter, r *http.Request) {
 		httpapi.Write(ctx, rw, http.StatusInternalServerError, codersdk.Response{
 			Message: "Failed to get chat persona.",
 			Detail:  err.Error(),
+		})
+		return
+	}
+	if existing.Builtin {
+		httpapi.Write(ctx, rw, http.StatusForbidden, codersdk.Response{
+			Message: "Builtin personas cannot be deleted.",
 		})
 		return
 	}
@@ -584,10 +580,9 @@ func (api *API) DeleteChatPersona(rw http.ResponseWriter, r *http.Request) {
 	defer commitAudit()
 	aReq.Old = existing
 
-	// Personas have no foreign key from chat_agents (agents may
-	// reference in-memory builtin personas), so referential integrity
-	// is enforced here: deletion is blocked while non-deleted agents
-	// still reference the persona.
+	// Personas are soft-deleted, so the foreign key from chat_agents
+	// alone cannot protect enabled agents from losing their persona;
+	// deletion is blocked here while non-deleted agents reference it.
 	referencing, err := api.Database.CountChatAgentsByPersonaID(ctx, personaID)
 	if err != nil {
 		httpapi.Write(ctx, rw, http.StatusInternalServerError, codersdk.Response{
@@ -719,7 +714,7 @@ func (api *API) CreateChatAgent(rw http.ResponseWriter, r *http.Request) {
 		PromptAppend:   req.PromptAppend,
 		ModelConfigID:  modelConfigID,
 		Enabled:        enabled,
-		CreatedBy:      apiKey.UserID,
+		CreatedBy:      uuid.NullUUID{UUID: apiKey.UserID, Valid: true},
 	})
 	if err != nil {
 		switch {
@@ -744,7 +739,7 @@ func (api *API) CreateChatAgent(rw http.ResponseWriter, r *http.Request) {
 	}
 	aReq.New = agent
 
-	httpapi.Write(ctx, rw, http.StatusCreated, convertChatAgent(agent, false))
+	httpapi.Write(ctx, rw, http.StatusCreated, convertChatAgent(agent))
 }
 
 // UpdateChatAgent is registered by enterprise coderd behind a premium
@@ -768,12 +763,6 @@ func (api *API) UpdateChatAgent(rw http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if _, builtin := chatd.BuiltinChatAgentByID(agentID); builtin {
-		httpapi.Write(ctx, rw, http.StatusForbidden, codersdk.Response{
-			Message: "Builtin agents cannot be modified.",
-		})
-		return
-	}
 
 	var req codersdk.UpdateChatAgentRequest
 	if !httpapi.Read(ctx, rw, r, &req) {
@@ -789,6 +778,12 @@ func (api *API) UpdateChatAgent(rw http.ResponseWriter, r *http.Request) {
 		httpapi.Write(ctx, rw, http.StatusInternalServerError, codersdk.Response{
 			Message: "Failed to get chat agent.",
 			Detail:  err.Error(),
+		})
+		return
+	}
+	if existing.Builtin {
+		httpapi.Write(ctx, rw, http.StatusForbidden, codersdk.Response{
+			Message: "Builtin agents cannot be modified.",
 		})
 		return
 	}
@@ -884,7 +879,7 @@ func (api *API) UpdateChatAgent(rw http.ResponseWriter, r *http.Request) {
 	}
 	aReq.New = updated
 
-	httpapi.Write(ctx, rw, http.StatusOK, convertChatAgent(updated, false))
+	httpapi.Write(ctx, rw, http.StatusOK, convertChatAgent(updated))
 }
 
 // DeleteChatAgent is registered by enterprise coderd behind a premium
@@ -905,12 +900,6 @@ func (api *API) DeleteChatAgent(rw http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if _, builtin := chatd.BuiltinChatAgentByID(agentID); builtin {
-		httpapi.Write(ctx, rw, http.StatusForbidden, codersdk.Response{
-			Message: "Builtin agents cannot be deleted.",
-		})
-		return
-	}
 
 	existing, err := api.Database.GetChatAgentByID(ctx, agentID)
 	if err != nil {
@@ -921,6 +910,12 @@ func (api *API) DeleteChatAgent(rw http.ResponseWriter, r *http.Request) {
 		httpapi.Write(ctx, rw, http.StatusInternalServerError, codersdk.Response{
 			Message: "Failed to get chat agent.",
 			Detail:  err.Error(),
+		})
+		return
+	}
+	if existing.Builtin {
+		httpapi.Write(ctx, rw, http.StatusForbidden, codersdk.Response{
+			Message: "Builtin agents cannot be deleted.",
 		})
 		return
 	}
@@ -976,8 +971,8 @@ func parseChatAgentID(rw http.ResponseWriter, r *http.Request) (uuid.UUID, bool)
 }
 
 // resolveCreateChatAgent resolves the agent selected for chat creation
-// along with its persona. Builtins are checked first; database rows go
-// through the caller's dbauthz context so read access is enforced. The
+// along with its persona. Lookups go through the caller's dbauthz
+// context so read access is enforced. The
 // agent must be enabled and be builtin, deployment-scoped, or belong
 // to the chat's organization; its persona must be enabled and follow
 // the same scope rules.
@@ -986,7 +981,7 @@ func (api *API) resolveCreateChatAgent(
 	organizationID uuid.UUID,
 	agentID uuid.UUID,
 ) (database.ChatAgent, database.ChatPersona, int, *codersdk.Response) {
-	agent, _, err := chatd.ResolveChatAgent(ctx, api.Database, agentID)
+	agent, err := api.Database.GetChatAgentByID(ctx, agentID)
 	if err != nil {
 		if httpapi.Is404Error(err) {
 			return database.ChatAgent{}, database.ChatPersona{}, http.StatusBadRequest, &codersdk.Response{
@@ -1009,7 +1004,7 @@ func (api *API) resolveCreateChatAgent(
 		}
 	}
 
-	persona, _, err := chatd.ResolveChatPersona(ctx, api.Database, agent.PersonaID)
+	persona, err := api.Database.GetChatPersonaByID(ctx, agent.PersonaID)
 	if err != nil {
 		if httpapi.Is404Error(err) {
 			return database.ChatAgent{}, database.ChatPersona{}, http.StatusBadRequest, &codersdk.Response{
@@ -1036,23 +1031,16 @@ func (api *API) resolveCreateChatAgent(
 
 // populateChatAgentSummaries fills slug, name, icon, and the builtin
 // flag on the ID-only agent summaries that db2sdk.Chat attaches to
-// chats created as an agent, including their children. Builtins
-// resolve in memory; database rows are collected and fetched in a
-// single batch. Soft-deleted agents still resolve so attribution
-// survives deletion. Failures are non-fatal: the summary keeps its ID.
+// chats created as an agent, including their children. Agent rows are
+// collected and fetched in a single batch. Soft-deleted agents still
+// resolve so attribution survives deletion. Failures are non-fatal:
+// the summary keeps its ID.
 func (api *API) populateChatAgentSummaries(ctx context.Context, chats ...*codersdk.Chat) {
 	var pending []*codersdk.ChatAgentSummary
 	var collect func(chat *codersdk.Chat)
 	collect = func(chat *codersdk.Chat) {
 		if chat.Agent != nil {
-			if builtin, ok := chatd.BuiltinChatAgentByID(chat.Agent.ID); ok {
-				chat.Agent.Slug = builtin.Slug
-				chat.Agent.Name = builtin.Name
-				chat.Agent.Icon = builtin.Icon
-				chat.Agent.Builtin = true
-			} else {
-				pending = append(pending, chat.Agent)
-			}
+			pending = append(pending, chat.Agent)
 		}
 		for i := range chat.Children {
 			collect(&chat.Children[i])
@@ -1096,5 +1084,6 @@ func (api *API) populateChatAgentSummaries(ctx context.Context, chats ...*coders
 		summary.Slug = agent.Slug
 		summary.Name = agent.Name
 		summary.Icon = agent.Icon
+		summary.Builtin = agent.Builtin
 	}
 }

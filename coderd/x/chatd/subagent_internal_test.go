@@ -143,6 +143,11 @@ func newInternalTestServer(
 		opt(&cfg)
 	}
 
+	// Internal tests construct the server directly, so seed the builtin
+	// chat catalog the same way coderd does at startup.
+	//nolint:gocritic // Startup seeder writes system-owned builtin rows.
+	require.NoError(t, SeedBuiltinChatCatalog(dbauthz.AsSystemRestricted(context.Background()), db))
+
 	server := New(ps, Config{
 		Logger:    cfg.logger,
 		Database:  db,

@@ -69,10 +69,10 @@ WHERE
 RETURNING *;
 
 -- name: UpdateChatPersonaDeletedByID :exec
--- Soft delete keeps the row so historical references stay resolvable.
--- There are no foreign keys from chat_agents or chats because those
--- columns may reference in-memory builtin personas and agents; the API
--- layer blocks deletion while non-deleted agents reference the persona.
+-- Soft delete keeps the row so historical references stay resolvable
+-- and the foreign keys from chat_agents and chats remain satisfied.
+-- The API layer blocks deletion while non-deleted agents reference the
+-- persona.
 UPDATE
     chat_personas
 SET
@@ -80,3 +80,46 @@ SET
     updated_at = now()
 WHERE
     id = @id::uuid;
+
+-- name: UpsertBuiltinChatPersona :exec
+-- Seeds or refreshes a builtin persona row at coderd startup. Builtin
+-- rows carry the canonical in-repo values, are always enabled and
+-- undeleted, and have no creator.
+INSERT INTO chat_personas (
+    id,
+    organization_id,
+    slug,
+    name,
+    description,
+    icon,
+    system_prompt,
+    model_config_id,
+    enabled,
+    deleted,
+    builtin,
+    created_by
+)
+VALUES (
+    @id,
+    NULL,
+    @slug,
+    @name,
+    @description,
+    @icon,
+    @system_prompt,
+    NULL,
+    TRUE,
+    FALSE,
+    TRUE,
+    NULL
+)
+ON CONFLICT (id) DO UPDATE SET
+    slug = EXCLUDED.slug,
+    name = EXCLUDED.name,
+    description = EXCLUDED.description,
+    icon = EXCLUDED.icon,
+    system_prompt = EXCLUDED.system_prompt,
+    enabled = TRUE,
+    deleted = FALSE,
+    builtin = TRUE,
+    updated_at = now();

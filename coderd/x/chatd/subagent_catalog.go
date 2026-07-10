@@ -261,11 +261,11 @@ func resolveSubagentDefinition(
 }
 
 // chatAgentsForChat lists every chat agent a chat can delegate to:
-// builtins plus enabled database agents in the deployment scope or the
-// chat's organization. Entries are deduplicated by slug with precedence
-// builtin > organization > deployment, so agent:<slug> always resolves
-// to the same agent even when scopes reuse a slug. Builtins sort
-// first, then database agents by name.
+// enabled agents in the deployment scope (including seeded builtins)
+// or the chat's organization. Entries are deduplicated by slug with
+// precedence builtin > organization > deployment, so agent:<slug>
+// always resolves to the same agent even when scopes reuse a slug.
+// Builtins sort first, then the remaining agents by name.
 func chatAgentsForChat(
 	ctx context.Context,
 	p *Server,
@@ -279,16 +279,21 @@ func chatAgentsForChat(
 	if err != nil {
 		return nil, xerrors.Errorf("list chat agents: %w", err)
 	}
-	agents := BuiltinChatAgents()
-	seen := make(map[string]struct{}, len(agents)+len(dbAgents))
-	for _, agent := range agents {
+	builtins := make([]database.ChatAgent, 0, len(dbAgents))
+	for _, agent := range dbAgents {
+		if agent.Builtin && agent.Enabled {
+			builtins = append(builtins, agent)
+		}
+	}
+	seen := make(map[string]struct{}, len(dbAgents))
+	for _, agent := range builtins {
 		seen[agent.Slug] = struct{}{}
 	}
 	custom := make([]database.ChatAgent, 0, len(dbAgents))
 	// Organization agents shadow deployment agents with the same slug.
 	for _, wantOrgScoped := range []bool{true, false} {
 		for _, agent := range dbAgents {
-			if !agent.Enabled || agent.OrganizationID.Valid != wantOrgScoped {
+			if agent.Builtin || !agent.Enabled || agent.OrganizationID.Valid != wantOrgScoped {
 				continue
 			}
 			if _, ok := seen[agent.Slug]; ok {
@@ -298,13 +303,18 @@ func chatAgentsForChat(
 			custom = append(custom, agent)
 		}
 	}
-	slices.SortFunc(custom, func(a, b database.ChatAgent) int {
+	sortChatAgentsByName(builtins)
+	sortChatAgentsByName(custom)
+	return append(builtins, custom...), nil
+}
+
+func sortChatAgentsByName(agents []database.ChatAgent) {
+	slices.SortFunc(agents, func(a, b database.ChatAgent) int {
 		if c := strings.Compare(a.Name, b.Name); c != 0 {
 			return c
 		}
 		return strings.Compare(a.Slug, b.Slug)
 	})
-	return append(agents, custom...), nil
 }
 
 // enumeratedChatAgentsForChat returns the chat agents advertised in the
@@ -312,8 +322,8 @@ func chatAgentsForChat(
 // maxSpawnAgentCatalogEntries. Chat agent types are not enumerated
 // during plan-mode turns, matching the planning overlay's guidance that
 // only general and explore may be used. A database failure degrades the
-// enumeration to builtins only; slug resolution does not share the cap
-// or the degradation (see resolveChatAgentBySlugForChat), so an agent
+// enumeration to nothing; slug resolution does not share the cap or
+// the degradation (see resolveChatAgentBySlugForChat), so an agent
 // omitted from the enumeration is still spawnable by exact slug.
 func enumeratedChatAgentsForChat(
 	ctx context.Context,
@@ -329,7 +339,7 @@ func enumeratedChatAgentsForChat(
 			slog.F("chat_id", currentChat.ID),
 			slog.Error(err),
 		)
-		agents = BuiltinChatAgents()
+		return nil
 	}
 	if len(agents) > maxSpawnAgentCatalogEntries {
 		agents = agents[:maxSpawnAgentCatalogEntries]
@@ -371,7 +381,7 @@ func resolveChatAgentBySlugForChat(
 	// The catalog query above already authorized visibility; the
 	// persona read uses the same chatd scope.
 	//nolint:gocritic // See above.
-	persona, _, err := ResolveChatPersona(dbauthz.AsChatd(ctx), p.db, agent.PersonaID)
+	persona, err := p.db.GetChatPersonaByID(dbauthz.AsChatd(ctx), agent.PersonaID)
 	if err != nil {
 		if xerrors.Is(err, sql.ErrNoRows) {
 			return database.ChatAgent{}, database.ChatPersona{}, xerrors.Errorf(
