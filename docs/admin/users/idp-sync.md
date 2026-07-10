@@ -301,7 +301,7 @@ Visit the Coder UI to confirm these changes:
 
 1. Set the following in your Coder server [configuration](../setup/index.md).
 
-   ```env
+   ```dotenv
     # Depending on your identity provider configuration, you may need to explicitly request a "roles" scope
    CODER_OIDC_SCOPES=openid,profile,email,offline_access,roles
 

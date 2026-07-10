@@ -8,7 +8,7 @@ You can store these modules externally from your Coder deployment, like in a git
 repository or a Terraform registry. This example shows how to reference a module
 from your template:
 
-```terraform
+```tf
 data "coder_workspace" "me" {}
 
 module "coder-base" {

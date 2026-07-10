@@ -79,7 +79,7 @@ Edit the Terraform `main.tf` file to provision the workspace's resources.
 Start by setting up the providers. At a minimum, we need the `coder` provider.
 For this template, we also need the `docker` provider:
 
-```terraform
+```tf
 terraform {
   required_providers {
     coder = {
@@ -137,7 +137,7 @@ needs `curl` access to the Coder server.
 
 Add this snippet after the last closing `}` in `main.tf` to create the agent:
 
-```terraform
+```tf
 resource "coder_agent" "main" {
   arch                   = data.coder_provisioner.me.arch
   os                     = "linux"
@@ -220,7 +220,7 @@ We installed code-server in the `startup_script` argument. To add code-server to
 the workspace, make it available in the workspace with a `coder_app` resource.
 See [web IDEs](../user-guides/workspace-access/web-ides.md) for more examples:
 
-```terraform
+```tf
 resource "coder_app" "code-server" {
   agent_id     = coder_agent.main.id
   slug         = "code-server"
@@ -241,7 +241,7 @@ resource "coder_app" "code-server" {
 You can also use a `coder_app` resource to link to external apps, such as links
 to wikis or cloud consoles:
 
-```terraform
+```tf
 resource "coder_app" "coder-server-doc" {
   agent_id     = coder_agent.main.id
   icon         = "/emojis/1f4dd.png"
@@ -271,7 +271,7 @@ Later, we use the Terraform
 [count](https://developer.hashicorp.com/terraform/language/meta-arguments/count)
 meta-argument to make sure that our Docker container is ephemeral.
 
-```terraform
+```tf
 resource "docker_volume" "home_volume" {
   name = "coder-${data.coder_workspace.me.id}-home"
   # Protect the volume from being deleted due to changes in attributes.
@@ -289,7 +289,7 @@ For details, see
 To set up our Docker container, our template has a `docker_image` resource that
 uses `build/Dockerfile`, which we created earlier:
 
-```terraform
+```tf
 resource "docker_image" "main" {
   name = "coder-${data.coder_workspace.me.id}"
   build {
@@ -307,7 +307,7 @@ resource "docker_image" "main" {
 Our `docker_container` resource uses `coder_workspace` `start_count` to start
 and stop the Docker container:
 
-```terraform
+```tf
 resource "docker_container" "workspace" {
   count = data.coder_workspace.me.start_count
   image = docker_image.main.name
@@ -365,7 +365,7 @@ use the Coder CLI.
 
 1. Paste it into the CLI:
 
-   ```output
+   ```text
    > Welcome to Coder, marc! You're authenticated.
    $
    ```

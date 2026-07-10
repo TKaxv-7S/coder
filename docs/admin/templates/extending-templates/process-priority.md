@@ -11,7 +11,7 @@ so the agent itself stays alive under resource pressure.
   the nice value below its current value. In Kubernetes, add
   it to the container's security context:
 
-  ```hcl
+  ```tf
   container {
     security_context {
       capabilities {
@@ -62,7 +62,7 @@ workloads.
 The following Kubernetes template snippet enables process
 priority management on the workspace container:
 
-```terraform
+```tf
 resource "kubernetes_deployment" "workspace" {
   # ... other configuration
 

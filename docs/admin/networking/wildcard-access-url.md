@@ -108,7 +108,7 @@ Each proxy's wildcard domain must have corresponding DNS records:
 
 In your Coder templates, enable subdomain applications using the `subdomain` parameter:
 
-```terraform
+```tf
 resource "coder_app" "code-server" {
   agent_id     = coder_agent.main.id
   slug         = "code-server"

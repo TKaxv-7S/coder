@@ -67,7 +67,7 @@ If the token is required to be inserted into the workspace, for example
 template. This token will not auto-refresh. The following example will
 authenticate via GitHub and auto-clone a repo into the `~/coder` directory.
 
-```terraform
+```tf
 data "coder_external_auth" "github" {
   # Matches the ID of the external auth provider in Coder.
   id = "github"

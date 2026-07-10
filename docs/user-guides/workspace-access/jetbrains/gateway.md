@@ -89,7 +89,7 @@ trust store present on your local machine as well as to the Coder plugin setting
 
    #### Linux
 
-   ```none
+   ```text
    <Gateway installation directory>/jbr/lib/security/cacerts
    ```
 
@@ -101,7 +101,7 @@ trust store present on your local machine as well as to the Coder plugin setting
 
    #### macOS
 
-   ```none
+   ```text
    <Gateway installation directory>/jbr/lib/security/cacerts
    /Library/Application Support/JetBrains/Toolbox/apps/JetBrainsGateway/ch-0/<app-id>/JetBrains Gateway.app/Contents/jbr/Contents/Home/lib/security/cacerts # Path for Toolbox installation
    ```
@@ -114,7 +114,7 @@ trust store present on your local machine as well as to the Coder plugin setting
 
    #### Windows
 
-   ```none
+   ```text
    C:\Program Files (x86)\<Gateway installation directory>\jre\lib\security\cacerts\%USERPROFILE%\AppData\Local\JetBrains\Toolbox\bin\jre\lib\security\cacerts # Path for Toolbox installation
    ```
 

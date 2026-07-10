@@ -80,7 +80,7 @@ Template admins can overwrite the site-wide access URL at the template level by
 leveraging the `url` argument when
 [defining the Coder provider](https://registry.terraform.io/providers/coder/coder/latest/docs#url-1):
 
-```terraform
+```tf
 provider "coder" {
   url = "https://coder.namespace.svc.cluster.local"
 }

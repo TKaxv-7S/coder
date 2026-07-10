@@ -53,7 +53,7 @@ account.
 
 Template admins can pre-configure Claude Code for a seamless experience. Admins can automatically inject the user's Coder session token and the AI Gateway base URL into the workspace environment.
 
-```terraform
+```tf
 module "claude-code" {
   source            = "registry.coder.com/coder/claude-code/coder"
   version           = "4.7.3"
@@ -67,7 +67,7 @@ module "claude-code" {
 
 [Coder Tasks](../../tasks.md) provides a framework for agents to complete background development operations autonomously. Claude Code can be configured in your Tasks automatically:
 
-```terraform
+```tf
 resource "coder_ai_task" "task" {
   count  = data.coder_workspace.me.start_count
   app_id = module.claude-code.task_app_id

@@ -186,7 +186,7 @@ The volume backs `/home/linuxbrew`, the prefix where Homebrew installs, so Homeb
 
 In `main.tf`, add a volume for Homebrew's directory next to the existing `home_volume`:
 
-```terraform
+```tf
 resource "docker_volume" "homebrew_volume" {
   name = "coder-${data.coder_workspace.me.id}-homebrew"
   lifecycle {
@@ -197,7 +197,7 @@ resource "docker_volume" "homebrew_volume" {
 
 Then mount it in the `docker_container "workspace"` resource, alongside the block that mounts `/home/coder`:
 
-```terraform
+```tf
   volumes {
     container_path = "/home/linuxbrew"
     volume_name    = docker_volume.homebrew_volume.name
@@ -267,7 +267,7 @@ It installs prebuilt binaries into `/home/coder`, which already persists, so the
 
 In `main.tf`, add a script next to the existing `install_languages` resource:
 
-```terraform
+```tf
 resource "coder_script" "install_tools" {
   agent_id     = coder_agent.main.id
   display_name = "Install Tools"
@@ -335,7 +335,7 @@ This approach relies on the `/home/linuxbrew` volume you added in Step 4, so Hom
 
 Use this `install_tools` script in place of the mise version:
 
-```terraform
+```tf
 resource "coder_script" "install_tools" {
   agent_id     = coder_agent.main.id
   display_name = "Install Tools"
@@ -395,7 +395,7 @@ Refer to [Resource persistence](../../admin/templates/extending-templates/resour
 
 Your `main.tf` after this guide's changes, starting from the Quickstart template:
 
-```terraform
+```tf
 terraform {
   required_providers {
     coder = {

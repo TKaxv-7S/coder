@@ -5,7 +5,7 @@
 1. Start a Coder deployment and be sure to set the following
    [configuration values](../admin/setup/index.md):
 
-   ```env
+   ```dotenv
    CODER_HTTP_ADDRESS=127.0.0.1:3000
    CODER_ACCESS_URL=https://coder.example.com
    CODER_WILDCARD_ACCESS_URL=*.coder.example.com

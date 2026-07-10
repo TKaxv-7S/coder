@@ -147,7 +147,7 @@ Web or using the workspace's terminal.
 1. In the Dockerfile, add instructions to make a folder and to copy the `vsix`
    files into the newly created folder.
 
-   ```Dockerfile
+   ```dockerfile
    FROM codercom/enterprise-base:ubuntu
 
    # Run below commands as root user

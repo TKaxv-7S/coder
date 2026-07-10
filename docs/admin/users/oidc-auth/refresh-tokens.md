@@ -35,7 +35,7 @@ Go to the Azure Portal > **Azure Active Directory** > **App registrations** > Yo
 
 1. In your [Coder configuration](../../../reference/cli/server.md#--oidc-auth-url-params), request the same scopes:
 
-   ```env
+   ```dotenv
    CODER_OIDC_SCOPES=openid,profile,email,offline_access
    ```
 
@@ -99,7 +99,7 @@ CODER_OIDC_AUTH_URL_PARAMS='{"access_type":"offline"}'
 
 1. In your [Coder configuration](../../../reference/cli/server.md#--oidc-scopes), add the `offline_access` scope:
 
-   ```env
+   ```dotenv
    CODER_OIDC_SCOPES=openid,profile,email,offline_access
    ```
 

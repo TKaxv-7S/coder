@@ -23,7 +23,7 @@ GitHub [external authentication](../external-auth/index.md) to get the token and
 
 To use this module, add the following code to your Terraform configuration.
 
-```terraform
+```tf
 module "vault" {
   source               = "registry.coder.com/modules/vault-github/coder"
   version              = "1.0.7"

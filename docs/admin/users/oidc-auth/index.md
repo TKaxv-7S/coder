@@ -107,13 +107,13 @@ The general steps to configure persistent user sessions are:
 
    For most providers, add the `offline_access` scope:
 
-   ```env
+   ```dotenv
    CODER_OIDC_SCOPES=openid,profile,email,offline_access
    ```
 
    For Google, add auth URL parameters (`CODER_OIDC_AUTH_URL_PARAMS`) too:
 
-   ```env
+   ```dotenv
    CODER_OIDC_SCOPES=openid,profile,email
    CODER_OIDC_AUTH_URL_PARAMS='{"access_type": "offline", "prompt": "consent"}'
    ```

@@ -82,7 +82,7 @@ would like to add workspace process logging to, follow these steps:
      in the exectrace repo.
    -->
 
-   ```hcl
+   ```tf
    locals {
      # This is the init script for the main workspace container that runs before the
      # agent starts to configure workspace process logging.
@@ -142,7 +142,7 @@ would like to add workspace process logging to, follow these steps:
      in the exectrace repo.
    -->
 
-   ```hcl
+   ```tf
    resource "kubernetes_pod" "main" {
      ...
      spec {
@@ -176,7 +176,7 @@ would like to add workspace process logging to, follow these steps:
      in the exectrace repo.
    -->
 
-   ```hcl
+   ```tf
    resource "kubernetes_pod" "main" {
      ...
      spec {
@@ -224,7 +224,7 @@ would like to add workspace process logging to, follow these steps:
      in the exectrace repo.
    -->
 
-   ```hcl
+   ```tf
    resource "kubernetes_pod" "main" {
      ...
      spec {

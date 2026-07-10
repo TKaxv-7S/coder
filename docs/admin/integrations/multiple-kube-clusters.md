@@ -62,7 +62,7 @@ From there, add
 [template parameters](../templates/extending-templates/parameters.md) to allow
 developers to pick their desired cluster.
 
-```terraform
+```tf
 # main.tf
 
 data "coder_parameter" "kube_context" {
@@ -159,7 +159,7 @@ rolebinding.rbac.authorization.k8s.io/coder-v2 created
 You can start from our
 [example template](../../../examples/templates/kubernetes).
 
-```terraform
+```tf
 variable "host" {
   description = "Cluster host address"
   sensitive   = true

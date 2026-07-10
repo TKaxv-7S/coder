@@ -104,7 +104,7 @@ This creates:
 
 Edit `main.tf` to build your module's features. Here's an example based on the `git-clone` module structure:
 
-```terraform
+```tf
 terraform {
   required_providers {
     coder = {
@@ -212,7 +212,7 @@ This module clones a Git repository into your Coder workspace and ensures Git is
 
 ## Usage
 
-```terraform
+```tf
 module "git_clone" {
   source   = "registry.coder.com/[your-username]/git-clone/coder"
   version  = "~> 1.0"

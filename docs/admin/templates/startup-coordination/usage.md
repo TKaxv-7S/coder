@@ -173,7 +173,7 @@ ensure that your unit does not conflict with others.
 
 Add comments explaining why dependencies exist:
 
-```terraform
+```tf
 resource "coder_script" "ide_setup" {
   # Depends on git-clone because we need .vscode/extensions.json
   # Depends on env-setup because we need $NODE_PATH configured

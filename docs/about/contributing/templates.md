@@ -103,7 +103,7 @@ cd registry/[your-username]/templates/[template-name]
 
 Create `main.tf` with your complete Terraform configuration:
 
-```terraform
+```tf
 terraform {
   required_providers {
     coder = {
@@ -262,7 +262,7 @@ You can customize this template by:
 
 Use registry modules for common features:
 
-```terraform
+```tf
 # VS Code in browser
 module "code-server" {
   count    = data.coder_workspace.me.start_count
@@ -311,7 +311,7 @@ module "dotfiles" {
 
 Provide meaningful customization options:
 
-```terraform
+```tf
 variable "git_repo_url" {
   description = "Git repository to clone"
   type        = string
@@ -432,7 +432,7 @@ Before submitting your template, verify:
 
 ### Docker-based template
 
-```terraform
+```tf
 # Simple Docker template
 resource "docker_container" "workspace" {
   count = data.coder_workspace.me.start_count
@@ -446,7 +446,7 @@ resource "docker_container" "workspace" {
 
 ### AWS EC2 template
 
-```terraform
+```tf
 # AWS EC2 template
 resource "aws_instance" "workspace" {
   count         = data.coder_workspace.me.start_count
@@ -463,7 +463,7 @@ resource "aws_instance" "workspace" {
 
 ### Kubernetes template
 
-```terraform
+```tf
 # Kubernetes template
 resource "kubernetes_pod" "workspace" {
   count = data.coder_workspace.me.start_count

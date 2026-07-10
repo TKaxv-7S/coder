@@ -18,7 +18,7 @@ The associated agent will facilitate
 port forwarding, and IDEs. The agent may also display real-time
 [workspace metadata](./agent-metadata.md) like resource usage.
 
-```terraform
+```tf
 resource "coder_agent" "dev" {
   os   = "linux"
   arch = "amd64"
@@ -95,7 +95,7 @@ You can use these examples to add new Coder apps:
 
 ## code-server
 
-```terraform
+```tf
 resource "coder_app" "code-server" {
   agent_id     = coder_agent.main.id
   slug         = "code-server"
@@ -109,7 +109,7 @@ resource "coder_app" "code-server" {
 
 ## Filebrowser
 
-```terraform
+```tf
 resource "coder_app" "filebrowser" {
   agent_id     = coder_agent.main.id
   display_name = "file browser"
@@ -123,7 +123,7 @@ resource "coder_app" "filebrowser" {
 
 ## Zed
 
-```terraform
+```tf
 resource "coder_app" "zed" {
     agent_id = coder_agent.main.id
     slug          = "slug"
@@ -168,7 +168,7 @@ on a scheduled basis. It provides more control than the deprecated
 
 ### Basic example
 
-```terraform
+```tf
 resource "coder_script" "install_dependencies" {
   agent_id           = coder_agent.main.id
   display_name       = "Install Dependencies"
@@ -209,7 +209,7 @@ internally. For example:
 
 You can also reference external script files:
 
-```terraform
+```tf
 resource "coder_script" "init_docker" {
   agent_id     = coder_agent.main.id
   display_name = "Initialize Docker"

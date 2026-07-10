@@ -8,7 +8,7 @@ development environments.
 
 ## Basic usage
 
-```terraform
+```tf
 resource "coder_agent" "dev" {
   os   = "linux"
   arch = "amd64"
@@ -43,7 +43,7 @@ the convention for `PATH`-style variables on Unix systems.
 
 Multiple `coder_env` resources can each add directories to `PATH`:
 
-```terraform
+```tf
 resource "coder_env" "path_tools" {
   agent_id       = coder_agent.dev.id
   name           = "PATH"
@@ -66,7 +66,7 @@ This produces `PATH` with the value
 
 Use `error` to catch accidental duplicate definitions:
 
-```terraform
+```tf
 resource "coder_env" "editor" {
   agent_id       = coder_agent.dev.id
   name           = "EDITOR"
@@ -96,7 +96,7 @@ after `coder_env` resources are merged, so `merge_strategy = "error"` does not
 trigger when the conflict is with the agent's `env` block — only when two
 `coder_env` resources define the same key:
 
-```terraform
+```tf
 resource "coder_agent" "dev" {
   os   = "linux"
   arch = "amd64"

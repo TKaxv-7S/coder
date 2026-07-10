@@ -39,7 +39,7 @@ In your template, add a `prebuilds` block within a `coder_workspace_preset` defi
 instances your Coder deployment should maintain, and optionally configure a `expiration_policy` block to set a TTL
 (Time To Live) for unclaimed prebuilt workspaces to ensure stale resources are automatically cleaned up.
 
-   ```hcl
+   ```tf
    data "coder_workspace_preset" "goland" {
      name = "GoLand: Large"
      parameters = {
@@ -123,7 +123,7 @@ This allows you to reduce resource costs during off-hours while maintaining avai
 
 Configure scheduling by adding a `scheduling` block within your `prebuilds` configuration:
 
-```terraform
+```tf
 data "coder_workspace_preset" "goland" {
    name = "GoLand: Large"
    parameters {
@@ -187,7 +187,7 @@ Cron expressions follow the format: `* HOUR DOM MONTH DAY-OF-WEEK`
 
 **Example schedules:**
 
-```terraform
+```tf
 # Business hours only (8AM-6:59PM, Mon-Fri)
 schedule {
   cron = "* 8-18 * * 1-5"
@@ -367,7 +367,7 @@ For example, when these values are used in immutable fields like the AWS instanc
 
 To prevent this, add a `lifecycle` block with `ignore_changes`:
 
-```terraform
+```tf
 resource "docker_container" "workspace" {
   lifecycle {
     ignore_changes = [env, image] # include all fields which caused drift
@@ -414,7 +414,7 @@ This keeps other provisioners available to handle user-initiated jobs.
 
 1. Update the template to conditionally add the prebuild tag for prebuild jobs.
 
-    ```hcl
+    ```tf
     data "coder_workspace_tags" "prebuilds" {
       count = data.coder_workspace_owner.me.name == "prebuilds" ? 1 : 0
       tags = {

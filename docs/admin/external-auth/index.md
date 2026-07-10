@@ -47,7 +47,7 @@ configure your callback URL as `https://example.com/external-auth/primary-github
 
 Add the following code to any template to add a button to the workspace setup page which will allow you to authenticate with your provider:
 
-```terraform
+```tf
 data "coder_external_auth" "<github|gitlab|azure-devops|bitbucket-cloud|bitbucket-server|other>" {
     id = "<USER_DEFINED_ID>"
 }
@@ -343,7 +343,7 @@ CODER_EXTERNAL_AUTH_0_SCOPES="repo:read repo:write write:gpg_key"
    before linking. To surface an **Install GitHub App** link in the
    Coder UI, set the following environment variable:
 
-   ```env
+   ```dotenv
    CODER_EXTERNAL_AUTH_0_APP_INSTALL_URL=https://github.com/apps/<your-app-slug>/installations/new
    ```
 

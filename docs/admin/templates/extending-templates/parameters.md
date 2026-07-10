@@ -14,7 +14,7 @@ parameters like instance size, geographical location, repository URL, etc.
 
 This example lets a developer choose a Docker host for the workspace:
 
-```terraform
+```tf
 data "coder_parameter" "docker_host" {
   name        = "Region"
   description = "Which region would you like to deploy to?"
@@ -44,7 +44,7 @@ data "coder_parameter" "docker_host" {
 
 From there, a template can refer to a parameter's value:
 
-```terraform
+```tf
 provider "docker" {
   host = data.coder_parameter.docker_host.value
 }
@@ -64,7 +64,7 @@ JSON array and the Terraform
 [jsonencode](https://developer.hashicorp.com/terraform/language/functions/jsonencode)
 function. For example:
 
-```terraform
+```tf
 data "coder_parameter" "security_groups" {
   name        = "Security groups"
   icon        = "/icon/aws.png"
@@ -109,7 +109,7 @@ data "coder_parameter" "security_groups" {
 
 A `string` parameter can provide a set of options to limit the user's choices:
 
-```terraform
+```tf
 data "coder_parameter" "docker_host" {
   name        = "Region"
   description = "Which region would you like to deploy to?"
@@ -171,7 +171,7 @@ Example:
 A parameter is _required_ if it doesn't have the `default` property. The user
 **must** provide a value to this parameter before creating a workspace:
 
-```terraform
+```tf
 data "coder_parameter" "account_name" {
   name        = "Account name"
   description = "Cloud account name"
@@ -182,7 +182,7 @@ data "coder_parameter" "account_name" {
 If a parameter contains the `default` property, Coder will use this value if the
 user does not specify any:
 
-```terraform
+```tf
 data "coder_parameter" "base_image" {
   name        = "Base image"
   description = "Base machine image to download"
@@ -193,7 +193,7 @@ data "coder_parameter" "base_image" {
 Admins can also set the `default` property to an empty value so that the
 parameter field can remain empty:
 
-```terraform
+```tf
 data "coder_parameter" "dotfiles_url" {
   name        = "dotfiles URL"
   description = "Git repository with dotfiles"
@@ -215,7 +215,7 @@ resources like volumes, regions, and so on.
 
 Example:
 
-```terraform
+```tf
 data "coder_parameter" "region" {
   name        = "Region"
   description = "Region where the workspace is hosted"
@@ -238,7 +238,7 @@ but do not persist after the workspace is stopped.
 Since these parameters are ephemeral in nature, subsequent builds proceed in the
 standard manner:
 
-```terraform
+```tf
 data "coder_parameter" "force_rebuild" {
   name         = "force_rebuild"
   type         = "bool"
@@ -262,7 +262,7 @@ You can also specify its monotonicity as `increasing` or `decreasing` to verify
 the current and new values. Use the `monotonic` attribute for resources that
 can't be shrunk or grown without implications, like disk volume size.
 
-```terraform
+```tf
 data "coder_parameter" "instances" {
   name        = "Instances"
   type        = "number"
@@ -279,7 +279,7 @@ It is possible to override the default `error` message for a `number` parameter,
 along with its associated `min` and/or `max` properties. The following message
 placeholders are available `{min}`, `{max}`, and `{value}`.
 
-```terraform
+```tf
 data "coder_parameter" "instances" {
   name        = "Instances"
   type        = "number"
@@ -303,7 +303,7 @@ data "coder_parameter" "instances" {
 You can validate a `string` parameter to match a regular expression. The `regex`
 property requires a corresponding `error` property.
 
-```terraform
+```tf
 data "coder_parameter" "project_id" {
   name        = "Project ID"
   description = "Alpha-numeric project ID"
@@ -344,7 +344,7 @@ For a complete list of all available fields, see the
 
 <details><summary>Expand for an example</summary>
 
-```terraform
+```tf
 data "coder_workspace_preset" "goland-gpu" {
   name        = "GoLand with GPU"
   description = "Development workspace with GPU acceleration for GoLand IDE"

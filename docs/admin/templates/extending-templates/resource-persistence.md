@@ -24,7 +24,7 @@ meta-argument.
 In this example, Coder will provision or tear down the `docker_container`
 resource:
 
-```terraform
+```tf
 data "coder_workspace" "me" {
 }
 
@@ -39,7 +39,7 @@ resource "docker_container" "workspace" {
 
 Take this example resource:
 
-```terraform
+```tf
 data "coder_workspace" "me" {
 }
 
@@ -59,7 +59,7 @@ To prevent this, use immutable IDs:
 
 You should also avoid using `coder_workspace.me.name` if your deployment allows workspace renaming via `CODER_ALLOW_WORKSPACE_RENAMES` or `--allow-workspace-renames`.
 
-```terraform
+```tf
 data "coder_workspace" "me" {
 }
 
@@ -80,7 +80,7 @@ You can prevent Terraform from recreating a resource under any circumstance by
 setting the
 [`ignore_changes = all` directive in the `lifecycle` block](https://developer.hashicorp.com/terraform/language/meta-arguments/lifecycle#ignore_changes).
 
-```terraform
+```tf
 data "coder_workspace" "me" {
 }
 
