@@ -327,15 +327,13 @@ export const AdvisorSettings: FC<AdvisorSettingsProps> = ({
 						return;
 					}
 					const option = modelOptions.find((option) => option.id === value);
-					let reasoningEffort = "";
-					if (option) {
-						reasoningEffort =
-							pickReasoningEffort(
+					const reasoningEffort = option
+						? (pickReasoningEffort(
 								"",
 								option.reasoningEfforts ?? [],
 								option.reasoningEffortDefault,
-							) ?? "";
-					}
+							) ?? "")
+						: "";
 					void form.setValues({
 						...form.values,
 						model_config_id: value,
