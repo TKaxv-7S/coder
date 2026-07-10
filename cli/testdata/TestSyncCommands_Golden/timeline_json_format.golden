@@ -1,0 +1,40 @@
+[
+  {
+    "seq": 1,
+    "time": "====[timestamp]=====",
+    "kind": "status_change",
+    "unit": "test-unit",
+    "to": "pending"
+  },
+  {
+    "seq": 2,
+    "time": "====[timestamp]=====",
+    "kind": "dependency_added",
+    "unit": "test-unit",
+    "depends_on": "dep-unit",
+    "required_status": "completed"
+  },
+  {
+    "seq": 3,
+    "time": "====[timestamp]=====",
+    "kind": "status_change",
+    "unit": "dep-unit",
+    "to": "pending"
+  },
+  {
+    "seq": 4,
+    "time": "====[timestamp]=====",
+    "kind": "status_change",
+    "unit": "dep-unit",
+    "from": "pending",
+    "to": "started"
+  },
+  {
+    "seq": 5,
+    "time": "====[timestamp]=====",
+    "kind": "status_change",
+    "unit": "dep-unit",
+    "from": "started",
+    "to": "completed"
+  }
+]

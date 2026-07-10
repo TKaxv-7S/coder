@@ -103,6 +103,10 @@ func TestCommandHelp(t *testing.T) {
 			Name: "coder exp sync list --help",
 			Cmd:  []string{"exp", "sync", "list", "--help"},
 		},
+		clitest.CommandHelpCase{
+			Name: "coder exp sync timeline --help",
+			Cmd:  []string{"exp", "sync", "timeline", "--help"},
+		},
 	))
 }
 

@@ -21,6 +21,7 @@ func (r *RootCmd) syncCommand() *serpent.Command {
 			r.syncComplete(&socketPath),
 			r.syncStatus(&socketPath),
 			r.syncList(&socketPath),
+			r.syncTimeline(&socketPath),
 		},
 		Options: serpent.OptionSet{
 			{

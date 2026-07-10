@@ -1,0 +1,9 @@
+*  [+0.0s]  test-unit  registered (pending)
+*  [+0.0s]  test-unit  depends on dep-unit (completed)
+| *  [+0.0s]  dep-unit  registered (pending)
+| *  [+0.0s]  dep-unit  pending → started
+| *  [+0.0s]  dep-unit  started → completed
+| /
+*  [+0.0s]  test-unit  ready (dependency satisfied)
+*  [+0.0s]  test-unit  pending → started
+*  [+0.0s]  test-unit  started → completed

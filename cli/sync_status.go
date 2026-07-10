@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"strings"
 
 	"golang.org/x/xerrors"
 
@@ -62,17 +63,29 @@ func (*RootCmd) syncStatus(socketPath *string) *serpent.Command {
 			}
 
 			var out string
-			header := fmt.Sprintf("Unit: %s\nStatus: %s\nReady: %t\n\nDependencies:\n", unit, statusResp.Status, statusResp.IsReady)
-			if formatter.FormatID() == "table" && len(statusResp.Dependencies) == 0 {
-				out = header + "No dependencies found"
+			if formatter.FormatID() == "table" {
+				header := fmt.Sprintf("Unit: %s\nStatus: %s\nReady: %t\n\nDependencies:\n", unit, statusResp.Status, statusResp.IsReady)
+				dependencies := "No dependencies found"
+				if len(statusResp.Dependencies) > 0 {
+					dependencies, err = formatter.Format(ctx, statusResp)
+					if err != nil {
+						return xerrors.Errorf("format status: %w", err)
+					}
+					dependencies = strings.TrimRight(dependencies, "\n")
+				}
+				history := "No history found"
+				if len(statusResp.History) > 0 {
+					history, err = cliui.DisplayTable(syncHistoryRows(statusResp.History), "", nil)
+					if err != nil {
+						return xerrors.Errorf("format history: %w", err)
+					}
+					history = strings.TrimRight(history, "\n")
+				}
+				out = header + dependencies + "\n\nHistory:\n" + history
 			} else {
 				out, err = formatter.Format(ctx, statusResp)
 				if err != nil {
 					return xerrors.Errorf("format status: %w", err)
-				}
-
-				if formatter.FormatID() == "table" {
-					out = header + out
 				}
 			}
 
@@ -84,4 +97,26 @@ func (*RootCmd) syncStatus(socketPath *string) *serpent.Command {
 
 	formatter.AttachOptions(&cmd.Options)
 	return cmd
+}
+
+// syncHistoryRow is one rendered line of a unit's event history.
+type syncHistoryRow struct {
+	Time    string `table:"time,nosort"`
+	Elapsed string `table:"elapsed"`
+	Event   string `table:"event"`
+}
+
+// syncHistoryRows renders unit events as history table rows. Times are
+// shown in UTC; elapsed offsets are relative to the first event.
+func syncHistoryRows(history []agentsocket.UnitEvent) []syncHistoryRow {
+	rows := make([]syncHistoryRow, 0, len(history))
+	base := history[0].Time
+	for _, ev := range unitEventsFromSocket(history) {
+		rows = append(rows, syncHistoryRow{
+			Time:    ev.Time.UTC().Format("15:04:05.000"),
+			Elapsed: syncElapsed(base, ev.Time),
+			Event:   syncEventDescription(ev),
+		})
+	}
+	return rows
 }

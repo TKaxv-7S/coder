@@ -6,3 +6,9 @@ Dependencies:
 DEPENDS ON  REQUIRED STATUS  CURRENT STATUS  SATISFIED  
 dep-1       completed        completed       true       
 dep-2       completed        not registered  false      
+
+History:
+TIME          ELAPSED  EVENT                         
+00:00:00.000  +0.0s    registered (pending)          
+00:00:00.000  +0.0s    depends on dep-1 (completed)  
+00:00:00.000  +0.0s    depends on dep-2 (completed)  

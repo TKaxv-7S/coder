@@ -19,6 +19,7 @@ type Option func(*options)
 type options struct {
 	path           string
 	contextManager ContextManager
+	unitManager    *unit.Manager
 }
 
 // WithPath sets the socket path. If not provided or empty, the client will
@@ -37,6 +38,16 @@ func WithPath(path string) Option {
 func WithContextManager(cm ContextManager) Option {
 	return func(opts *options) {
 		opts.contextManager = cm
+	}
+}
+
+// WithUnitManager supplies the unit Manager the server uses for sync
+// coordination, letting tests inject a Manager with a mock clock for
+// deterministic event timestamps. If not provided, the server constructs
+// its own. Server-only; ignored by the client.
+func WithUnitManager(um *unit.Manager) Option {
+	return func(opts *options) {
+		opts.unitManager = um
 	}
 }
 

@@ -39,13 +39,18 @@ func NewServer(logger slog.Logger, opts ...Option) (*Server, error) {
 		opt(options)
 	}
 
+	unitManager := options.unitManager
+	if unitManager == nil {
+		unitManager = unit.NewManager()
+	}
+
 	logger = logger.Named("agentsocket-server")
 	server := &Server{
 		logger: logger,
 		path:   options.path,
 		service: &DRPCAgentSocketService{
 			logger:         logger,
-			unitManager:    unit.NewManager(),
+			unitManager:    unitManager,
 			contextManager: options.contextManager,
 		},
 	}

@@ -5,3 +5,8 @@ Ready: false
 Dependencies:
 DEPENDS ON  REQUIRED STATUS  CURRENT STATUS  SATISFIED  
 dep-unit    completed        not registered  false      
+
+History:
+TIME          ELAPSED  EVENT                            
+00:00:00.000  +0.0s    registered (pending)             
+00:00:00.000  +0.0s    depends on dep-unit (completed)  

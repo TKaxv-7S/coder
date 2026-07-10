@@ -12,8 +12,10 @@ import (
 
 	"cdr.dev/slog/v3"
 	"github.com/coder/coder/v2/agent/agentsocket"
+	"github.com/coder/coder/v2/agent/unit"
 	"github.com/coder/coder/v2/cli/clitest"
 	"github.com/coder/coder/v2/testutil"
+	"github.com/coder/quartz"
 )
 
 // setupSocketServer creates an agentsocket server at a temporary path for testing.
@@ -36,6 +38,9 @@ func setupSocketServer(t *testing.T) (path string, cleanup func()) {
 	server, err := agentsocket.NewServer(
 		slog.Make().Leveled(slog.LevelDebug),
 		agentsocket.WithPath(socketPath),
+		// A mock clock keeps event timestamps deterministic so golden
+		// files that include unit event history are stable.
+		agentsocket.WithUnitManager(unit.NewManager(unit.WithClock(quartz.NewMock(t)))),
 	)
 	require.NoError(t, err, "create socket server")
 
@@ -426,6 +431,86 @@ func TestSyncCommands_Golden(t *testing.T) {
 		require.NoError(t, err)
 
 		clitest.TestGoldenFile(t, "TestSyncCommands_Golden/list_no_units", outBuf.Bytes(), nil)
+	})
+
+	t.Run("timeline_no_events", func(t *testing.T) {
+		t.Parallel()
+		path, cleanup := setupSocketServer(t)
+		defer cleanup()
+
+		ctx := testutil.Context(t, testutil.WaitShort)
+
+		var outBuf bytes.Buffer
+		inv, _ := clitest.New(t, "exp", "sync", "timeline", "--socket-path", path)
+		inv.Stdout = &outBuf
+		inv.Stderr = &outBuf
+
+		err := inv.WithContext(ctx).Run()
+		require.NoError(t, err)
+
+		clitest.TestGoldenFile(t, "TestSyncCommands_Golden/timeline_no_events", outBuf.Bytes(), nil)
+	})
+
+	t.Run("timeline_with_units", func(t *testing.T) {
+		t.Parallel()
+		path, cleanup := setupSocketServer(t)
+		defer cleanup()
+
+		ctx := testutil.Context(t, testutil.WaitShort)
+
+		// dep-unit runs to completion, unblocking test-unit which then
+		// runs to completion itself.
+		client, err := agentsocket.NewClient(ctx, agentsocket.WithPath(path))
+		require.NoError(t, err)
+		err = client.SyncWant(ctx, "test-unit", "dep-unit")
+		require.NoError(t, err)
+		err = client.SyncStart(ctx, "dep-unit")
+		require.NoError(t, err)
+		err = client.SyncComplete(ctx, "dep-unit")
+		require.NoError(t, err)
+		err = client.SyncStart(ctx, "test-unit")
+		require.NoError(t, err)
+		err = client.SyncComplete(ctx, "test-unit")
+		require.NoError(t, err)
+		client.Close()
+
+		var outBuf bytes.Buffer
+		inv, _ := clitest.New(t, "exp", "sync", "timeline", "--socket-path", path)
+		inv.Stdout = &outBuf
+		inv.Stderr = &outBuf
+
+		err = inv.WithContext(ctx).Run()
+		require.NoError(t, err)
+
+		clitest.TestGoldenFile(t, "TestSyncCommands_Golden/timeline_with_units", outBuf.Bytes(), nil)
+	})
+
+	t.Run("timeline_json_format", func(t *testing.T) {
+		t.Parallel()
+		path, cleanup := setupSocketServer(t)
+		defer cleanup()
+
+		ctx := testutil.Context(t, testutil.WaitShort)
+
+		client, err := agentsocket.NewClient(ctx, agentsocket.WithPath(path))
+		require.NoError(t, err)
+		err = client.SyncWant(ctx, "test-unit", "dep-unit")
+		require.NoError(t, err)
+		err = client.SyncStart(ctx, "dep-unit")
+		require.NoError(t, err)
+		err = client.SyncComplete(ctx, "dep-unit")
+		require.NoError(t, err)
+		client.Close()
+
+		var outBuf bytes.Buffer
+		inv, _ := clitest.New(t, "exp", "sync", "timeline", "--output", "json", "--socket-path", path)
+		inv.Stdout = &outBuf
+		inv.Stderr = &outBuf
+
+		err = inv.WithContext(ctx).Run()
+		require.NoError(t, err)
+
+		clitest.TestGoldenFile(t, "TestSyncCommands_Golden/timeline_json_format", outBuf.Bytes(), nil)
 	})
 
 	t.Run("list_with_units", func(t *testing.T) {

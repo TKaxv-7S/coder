@@ -17,6 +17,7 @@ SUBCOMMANDS:
     ping        Test agent socket connectivity and health
     start       Wait until all unit dependencies are satisfied
     status      Show unit status and dependency state
+    timeline    Show a timeline of unit state changes
     want        Declare that a unit depends on other units completing before it
                 can start
 
