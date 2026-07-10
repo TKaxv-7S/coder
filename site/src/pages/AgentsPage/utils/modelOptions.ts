@@ -276,6 +276,14 @@ export const getModelOptionsFromConfigs = (
 	});
 };
 
+// filterAnthropicModelOptions keeps only options served by an Anthropic
+// provider. Claude Code chats inject Anthropic credentials into the
+// runtime agent, so other providers cannot be honored there.
+export const filterAnthropicModelOptions = (
+	options: readonly ModelSelectorOption[],
+): readonly ModelSelectorOption[] =>
+	options.filter((option) => option.provider === "anthropic");
+
 // Read slice of a react-query result. The field types come from UseQueryResult
 // by indexed access, not Pick (which would distribute over v5's status union),
 // so they track the library rather than being hand-maintained.
