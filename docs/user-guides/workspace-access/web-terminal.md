@@ -42,13 +42,13 @@ WebSocket connection.
 
 You can also bookmark or share direct terminal URLs:
 
-```text
+```txt
 https://coder.example.com/@username/workspace-name/terminal
 ```
 
 To access a specific agent in a multi-agent workspace:
 
-```text
+```txt
 https://coder.example.com/@username/workspace-name.agent-name/terminal
 ```
 
@@ -155,7 +155,7 @@ This makes it seamless to open development servers running in your workspace.
 
 You can open a terminal with a specific command by adding a query parameter:
 
-```text
+```txt
 https://coder.example.com/@user/workspace/terminal?command=htop
 ```
 
@@ -174,13 +174,13 @@ parameter internally, which resolves the command from the agent's app list.
 For workspaces with multiple Docker containers, specify which container to
 connect to:
 
-```text
+```txt
 https://coder.example.com/@user/workspace/terminal?container=sidecar
 ```
 
 You can also specify the container user:
 
-```text
+```txt
 https://coder.example.com/@user/workspace/terminal?container=app&container_user=node
 ```
 
@@ -190,7 +190,7 @@ https://coder.example.com/@user/workspace/terminal?container=app&container_user=
 
 Enable debug information to monitor connection latency:
 
-```text
+```txt
 https://coder.example.com/@user/workspace/terminal?debug
 ```
 

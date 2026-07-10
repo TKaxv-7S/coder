@@ -140,7 +140,7 @@ Organization administrators can also enforce this setting across managed devices
 
 Set the `Updater:Enable` registry value to `0` under `HKEY_LOCAL_MACHINE\SOFTWARE\Coder Desktop\App`:
 
-```powershell
+```ps1
 New-Item -Path "HKLM:\SOFTWARE\Coder Desktop\App" -Force
 New-ItemProperty -Path "HKLM:\SOFTWARE\Coder Desktop\App" -Name "Updater:Enable" -Value 0 -PropertyType DWord -Force
 ```
@@ -202,19 +202,19 @@ Coder Desktop has three components that write logs: the app (UI), the VPN servic
 
 1. App log (daily rolling):
 
-    ```powershell
+    ```ps1
     %LOCALAPPDATA%\CoderDesktop\app.log
     ```
 
 2. VPN service log (default install path):
 
-    ```powershell
+    ```ps1
     C:\Program Files\Coder Desktop\coder-desktop-service.log
     ```
 
 3. File sync (Mutagen) daemon log, if you use file sync:
 
-    ```powershell
+    ```ps1
     %LOCALAPPDATA%\CoderDesktop\mutagen\daemon.log
     ```
 

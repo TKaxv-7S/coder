@@ -265,7 +265,7 @@ Before using Podman, please review the following documentation:
 Rootless containers rely on Linux user-namespaces.
 [Bottlerocket](https://github.com/bottlerocket-os/bottlerocket) disables them by default (`user.max_user_namespaces = 0`), so Podman commands will return an error until you raise the limit:
 
-```text
+```txt
 cannot clone: Invalid argument
 user namespaces are not enabled in /proc/sys/user/max_user_namespaces
 ```

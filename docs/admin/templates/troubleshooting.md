@@ -204,7 +204,7 @@ This error mostly affects Raspberry Pi OS, but might also affect older Debian-ba
 
 1. Add cgroup entries to `cmdline.txt` in `/boot/firmware` (or `/boot/` on older Pi OS releases):
 
-   ```text
+   ```txt
    cgroup_memory=1 cgroup_enable=memory
    ```
 

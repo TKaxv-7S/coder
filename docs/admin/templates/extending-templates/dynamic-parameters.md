@@ -839,7 +839,7 @@ Dynamic Parameters require Terraform modules to be archived and stored in the da
 
 You may see warnings in the provisioner logs:
 
-```text
+```txt
 [API] 2026-01-29 22:00:22.691 [warn]  provisionerd-nixos-0.executor: some (or all) terraform modules were not archived, template will have reduced function  skipped_modules=large:git::https://github.com/coder/large-module.git
 ```
 

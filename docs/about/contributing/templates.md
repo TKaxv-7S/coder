@@ -44,7 +44,7 @@ Before contributing templates, ensure you have:
 
 3. **Understand the structure**:
 
-   ```text
+   ```txt
    registry/[namespace]/
    ├── templates/       # Your templates
    ├── .images/         # Namespace avatar and screenshots

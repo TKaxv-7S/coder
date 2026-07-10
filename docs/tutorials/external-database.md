@@ -44,7 +44,7 @@ CREATE SCHEMA myschema;
 
 Once the schema is created, you can list all schemas with `\dn`:
 
-```text
+```txt
 List of schemas
  Name      | Owner
 -----------+----------

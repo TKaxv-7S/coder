@@ -86,7 +86,7 @@ If client authentication fails, the token endpoint returns **HTTP 401** with an 
 
 1. **Authorization Request**: Redirect users to Coder's authorization endpoint:
 
-   ```text
+   ```txt
    https://coder.example.com/oauth2/authorize?
      client_id=your-client-id&
      response_type=code&
@@ -148,7 +148,7 @@ confidential clients must include PKCE parameters:
 
 2. Include PKCE parameters in the authorization request:
 
-   ```text
+   ```txt
    https://coder.example.com/oauth2/authorize?
      client_id=your-client-id&
      response_type=code&

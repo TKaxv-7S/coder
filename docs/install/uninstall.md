@@ -54,7 +54,7 @@ sudo rm /usr/local/bin/coder
 
 ## Windows
 
-```powershell
+```ps1
 winget uninstall Coder.Coder
 ```
 
@@ -89,7 +89,7 @@ rm -rf ~/Library/Application\ Support/coderv2
 
 ## Windows
 
-```powershell
+```ps1
 rmdir %AppData%\coderv2
 ```
 

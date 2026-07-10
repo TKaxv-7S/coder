@@ -232,7 +232,7 @@ RC tags can be created from `main` or from a release branch. The
 `create-release-branch` type creates `release/X.Y` and tags the next RC in one
 step, continuing the RC numbering sequence.
 
-```text
+```txt
 main:  --*--*--*--*--*--*--*--*--*--
               |  rc.0   rc.1  |
               |               +--- create-release-branch ---+

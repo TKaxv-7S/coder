@@ -72,7 +72,7 @@ Download the latest Windows installer or binary from
 [GitHub releases](https://github.com/coder/coder/releases/latest), or upgrade
 from Winget.
 
-```powershell
+```ps1
 winget install Coder.Coder
 ```
 

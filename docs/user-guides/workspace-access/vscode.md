@@ -27,7 +27,7 @@ You can install our extension manually in VS Code using the command palette.
 Launch VS Code Quick Open (Ctrl+P), paste the following command, and press
 enter.
 
-```text
+```txt
 ext install coder.coder-remote
 ```
 

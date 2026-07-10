@@ -72,13 +72,13 @@ You'll need to configure DNS to point wildcard subdomains to your Coder server:
 > browsers consider these "public" domains and will refuse Coder's cookies,
 > which are vital to the proper operation of this feature.
 
-```text
+```txt
 *.coder.example.com    A    <your-coder-server-ip>
 ```
 
 Or alternatively, using a CNAME record:
 
-```text
+```txt
 *.coder.example.com    CNAME    coder.example.com
 ```
 
@@ -99,7 +99,7 @@ export CODER_WILDCARD_ACCESS_URL="*.london.coder.example.com"
 
 Each proxy's wildcard domain must have corresponding DNS records:
 
-```text
+```txt
 *.sydney.coder.example.com    A    <sydney-proxy-ip>
 *.london.coder.example.com    A    <london-proxy-ip>
 ```

@@ -26,13 +26,13 @@ You can also use a URI handler to launch an RDP session directly.
 
 The URI format is:
 
-```text
+```txt
 coder://<your Coder server name>/v0/open/ws/<workspace name>/agent/<agent name>/rdp?username=<username>&password=<password>
 ```
 
 For example:
 
-```text
+```txt
 coder://coder.example.com/v0/open/ws/myworkspace/agent/main/rdp?username=Administrator&password=coderRDP!
 ```
 

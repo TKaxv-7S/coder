@@ -150,7 +150,7 @@ Responses API. AI Gateway does not support WebSocket transport, so each
 request attempts a WebSocket connection and retries up to 5 times before
 falling back to HTTPS. When this happens you will see:
 
-```text
+```txt
 Falling back from WebSockets to HTTPS transport.
 ```
 

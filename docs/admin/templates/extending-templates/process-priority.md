@@ -138,7 +138,7 @@ runs another Coder agent.
 The agent logs whether process priority management is active
 at startup. Look for these lines in the agent log:
 
-```text
+```txt
 "process priority management enabled"
 "process priority management not enabled (linux-only)"
 ```

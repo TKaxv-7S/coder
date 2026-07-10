@@ -365,7 +365,7 @@ use the Coder CLI.
 
 1. Paste it into the CLI:
 
-   ```text
+   ```txt
    > Welcome to Coder, marc! You're authenticated.
    $
    ```

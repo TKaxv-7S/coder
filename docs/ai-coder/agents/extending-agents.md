@@ -39,7 +39,7 @@ a path-safe convenience for reading supporting files.
 
 ### Directory structure
 
-```text
+```txt
 .agents/skills/
 ├── deep-review/
 │   ├── SKILL.md

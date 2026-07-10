@@ -65,7 +65,7 @@ helm install coder-db bitnami/postgresql \
 
 After installation, the cluster-internal database URL will be:
 
-```text
+```txt
 postgres://coder:coder@coder-db-postgresql.coder.svc.cluster.local:5432/coder?sslmode=disable
 ```
 

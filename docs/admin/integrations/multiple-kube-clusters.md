@@ -147,7 +147,7 @@ EOF
 
 The output should be similar to:
 
-```text
+```txt
 serviceaccount/coder-v2 created
 secret/coder-v2 created
 role.rbac.authorization.k8s.io/coder-v2 created

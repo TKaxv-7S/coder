@@ -136,9 +136,10 @@ Use the most specific language tag available:
   Use `sh` when the block is input the reader types or a script they save, and the block doesn't also show output.
 - `console` for an interactive session that shows the typed command and its output together.
   Prefix each typed line with `$`.
-- `powershell` for Windows command-line blocks.
+- `ps1` for Windows command-line blocks.
   PowerShell is the default Windows shell in the Coder docs.
-  `pwsh` is not a valid tag; use `powershell`.
+  `pwsh` and `powershell` are not the canonical tag; use `ps1`.
+  `ps1` is Shiki's PowerShell alias, and it's also GitHub's `.ps1` file extension, which its markdown renderer falls back to when a fence label isn't a recognized language name; `ps` isn't registered either way and won't highlight on GitHub today.
 - `tf` for Terraform and HCL.
   `terraform` and `hcl` are not the canonical tag; use `tf`.
   Shiki ships `terraform` and `hcl` as two distinct grammars; `tf` is an alias of the more specific `terraform` grammar (not `hcl`), and matches what nearly every Coder docs code block actually is.
@@ -146,8 +147,8 @@ Use the most specific language tag available:
 - `go` for Go.
 - `json` for JSON.
 - `dotenv` for `.env`-style `KEY=VALUE` blocks.
-- `text` for command output shown on its own, and for any block with no syntax to highlight.
-  `output`, `none`, and `url` are not valid tags; use `text`.
+- `txt` for command output shown on its own, and for any block with no syntax to highlight.
+  `text`, `output`, `none`, and `url` are not the canonical tag; use `txt`.
 - `dockerfile` for Dockerfiles, lowercase.
   `Dockerfile` (capitalized) is not a valid tag.
 
@@ -155,7 +156,7 @@ Use the most specific language tag available:
 Use `sh` so the corpus stays consistent.
 
 A command with no output shown is `sh`, not `console`.
-To show a command together with its output, either use one `console` block with `$` before the typed line, or split the command into an `sh` block and the output into a `text` block.
+To show a command together with its output, either use one `console` block with `$` before the typed line, or split the command into an `sh` block and the output into a `txt` block.
 
 The auto-generated Coder CLI reference under `docs/reference/cli/` labels its command-usage blocks `console`.
 That output is generated.
@@ -164,8 +165,8 @@ Do not copy the pattern into hand-written pages.
 The docs site highlights code with [Speed-Highlight](https://github.com/speed-highlight/core), which detects the language from the code content, not from the fence label.
 The fence label still drives highlighting on GitHub and in most editors, and `markdownlint` rule `MD040` requires one, so always declare the most specific language.
 A future docs renderer may adopt [Shiki](https://shiki.style), which fails the build on a fence label it doesn't recognize as a language or alias, so use only tags Shiki supports.
-For content with no sensible language tag, fall back to `text`.
-A fence label needing a grammar Shiki doesn't bundle (for example `promql` or `caddyfile`) stays as-is; register it as a custom grammar when the site adopts Shiki, rather than degrading it to `text`.
+For content with no sensible language tag, fall back to `txt`.
+A fence label needing a grammar Shiki doesn't bundle (for example `promql` or `caddyfile`) stays as-is; register it as a custom grammar when the site adopts Shiki, rather than degrading it to `txt`.
 
 **Do**:
 
@@ -242,7 +243,7 @@ curl -L https://coder.com/install.sh | sh
 
 ### Windows
 
-```powershell
+```ps1
 winget install Coder.Coder
 ```
 

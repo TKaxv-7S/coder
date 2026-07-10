@@ -39,7 +39,7 @@ Before contributing modules, ensure you have:
 
 3. **Understand the structure**:
 
-   ```text
+   ```txt
    registry/[namespace]/
    ├── modules/         # Your modules
    ├── .images/         # Namespace avatar and screenshots

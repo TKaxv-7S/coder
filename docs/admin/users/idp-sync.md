@@ -15,7 +15,7 @@ synchronize Coder groups, roles, and organizations based on claims from your IdP
 To confirm that your OIDC provider is sending claims, log in with OIDC and visit
 the following URL with an `Owner` account:
 
-```text
+```txt
 https://[coder.example.com]/api/v2/debug/[your-username]/debug-link
 ```
 
@@ -53,7 +53,7 @@ group sync for each organization.
 
 1. Fetch the corresponding group IDs using the following endpoint:
 
-   ```text
+   ```txt
    https://[coder.example.com]/api/v2/groups
    ```
 
@@ -335,7 +335,7 @@ You can initiate an organization sync through the Coder dashboard or CLI:
 
 1. Fetch the corresponding organization IDs using the following endpoint:
 
-   ```text
+   ```txt
    https://[coder.example.com]/api/v2/organizations
    ```
 

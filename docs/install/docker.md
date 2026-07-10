@@ -105,7 +105,7 @@ Replace `ghcr.io/coder/coder:latest` in the `docker run` command in the
 
 If you see an error like:
 
-```text
+```txt
 Error: Error pinging Docker server: Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?
 ```
 

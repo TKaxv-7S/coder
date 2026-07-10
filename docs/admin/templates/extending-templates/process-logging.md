@@ -291,7 +291,7 @@ or workspace.
 To view your logs, go to the CloudWatch dashboard (which is available on the
 **Log Insights** tab) and run a query similar to the following:
 
-```text
+```txt
 fields @timestamp, log_processed.fields.cmdline
 | sort @timestamp asc
 | filter kubernetes.container_name="exectrace"
