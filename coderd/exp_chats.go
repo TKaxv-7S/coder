@@ -5613,11 +5613,20 @@ func (api *API) putChatAdvisorConfig(rw http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else {
-		modelConfig, err := lookupEnabledChatModelConfigByID(ctx, api.Database, req.ModelConfigID)
+		// Use system context because GetChatModelConfigByID requires
+		// deployment-config read access, which can be broader than the
+		// handler's explicit update check. Disabled models remain valid
+		// stored overrides so admins can update unrelated advisor limits;
+		// the runtime falls back when the model is unavailable.
+		//nolint:gocritic // This admin-authorized validation lookup intentionally bypasses read authz.
+		modelConfig, err := api.Database.GetChatModelConfigByID(
+			dbauthz.AsSystemRestricted(ctx),
+			req.ModelConfigID,
+		)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) || httpapi.Is404Error(err) {
 				httpapi.Write(ctx, rw, http.StatusBadRequest, codersdk.Response{
-					Message: fmt.Sprintf("model_config_id %q does not match any enabled model config.", req.ModelConfigID),
+					Message: fmt.Sprintf("model_config_id %q does not match any existing model config.", req.ModelConfigID),
 				})
 				return
 			}

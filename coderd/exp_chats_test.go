@@ -14041,24 +14041,42 @@ func TestChatAdvisorConfig_RejectsUnsupportedReasoningEffort(t *testing.T) {
 	require.Contains(t, sdkErr.Detail, "none, minimal, low, medium")
 }
 
-func TestChatAdvisorConfig_RejectsDisabledModel(t *testing.T) {
+func TestChatAdvisorConfig_AllowsUpdatingLimitsWithDisabledModel(t *testing.T) {
 	t.Parallel()
 
 	ctx := testutil.Context(t, testutil.WaitLong)
 	adminClient := newChatClient(t)
 	coderdtest.CreateFirstUser(t, adminClient.Client)
-	modelConfig := createDisabledChatModelConfig(
+	modelConfig := createAdditionalChatModelConfigWithReasoningEffort(
 		t,
 		adminClient,
 		coderdtest.TestChatProviderOpenAICompat,
 		"advisor-disabled",
+		codersdk.ChatModelReasoningEffortMedium,
+		codersdk.ChatModelReasoningEffortHigh,
 	)
+	want := codersdk.AdvisorConfig{
+		Enabled:         true,
+		MaxUsesPerRun:   3,
+		MaxOutputTokens: 2048,
+		ModelConfigID:   modelConfig.ID,
+		ReasoningEffort: ptr.Ref(codersdk.ChatModelReasoningEffortHigh),
+	}
+	err := adminClient.UpdateChatAdvisorConfig(ctx, want)
+	require.NoError(t, err)
 
-	err := adminClient.UpdateChatAdvisorConfig(ctx, codersdk.UpdateAdvisorConfigRequest{
-		ModelConfigID: modelConfig.ID,
+	_, err = adminClient.UpdateChatModelConfig(ctx, modelConfig.ID, codersdk.UpdateChatModelConfigRequest{
+		Enabled: ptr.Ref(false),
 	})
-	sdkErr := requireSDKError(t, err, http.StatusBadRequest)
-	require.Contains(t, sdkErr.Message, "enabled model config")
+	require.NoError(t, err)
+
+	want.MaxUsesPerRun = 5
+	err = adminClient.UpdateChatAdvisorConfig(ctx, want)
+	require.NoError(t, err)
+
+	resp, err := adminClient.GetChatAdvisorConfig(ctx)
+	require.NoError(t, err)
+	require.Equal(t, want, resp)
 }
 
 func TestChatAdvisorConfig_InvalidModelConfigID(t *testing.T) {
@@ -14074,7 +14092,7 @@ func TestChatAdvisorConfig_InvalidModelConfigID(t *testing.T) {
 	})
 	sdkErr := requireSDKError(t, err, http.StatusBadRequest)
 	require.Contains(t, sdkErr.Message, unknownID.String())
-	require.Contains(t, sdkErr.Message, "does not match any enabled model config")
+	require.Contains(t, sdkErr.Message, "does not match any existing model config")
 }
 
 func TestChatAdvisorConfig_RoundTripZeroValues(t *testing.T) {
