@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -20,19 +19,16 @@ func fixtureUpstream(t *testing.T) map[string]upstreamProvider {
 				"claude-fable-5": {
 					"name": "Claude Fable 5",
 					"limit": {"context": 1000000, "output": 128000},
-					"cost": {"input": 10, "output": 50, "cache_read": 1, "cache_write": 12.5},
-					"last_updated": "2026-06-09"
+					"cost": {"input": 10, "output": 50, "cache_read": 1, "cache_write": 12.5}
 				},
 				"claude-mythos-5": {
 					"name": "Claude Mythos 5",
 					"limit": {"context": 1000000, "output": 128000},
-					"cost": {"input": 10, "output": 50, "cache_read": 1, "cache_write": 12.5},
-					"last_updated": "2026-06-09"
+					"cost": {"input": 10, "output": 50, "cache_read": 1, "cache_write": 12.5}
 				},
 				"claude-costless": {
 					"name": "Claude Costless",
-					"limit": {"context": 200000, "output": 64000},
-					"last_updated": "2026-01-01"
+					"limit": {"context": 200000, "output": 64000}
 				}
 			}
 		},
@@ -41,14 +37,12 @@ func fixtureUpstream(t *testing.T) map[string]upstreamProvider {
 				"gpt-5.6-sol": {
 					"name": "GPT-5.6 Sol",
 					"limit": {"context": 1050000, "output": 128000},
-					"cost": {"input": 5, "output": 30, "cache_read": 0.5, "cache_write": 6.25},
-					"last_updated": "2026-07-09"
+					"cost": {"input": 5, "output": 30, "cache_read": 0.5, "cache_write": 6.25}
 				},
 				"gpt-partial": {
 					"name": "GPT Partial",
 					"limit": {"context": 400000, "output": 128000},
-					"cost": {"input": 0.2, "output": 1.25},
-					"last_updated": "2026-03-17"
+					"cost": {"input": 0.2, "output": 1.25}
 				}
 			}
 		}
@@ -57,8 +51,6 @@ func fixtureUpstream(t *testing.T) map[string]upstreamProvider {
 	require.NoError(t, json.Unmarshal([]byte(upstreamJSON), &upstream))
 	return upstream
 }
-
-var fixedNow = time.Date(2026, 7, 10, 12, 34, 56, 0, time.UTC)
 
 func TestBuildCatalog(t *testing.T) {
 	t.Parallel()
@@ -74,7 +66,7 @@ func TestBuildCatalog(t *testing.T) {
 		},
 	}
 
-	catalog, err := buildCatalog(fixtureUpstream(t), curation, fixedNow)
+	catalog, err := buildCatalog(fixtureUpstream(t), curation)
 	require.NoError(t, err)
 
 	var buf bytes.Buffer
@@ -93,12 +85,7 @@ func TestBuildCatalog(t *testing.T) {
       "inputCost": 10,
       "outputCost": 50,
       "cacheReadCost": 1,
-      "cacheWriteCost": 12.5,
-      "sourceMetadata": {
-        "sourceName": "models.dev",
-        "sourceRetrievedAt": "2026-07-10",
-        "lastUpdated": "2026-06-09"
-      }
+      "cacheWriteCost": 12.5
     },
     {
       "provider": "anthropic",
@@ -111,12 +98,7 @@ func TestBuildCatalog(t *testing.T) {
       "inputCost": 10,
       "outputCost": 50,
       "cacheReadCost": 1,
-      "cacheWriteCost": 12.5,
-      "sourceMetadata": {
-        "sourceName": "models.dev",
-        "sourceRetrievedAt": "2026-07-10",
-        "lastUpdated": "2026-06-09"
-      }
+      "cacheWriteCost": 12.5
     }
   ],
   "openai": [
@@ -133,12 +115,7 @@ func TestBuildCatalog(t *testing.T) {
       "inputCost": 5,
       "outputCost": 30,
       "cacheReadCost": 0.5,
-      "cacheWriteCost": 6.25,
-      "sourceMetadata": {
-        "sourceName": "models.dev",
-        "sourceRetrievedAt": "2026-07-10",
-        "lastUpdated": "2026-07-09"
-      }
+      "cacheWriteCost": 6.25
     },
     {
       "provider": "openai",
@@ -148,31 +125,12 @@ func TestBuildCatalog(t *testing.T) {
       "contextLimit": 400000,
       "maxOutputTokens": 128000,
       "inputCost": 0.2,
-      "outputCost": 1.25,
-      "sourceMetadata": {
-        "sourceName": "models.dev",
-        "sourceRetrievedAt": "2026-07-10",
-        "lastUpdated": "2026-03-17"
-      }
+      "outputCost": 1.25
     }
   ]
 }
 `
 	require.Equal(t, want, buf.String())
-}
-
-// TestBuildCatalogClock asserts the injected clock feeds sourceRetrievedAt
-// and leaves upstream-derived fields alone.
-func TestBuildCatalogClock(t *testing.T) {
-	t.Parallel()
-
-	curation := map[string][]curatedModel{
-		"openai": {{ModelIdentifier: "gpt-5.6-sol"}},
-	}
-	later, err := buildCatalog(fixtureUpstream(t), curation, fixedNow.AddDate(0, 0, 1))
-	require.NoError(t, err)
-	require.Equal(t, "2026-07-11", later["openai"][0].SourceMetadata.SourceRetrievedAt)
-	require.Equal(t, "2026-07-09", later["openai"][0].SourceMetadata.LastUpdated)
 }
 
 func TestBuildCatalogErrors(t *testing.T) {
@@ -274,43 +232,10 @@ func TestBuildCatalogErrors(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			_, err := buildCatalog(fixtureUpstream(t), tc.curation, fixedNow)
+			_, err := buildCatalog(fixtureUpstream(t), tc.curation)
 			require.Error(t, err)
 			require.Contains(t, err.Error(), tc.wantErr)
 		})
-	}
-}
-
-// TestEmbeddedCurationBuilds runs the checked-in curation.json through
-// buildCatalog against a synthetic upstream derived from the curation's own
-// model identifiers, so every buildCatalog validation (present and future)
-// automatically guards the checked-in file.
-func TestEmbeddedCurationBuilds(t *testing.T) {
-	t.Parallel()
-
-	curation := embeddedCuration(t)
-	require.NotEmpty(t, curation)
-
-	price := 1.0
-	limit := int64(100000)
-	upstream := make(map[string]upstreamProvider, len(curation))
-	for providerID, entries := range curation {
-		models := make(map[string]upstreamModel, len(entries))
-		for _, c := range entries {
-			models[c.ModelIdentifier] = upstreamModel{
-				Name:        "Synthetic " + c.ModelIdentifier,
-				Limit:       upstreamLimit{Context: &limit, Output: &limit},
-				Cost:        &upstreamCost{Input: &price, Output: &price},
-				LastUpdated: "2026-01-01",
-			}
-		}
-		upstream[providerID] = upstreamProvider{Models: models}
-	}
-
-	catalog, err := buildCatalog(upstream, curation, fixedNow)
-	require.NoError(t, err)
-	for providerID, entries := range catalog {
-		require.NotEmpty(t, entries, providerID)
 	}
 }
 

@@ -16,7 +16,6 @@ import (
 	"math"
 	"os"
 	"sort"
-	"time"
 
 	"golang.org/x/xerrors"
 )
@@ -31,10 +30,9 @@ type upstreamProvider struct {
 }
 
 type upstreamModel struct {
-	Name        string        `json:"name"`
-	Limit       upstreamLimit `json:"limit"`
-	Cost        *upstreamCost `json:"cost"`
-	LastUpdated string        `json:"last_updated"`
+	Name  string        `json:"name"`
+	Limit upstreamLimit `json:"limit"`
+	Cost  *upstreamCost `json:"cost"`
 }
 
 // Pointer fields in upstreamLimit and upstreamCost distinguish "key absent"
@@ -142,7 +140,7 @@ func runCatalog(upstream map[string]upstreamProvider) error {
 	if err := json.Unmarshal(curationJSON, &curation); err != nil {
 		return xerrors.Errorf("parse embedded curation.json: %w", err)
 	}
-	catalog, err := buildCatalog(upstream, curation, time.Now())
+	catalog, err := buildCatalog(upstream, curation)
 	if err != nil {
 		return err
 	}

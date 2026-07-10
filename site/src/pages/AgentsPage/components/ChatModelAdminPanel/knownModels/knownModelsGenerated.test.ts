@@ -88,10 +88,6 @@ describe("knownModelsGenerated", () => {
 					expect(value, field).toBeGreaterThanOrEqual(0);
 				}
 			}
-
-			expect(model.sourceMetadata.sourceName).toBe("models.dev");
-			expect(model.sourceMetadata.sourceRetrievedAt).not.toBe("");
-			expect(model.sourceMetadata.lastUpdated).not.toBe("");
 		}
 	});
 });

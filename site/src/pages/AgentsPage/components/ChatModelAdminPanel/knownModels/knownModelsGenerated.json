@@ -11,12 +11,7 @@
 			"inputCost": 10,
 			"outputCost": 50,
 			"cacheReadCost": 1,
-			"cacheWriteCost": 12.5,
-			"sourceMetadata": {
-				"sourceName": "models.dev",
-				"sourceRetrievedAt": "2026-07-10",
-				"lastUpdated": "2026-06-09"
-			}
+			"cacheWriteCost": 12.5
 		},
 		{
 			"provider": "anthropic",
@@ -29,12 +24,7 @@
 			"inputCost": 10,
 			"outputCost": 50,
 			"cacheReadCost": 1,
-			"cacheWriteCost": 12.5,
-			"sourceMetadata": {
-				"sourceName": "models.dev",
-				"sourceRetrievedAt": "2026-07-10",
-				"lastUpdated": "2026-06-09"
-			}
+			"cacheWriteCost": 12.5
 		},
 		{
 			"provider": "anthropic",
@@ -47,12 +37,7 @@
 			"inputCost": 5,
 			"outputCost": 25,
 			"cacheReadCost": 0.5,
-			"cacheWriteCost": 6.25,
-			"sourceMetadata": {
-				"sourceName": "models.dev",
-				"sourceRetrievedAt": "2026-07-10",
-				"lastUpdated": "2026-05-28"
-			}
+			"cacheWriteCost": 6.25
 		},
 		{
 			"provider": "anthropic",
@@ -65,12 +50,7 @@
 			"inputCost": 5,
 			"outputCost": 25,
 			"cacheReadCost": 0.5,
-			"cacheWriteCost": 6.25,
-			"sourceMetadata": {
-				"sourceName": "models.dev",
-				"sourceRetrievedAt": "2026-07-10",
-				"lastUpdated": "2026-04-16"
-			}
+			"cacheWriteCost": 6.25
 		},
 		{
 			"provider": "anthropic",
@@ -83,12 +63,7 @@
 			"inputCost": 5,
 			"outputCost": 25,
 			"cacheReadCost": 0.5,
-			"cacheWriteCost": 6.25,
-			"sourceMetadata": {
-				"sourceName": "models.dev",
-				"sourceRetrievedAt": "2026-07-10",
-				"lastUpdated": "2026-03-13"
-			}
+			"cacheWriteCost": 6.25
 		},
 		{
 			"provider": "anthropic",
@@ -101,12 +76,7 @@
 			"inputCost": 2,
 			"outputCost": 10,
 			"cacheReadCost": 0.2,
-			"cacheWriteCost": 2.5,
-			"sourceMetadata": {
-				"sourceName": "models.dev",
-				"sourceRetrievedAt": "2026-07-10",
-				"lastUpdated": "2026-06-30"
-			}
+			"cacheWriteCost": 2.5
 		},
 		{
 			"provider": "anthropic",
@@ -119,12 +89,7 @@
 			"inputCost": 3,
 			"outputCost": 15,
 			"cacheReadCost": 0.3,
-			"cacheWriteCost": 3.75,
-			"sourceMetadata": {
-				"sourceName": "models.dev",
-				"sourceRetrievedAt": "2026-07-10",
-				"lastUpdated": "2026-03-13"
-			}
+			"cacheWriteCost": 3.75
 		},
 		{
 			"provider": "anthropic",
@@ -137,12 +102,7 @@
 			"inputCost": 1,
 			"outputCost": 5,
 			"cacheReadCost": 0.1,
-			"cacheWriteCost": 1.25,
-			"sourceMetadata": {
-				"sourceName": "models.dev",
-				"sourceRetrievedAt": "2026-07-10",
-				"lastUpdated": "2025-10-15"
-			}
+			"cacheWriteCost": 1.25
 		},
 		{
 			"provider": "anthropic",
@@ -155,12 +115,7 @@
 			"inputCost": 3,
 			"outputCost": 15,
 			"cacheReadCost": 0.3,
-			"cacheWriteCost": 3.75,
-			"sourceMetadata": {
-				"sourceName": "models.dev",
-				"sourceRetrievedAt": "2026-07-10",
-				"lastUpdated": "2025-09-29"
-			}
+			"cacheWriteCost": 3.75
 		}
 	],
 	"openai": [
@@ -175,12 +130,7 @@
 			"inputCost": 5,
 			"outputCost": 30,
 			"cacheReadCost": 0.5,
-			"cacheWriteCost": 6.25,
-			"sourceMetadata": {
-				"sourceName": "models.dev",
-				"sourceRetrievedAt": "2026-07-10",
-				"lastUpdated": "2026-07-09"
-			}
+			"cacheWriteCost": 6.25
 		},
 		{
 			"provider": "openai",
@@ -193,12 +143,7 @@
 			"inputCost": 2.5,
 			"outputCost": 15,
 			"cacheReadCost": 0.25,
-			"cacheWriteCost": 3.125,
-			"sourceMetadata": {
-				"sourceName": "models.dev",
-				"sourceRetrievedAt": "2026-07-10",
-				"lastUpdated": "2026-07-09"
-			}
+			"cacheWriteCost": 3.125
 		},
 		{
 			"provider": "openai",
@@ -211,12 +156,7 @@
 			"inputCost": 1,
 			"outputCost": 6,
 			"cacheReadCost": 0.1,
-			"cacheWriteCost": 1.25,
-			"sourceMetadata": {
-				"sourceName": "models.dev",
-				"sourceRetrievedAt": "2026-07-10",
-				"lastUpdated": "2026-07-09"
-			}
+			"cacheWriteCost": 1.25
 		},
 		{
 			"provider": "openai",
@@ -228,12 +168,7 @@
 			"reasoningEffort": "medium",
 			"inputCost": 5,
 			"outputCost": 30,
-			"cacheReadCost": 0.5,
-			"sourceMetadata": {
-				"sourceName": "models.dev",
-				"sourceRetrievedAt": "2026-07-10",
-				"lastUpdated": "2026-04-23"
-			}
+			"cacheReadCost": 0.5
 		},
 		{
 			"provider": "openai",
@@ -244,12 +179,7 @@
 			"maxOutputTokens": 128000,
 			"reasoningEffort": "high",
 			"inputCost": 30,
-			"outputCost": 180,
-			"sourceMetadata": {
-				"sourceName": "models.dev",
-				"sourceRetrievedAt": "2026-07-10",
-				"lastUpdated": "2026-04-23"
-			}
+			"outputCost": 180
 		},
 		{
 			"provider": "openai",
@@ -260,12 +190,7 @@
 			"maxOutputTokens": 128000,
 			"inputCost": 2.5,
 			"outputCost": 15,
-			"cacheReadCost": 0.25,
-			"sourceMetadata": {
-				"sourceName": "models.dev",
-				"sourceRetrievedAt": "2026-07-10",
-				"lastUpdated": "2026-03-05"
-			}
+			"cacheReadCost": 0.25
 		},
 		{
 			"provider": "openai",
@@ -277,12 +202,7 @@
 			"reasoningEffort": "medium",
 			"inputCost": 0.75,
 			"outputCost": 4.5,
-			"cacheReadCost": 0.075,
-			"sourceMetadata": {
-				"sourceName": "models.dev",
-				"sourceRetrievedAt": "2026-07-10",
-				"lastUpdated": "2026-03-17"
-			}
+			"cacheReadCost": 0.075
 		},
 		{
 			"provider": "openai",
@@ -293,12 +213,7 @@
 			"maxOutputTokens": 128000,
 			"inputCost": 0.2,
 			"outputCost": 1.25,
-			"cacheReadCost": 0.02,
-			"sourceMetadata": {
-				"sourceName": "models.dev",
-				"sourceRetrievedAt": "2026-07-10",
-				"lastUpdated": "2026-03-17"
-			}
+			"cacheReadCost": 0.02
 		},
 		{
 			"provider": "openai",
@@ -310,12 +225,7 @@
 			"reasoningEffort": "medium",
 			"inputCost": 1.75,
 			"outputCost": 14,
-			"cacheReadCost": 0.175,
-			"sourceMetadata": {
-				"sourceName": "models.dev",
-				"sourceRetrievedAt": "2026-07-10",
-				"lastUpdated": "2026-02-05"
-			}
+			"cacheReadCost": 0.175
 		}
 	]
 }

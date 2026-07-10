@@ -5,7 +5,6 @@ import (
 	_ "embed"
 	"encoding/json"
 	"io"
-	"time"
 
 	"golang.org/x/xerrors"
 )
@@ -41,35 +40,26 @@ type curatedModel struct {
 // Costs are flat USD per million tokens, straight from models.dev; tiered
 // pricing such as context_over_200k is intentionally omitted.
 type catalogEntry struct {
-	Provider             string         `json:"provider"`
-	ModelIdentifier      string         `json:"modelIdentifier"`
-	DisplayName          string         `json:"displayName"`
-	Aliases              []string       `json:"aliases"`
-	ContextLimit         *int64         `json:"contextLimit,omitempty"`
-	MaxOutputTokens      *int64         `json:"maxOutputTokens,omitempty"`
-	ReasoningEffort      string         `json:"reasoningEffort,omitempty"`
-	ThinkingBudgetTokens int            `json:"thinkingBudgetTokens,omitempty"`
-	InputCost            *float64       `json:"inputCost,omitempty"`
-	OutputCost           *float64       `json:"outputCost,omitempty"`
-	CacheReadCost        *float64       `json:"cacheReadCost,omitempty"`
-	CacheWriteCost       *float64       `json:"cacheWriteCost,omitempty"`
-	SourceMetadata       sourceMetadata `json:"sourceMetadata"`
-}
-
-type sourceMetadata struct {
-	SourceName        string `json:"sourceName"`
-	SourceRetrievedAt string `json:"sourceRetrievedAt"`
-	LastUpdated       string `json:"lastUpdated"`
+	Provider             string   `json:"provider"`
+	ModelIdentifier      string   `json:"modelIdentifier"`
+	DisplayName          string   `json:"displayName"`
+	Aliases              []string `json:"aliases"`
+	ContextLimit         *int64   `json:"contextLimit,omitempty"`
+	MaxOutputTokens      *int64   `json:"maxOutputTokens,omitempty"`
+	ReasoningEffort      string   `json:"reasoningEffort,omitempty"`
+	ThinkingBudgetTokens int      `json:"thinkingBudgetTokens,omitempty"`
+	InputCost            *float64 `json:"inputCost,omitempty"`
+	OutputCost           *float64 `json:"outputCost,omitempty"`
+	CacheReadCost        *float64 `json:"cacheReadCost,omitempty"`
+	CacheWriteCost       *float64 `json:"cacheWriteCost,omitempty"`
 }
 
 // validReasoningEfforts are the values accepted for curatedModel.ReasoningEffort.
 var validReasoningEfforts = map[string]bool{"low": true, "medium": true, "high": true}
 
 // buildCatalog joins the curation file with the upstream models.dev payload
-// and returns provider-keyed ordered entry lists. now supplies the
-// sourceRetrievedAt date so output is deterministic under test.
-func buildCatalog(upstream map[string]upstreamProvider, curation map[string][]curatedModel, now time.Time) (map[string][]catalogEntry, error) {
-	retrievedAt := now.UTC().Format("2006-01-02")
+// and returns provider-keyed ordered entry lists.
+func buildCatalog(upstream map[string]upstreamProvider, curation map[string][]curatedModel) (map[string][]catalogEntry, error) {
 	out := make(map[string][]catalogEntry, len(curation))
 	for providerID, curated := range curation {
 		provider, ok := upstream[providerID]
@@ -133,11 +123,6 @@ func buildCatalog(upstream map[string]upstreamProvider, curation map[string][]cu
 				OutputCost:           m.Cost.Output,
 				CacheReadCost:        m.Cost.CacheRead,
 				CacheWriteCost:       m.Cost.CacheWrite,
-				SourceMetadata: sourceMetadata{
-					SourceName:        "models.dev",
-					SourceRetrievedAt: retrievedAt,
-					LastUpdated:       m.LastUpdated,
-				},
 			})
 		}
 		// An alias resolving to a canonical identifier would make exact-alias

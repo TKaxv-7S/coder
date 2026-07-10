@@ -1,8 +1,8 @@
 import { normalizeProvider } from "#/modules/aiModels/helpers";
 import knownModelsGenerated from "./knownModelsGenerated.json";
-import type { KnownModel, KnownModelSourceMetadata } from "./types";
+import type { KnownModel } from "./types";
 
-export type { KnownModel, KnownModelSourceMetadata };
+export type { KnownModel };
 
 // knownModelsGenerated.json is produced by `make gen/aibridge-prices` from
 // models.dev joined with the editorial curation in
