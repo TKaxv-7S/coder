@@ -55,6 +55,17 @@ const claudeSonnetModelConfig = buildModelConfig({
 	context_limit: 200_000,
 });
 
+const advisorReasoningModelConfig = buildModelConfig({
+	id: "model-advisor-gpt-5",
+	model: "gpt-5",
+	display_name: "GPT-5 Advisor",
+	context_limit: 400_000,
+	model_config: {
+		reasoning_effort: { default: "medium", max: "high" },
+	},
+	reasoning_efforts: ["none", "minimal", "low", "medium", "high"],
+});
+
 const titleModelConfig = buildModelConfig({
 	id: "model-title-gpt-4o-mini",
 	model: "gpt-4o-mini",
@@ -97,6 +108,7 @@ const exploreDisabledModelConfig = buildModelConfig({
 const allModelConfigs: TypesGen.ChatModelConfig[] = [
 	generalModelConfig,
 	claudeSonnetModelConfig,
+	advisorReasoningModelConfig,
 	titleModelConfig,
 	exploreFallbackModelConfig,
 	generalDisabledModelConfig,
@@ -534,6 +546,102 @@ export const AdvisorSettingsVisible: Story = {
 				expect.anything(),
 			);
 		});
+	},
+};
+
+export const AdvisorReasoningEffort: Story = {
+	args: buildArgs({
+		showAdvisorSettings: true,
+		advisorConfigData: {
+			enabled: true,
+			max_uses_per_run: 3,
+			max_output_tokens: 16384,
+			model_config_id: advisorReasoningModelConfig.id,
+		},
+	}),
+	play: async ({ canvasElement, args }) => {
+		const section = await getSection(canvasElement, "Advisor");
+		const body = within(canvasElement.ownerDocument.body);
+		const trigger = within(section).getByRole("combobox", {
+			name: "Advisor model",
+		});
+		await userEvent.click(trigger);
+		const slider = await within(body.getByRole("dialog")).findByRole("slider");
+		expect(slider).toHaveAttribute("aria-valuenow", "3");
+		await userEvent.click(slider);
+		await userEvent.keyboard("{ArrowRight}");
+		await waitFor(() => {
+			expect(slider).toHaveAttribute("aria-valuenow", "4");
+		});
+		await userEvent.click(trigger);
+		const saveButton = within(section).getByRole("button", { name: "Save" });
+		await userEvent.click(saveButton);
+		await waitFor(() => {
+			expect(args.onSaveAdvisorConfig).toHaveBeenCalledWith(
+				expect.objectContaining({
+					model_config_id: advisorReasoningModelConfig.id,
+					reasoning_effort: "high",
+				}),
+				expect.anything(),
+			);
+		});
+
+		await userEvent.click(trigger);
+		await userEvent.type(
+			body.getByPlaceholderText("Search..."),
+			"Use chat model",
+		);
+		await userEvent.keyboard("{Enter}");
+		expect(body.queryByRole("slider")).not.toBeInTheDocument();
+		await userEvent.click(saveButton);
+		await waitFor(() => {
+			expect(args.onSaveAdvisorConfig).toHaveBeenLastCalledWith(
+				expect.not.objectContaining({ reasoning_effort: expect.anything() }),
+				expect.anything(),
+			);
+		});
+	},
+};
+
+export const AdvisorUnavailableModel: Story = {
+	args: buildArgs({
+		showAdvisorSettings: true,
+		advisorConfigData: {
+			enabled: true,
+			max_uses_per_run: 3,
+			max_output_tokens: 16384,
+			model_config_id: generalDisabledModelConfig.id,
+			reasoning_effort: "high",
+		},
+	}),
+	play: async ({ canvasElement }) => {
+		const section = await getSection(canvasElement, "Advisor");
+		expect(
+			within(section).getByRole("combobox", { name: "Advisor model" }),
+		).toHaveTextContent("Unavailable: GPT 4.1 Legacy");
+		expect(within(section).queryByRole("slider")).not.toBeInTheDocument();
+	},
+};
+
+export const AdvisorModelWithoutReasoningEffort: Story = {
+	args: buildArgs({
+		showAdvisorSettings: true,
+		advisorConfigData: {
+			enabled: true,
+			max_uses_per_run: 3,
+			max_output_tokens: 16384,
+			model_config_id: generalModelConfig.id,
+		},
+	}),
+	play: async ({ canvasElement }) => {
+		const section = await getSection(canvasElement, "Advisor");
+		const trigger = within(section).getByRole("combobox", {
+			name: "Advisor model",
+		});
+		await userEvent.click(trigger);
+		expect(
+			within(canvasElement.ownerDocument.body).queryByRole("slider"),
+		).not.toBeInTheDocument();
 	},
 };
 

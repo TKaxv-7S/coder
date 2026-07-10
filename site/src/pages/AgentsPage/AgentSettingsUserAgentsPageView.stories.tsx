@@ -70,6 +70,17 @@ const claudeModelConfig = buildModelConfig({
 	context_limit: 200_000,
 });
 
+const reasoningModelConfig = buildModelConfig({
+	id: "model-gpt-5",
+	model: "gpt-5",
+	display_name: "GPT-5",
+	context_limit: 400_000,
+	model_config: {
+		reasoning_effort: { default: "medium", max: "high" },
+	},
+	reasoning_efforts: ["none", "minimal", "low", "medium", "high"],
+});
+
 const disabledModelConfig = buildModelConfig({
 	id: "model-disabled",
 	model: "gpt-4.1-legacy",
@@ -87,6 +98,7 @@ const inaccessibleModelConfig = buildModelConfig({
 const modelConfigs = [
 	defaultModelConfig,
 	claudeModelConfig,
+	reasoningModelConfig,
 	disabledModelConfig,
 	inaccessibleModelConfig,
 ];
@@ -98,6 +110,15 @@ const modelOptions: ModelSelectorOption[] = [
 		model: defaultModelConfig.model,
 		displayName: defaultModelConfig.display_name,
 		contextLimit: defaultModelConfig.context_limit,
+	},
+	{
+		id: reasoningModelConfig.id,
+		provider: "openai",
+		model: reasoningModelConfig.model,
+		displayName: reasoningModelConfig.display_name,
+		contextLimit: reasoningModelConfig.context_limit,
+		reasoningEffortDefault: "medium",
+		reasoningEfforts: reasoningModelConfig.reasoning_efforts,
 	},
 	{
 		id: claudeModelConfig.id,
@@ -275,6 +296,76 @@ export const EnabledWithSavedValues: Story = {
 				expect.anything(),
 			);
 		});
+	},
+};
+
+export const ReasoningEffortForAllAgentTypes: Story = {
+	args: buildArgs({
+		overridesData: buildOverridesResponse({
+			root: buildOverride("root", {
+				mode: "model",
+				model_config_id: reasoningModelConfig.id,
+				is_set: true,
+			}),
+			general: buildOverride("general", {
+				mode: "model",
+				model_config_id: reasoningModelConfig.id,
+				is_set: true,
+			}),
+			explore: buildOverride("explore", {
+				mode: "model",
+				model_config_id: reasoningModelConfig.id,
+				is_set: true,
+			}),
+		}),
+	}),
+	play: async ({ canvasElement, args }) => {
+		const body = within(canvasElement.ownerDocument.body);
+		const cases = [
+			{
+				title: "Root agent model",
+				onSave: args.onSaveRootModelOverride,
+			},
+			{
+				title: "General subagent model",
+				onSave: args.onSaveGeneralModelOverride,
+			},
+			{
+				title: "Explore subagent model",
+				onSave: args.onSaveExploreModelOverride,
+			},
+		];
+
+		for (const testCase of cases) {
+			const section = await getSection(canvasElement, testCase.title);
+			const trigger = within(section).getByRole("combobox", {
+				name: `${testCase.title} behavior`,
+			});
+			await userEvent.click(trigger);
+			const slider = await within(body.getByRole("dialog")).findByRole(
+				"slider",
+			);
+			expect(slider).toHaveAttribute("aria-valuenow", "3");
+			await userEvent.click(slider);
+			await userEvent.keyboard("{ArrowRight}");
+			await waitFor(() => {
+				expect(slider).toHaveAttribute("aria-valuenow", "4");
+			});
+			await userEvent.click(trigger);
+			await userEvent.click(
+				within(section).getByRole("button", { name: "Save" }),
+			);
+			await waitFor(() => {
+				expect(testCase.onSave).toHaveBeenCalledWith(
+					{
+						mode: "model",
+						model_config_id: reasoningModelConfig.id,
+						reasoning_effort: "high",
+					},
+					expect.anything(),
+				);
+			});
+		}
 	},
 };
 

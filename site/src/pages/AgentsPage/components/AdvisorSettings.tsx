@@ -7,20 +7,19 @@ import type {
 	UpdateAdvisorConfigRequest,
 } from "#/api/typesGenerated";
 import { Button } from "#/components/Button/Button";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "#/components/Select/Select";
 import { useTemporarySavedState } from "#/components/TemporarySavedState/TemporarySavedState";
 import { AgentSettingLayout } from "#/pages/AISettingsPage/CoderAgentsPage/components/AgentSettingLayout";
 import { cn } from "#/utils/cn";
+import type { ProviderInfo } from "../utils/modelOptions";
+import { pickReasoningEffort } from "../utils/reasoningEffort";
+import {
+	ModelSelector,
+	type ModelSelectorOption,
+	type ModelSelectorSpecialOption,
+} from "./ChatElements";
 
 const nilUUID = "00000000-0000-0000-0000-000000000000";
 const chatModelFallbackValue = "__use-chat-model__";
-const unavailableModelValue = "__unavailable-model__";
 
 interface MutationCallbacks {
 	onSuccess?: () => void;
@@ -33,6 +32,7 @@ interface AdvisorSettingsProps {
 	isAdvisorConfigFetching: boolean;
 	isAdvisorConfigLoadError: boolean;
 	modelConfigs: readonly ChatModelConfig[];
+	providerInfoByID: ReadonlyMap<string, ProviderInfo>;
 	modelConfigsError: unknown;
 	isLoadingModelConfigs: boolean;
 	isFetchingModelConfigs: boolean;
@@ -49,6 +49,7 @@ type AdvisorSettingsFormValues = {
 	max_uses_per_run: string;
 	max_output_tokens: string;
 	model_config_id: string;
+	reasoning_effort: string;
 };
 
 const isUnsetModelConfigId = (id: string): boolean =>
@@ -78,6 +79,8 @@ const normalizeAdvisorConfig = (
 		!isUnsetModelConfigId(config.model_config_id)
 			? config.model_config_id
 			: "",
+	reasoning_effort:
+		typeof config?.reasoning_effort === "string" ? config.reasoning_effort : "",
 });
 
 const toAdvisorConfigRequest = (
@@ -89,6 +92,9 @@ const toAdvisorConfigRequest = (
 	model_config_id: isUnsetModelConfigId(values.model_config_id)
 		? nilUUID
 		: values.model_config_id,
+	...(!isUnsetModelConfigId(values.model_config_id) && values.reasoning_effort
+		? { reasoning_effort: values.reasoning_effort }
+		: {}),
 });
 
 const isNonNegativeIntegerString = (value: string): boolean => {
@@ -124,6 +130,7 @@ export const AdvisorSettings: FC<AdvisorSettingsProps> = ({
 	isAdvisorConfigFetching,
 	isAdvisorConfigLoadError,
 	modelConfigs,
+	providerInfoByID,
 	modelConfigsError,
 	isLoadingModelConfigs,
 	isFetchingModelConfigs,
@@ -137,6 +144,27 @@ export const AdvisorSettings: FC<AdvisorSettingsProps> = ({
 	const { isSavedVisible, showSavedState } = useTemporarySavedState();
 	const hasLoadedAdvisorConfig = advisorConfigData !== undefined;
 	const enabledModelConfigs = modelConfigs.filter((config) => config.enabled);
+	const modelOptions: ModelSelectorOption[] = enabledModelConfigs.map(
+		(modelConfig) => {
+			const providerInfo = providerInfoByID.get(modelConfig.ai_provider_id);
+			const reasoningEffort = modelConfig.model_config?.reasoning_effort;
+			const reasoningEfforts = modelConfig.reasoning_efforts ?? [];
+			return {
+				id: modelConfig.id,
+				provider: providerInfo?.provider ?? "",
+				providerId: modelConfig.ai_provider_id,
+				providerLabel: providerInfo?.displayName,
+				providerIcon: providerInfo?.icon,
+				model: modelConfig.model,
+				displayName: getModelDisplayName(modelConfig),
+				contextLimit: modelConfig.context_limit,
+				...(reasoningEffort?.default
+					? { reasoningEffortDefault: reasoningEffort.default }
+					: {}),
+				...(reasoningEfforts.length > 0 ? { reasoningEfforts } : {}),
+			};
+		},
+	);
 
 	const form = useFormik<AdvisorSettingsFormValues>({
 		enableReinitialize: true,
@@ -157,7 +185,17 @@ export const AdvisorSettings: FC<AdvisorSettingsProps> = ({
 				!modelConfigsError &&
 				!modelConfigs.some((config) => config.id === source.model_config_id)
 			) {
-				source = { ...source, model_config_id: "" };
+				source = { ...source, model_config_id: "", reasoning_effort: "" };
+			}
+			const selectedOption = modelOptions.find(
+				(option) => option.id === source.model_config_id,
+			);
+			if (
+				source.reasoning_effort &&
+				selectedOption &&
+				!selectedOption.reasoningEfforts?.includes(source.reasoning_effort)
+			) {
+				source = { ...source, reasoning_effort: "" };
 			}
 			const request = toAdvisorConfigRequest(source);
 			onSaveAdvisorConfig(request, {
@@ -186,18 +224,45 @@ export const AdvisorSettings: FC<AdvisorSettingsProps> = ({
 	const selectedModelConfig = modelConfigs.find(
 		(config) => config.id === form.values.model_config_id,
 	);
-	const selectedModelLabel = isUnsetModelConfigId(form.values.model_config_id)
-		? "Use chat model"
-		: isLoadingModelConfigs
-			? "Loading..."
-			: selectedModelConfig
-				? getModelDisplayName(selectedModelConfig)
-				: `Unavailable model (${form.values.model_config_id})`;
+	const selectedModelOption = modelOptions.find(
+		(option) => option.id === form.values.model_config_id,
+	);
+	const selectedReasoningEffort = selectedModelOption
+		? pickReasoningEffort(
+				form.values.reasoning_effort,
+				selectedModelOption.reasoningEfforts ?? [],
+				selectedModelOption.reasoningEffortDefault,
+			)
+		: undefined;
 	const selectedModelValue = isUnsetModelConfigId(form.values.model_config_id)
 		? chatModelFallbackValue
-		: hasUnavailableSelectedModel
-			? unavailableModelValue
-			: form.values.model_config_id;
+		: form.values.model_config_id;
+	const specialOptions: ModelSelectorSpecialOption[] = [
+		{
+			value: chatModelFallbackValue,
+			dropdownLabel: "Use chat model",
+			description: "Use the model selected for the current chat",
+		},
+	];
+	if (
+		!isUnsetModelConfigId(form.values.model_config_id) &&
+		isLoadingModelConfigs
+	) {
+		specialOptions.push({
+			value: form.values.model_config_id,
+			dropdownLabel: "Loading...",
+			disabled: true,
+		});
+	} else if (hasUnavailableSelectedModel) {
+		const unavailableLabel = selectedModelConfig
+			? `Unavailable: ${getModelDisplayName(selectedModelConfig)}`
+			: `Unavailable model (${form.values.model_config_id})`;
+		specialOptions.push({
+			value: form.values.model_config_id,
+			dropdownLabel: unavailableLabel,
+			disabled: true,
+		});
+	}
 	const canSave = hasLoadedAdvisorConfig && form.dirty && form.isValid;
 
 	return (
@@ -248,42 +313,50 @@ export const AdvisorSettings: FC<AdvisorSettingsProps> = ({
 				disabled={isFormDisabled}
 				className="w-36"
 			/>
-			<Select
+			<ModelSelector
+				options={modelOptions}
+				specialOptions={specialOptions}
 				value={selectedModelValue}
 				onValueChange={(value) => {
 					if (value === chatModelFallbackValue) {
-						void form.setFieldValue("model_config_id", "");
+						void form.setValues({
+							...form.values,
+							model_config_id: "",
+							reasoning_effort: "",
+						});
 						return;
 					}
-					if (value === unavailableModelValue) {
-						return;
+					const option = modelOptions.find((option) => option.id === value);
+					let reasoningEffort = "";
+					if (option) {
+						reasoningEffort =
+							pickReasoningEffort(
+								"",
+								option.reasoningEfforts ?? [],
+								option.reasoningEffortDefault,
+							) ?? "";
 					}
-					void form.setFieldValue("model_config_id", value);
+					void form.setValues({
+						...form.values,
+						model_config_id: value,
+						reasoning_effort: reasoningEffort,
+					});
 				}}
 				disabled={isModelSelectDisabled}
-			>
-				<SelectTrigger
-					className="h-10 w-[22rem] max-w-full justify-between rounded-md border border-border border-solid bg-transparent px-3 text-sm shadow-none"
-					aria-label="Advisor model"
-				>
-					<SelectValue placeholder="Use chat model">
-						{selectedModelLabel}
-					</SelectValue>
-				</SelectTrigger>
-				<SelectContent>
-					{hasUnavailableSelectedModel && (
-						<SelectItem value={unavailableModelValue}>
-							{selectedModelLabel}
-						</SelectItem>
-					)}
-					<SelectItem value={chatModelFallbackValue}>Use chat model</SelectItem>
-					{enabledModelConfigs.map((config) => (
-						<SelectItem key={config.id} value={config.id}>
-							{getModelDisplayName(config)}
-						</SelectItem>
-					))}
-				</SelectContent>
-			</Select>
+				ariaLabel="Advisor model"
+				placeholder="Use chat model"
+				emptyMessage={
+					isLoadingModelConfigs
+						? "Loading models..."
+						: "No enabled models found."
+				}
+				className="h-10 w-[22rem] max-w-full justify-between rounded-md border border-border border-solid bg-transparent px-3 text-sm shadow-none"
+				contentClassName="min-w-[18rem]"
+				reasoningEffort={selectedReasoningEffort}
+				onReasoningEffortChange={(value) =>
+					void form.setFieldValue("reasoning_effort", value)
+				}
+			/>
 			<Button
 				size="lg"
 				variant="outline"
@@ -293,6 +366,7 @@ export const AdvisorSettings: FC<AdvisorSettingsProps> = ({
 						max_uses_per_run: "0",
 						max_output_tokens: "0",
 						model_config_id: "",
+						reasoning_effort: "",
 					});
 				}}
 				disabled={isFormDisabled}

@@ -994,7 +994,7 @@ func TestConfigCache_AdvisorConfig_CacheHit(t *testing.T) {
 
 	ctx := testutil.Context(t, testutil.WaitShort)
 	clock := quartz.NewMock(t)
-	const raw = `{"enabled":true,"max_uses_per_run":3,"max_output_tokens":16384}`
+	const raw = `{"enabled":true,"max_uses_per_run":3,"max_output_tokens":16384,"model_config_id":"00000000-0000-0000-0000-000000000001","reasoning_effort":"high","_version":1}`
 	store := &stubChatConfigStore{
 		getChatAdvisorConfig: func(context.Context) (string, error) {
 			return raw, nil
@@ -1010,6 +1010,8 @@ func TestConfigCache_AdvisorConfig_CacheHit(t *testing.T) {
 	require.True(t, first.Enabled)
 	require.Equal(t, 3, first.MaxUsesPerRun)
 	require.Equal(t, int64(16384), first.MaxOutputTokens)
+	require.NotNil(t, first.ReasoningEffort)
+	require.Equal(t, codersdk.ChatModelReasoningEffortHigh, *first.ReasoningEffort)
 	require.Equal(t, first, second)
 	require.Equal(t, int32(1), store.advisorConfigCalls.Load(),
 		"second lookup must be served from cache")
@@ -1099,6 +1101,23 @@ func TestConfigCache_AdvisorConfig_EmptyJSONYieldsZeroValue(t *testing.T) {
 	cfg, err := cache.AdvisorConfig(ctx)
 	require.NoError(t, err)
 	require.Equal(t, codersdk.AdvisorConfig{}, cfg)
+}
+
+func TestConfigCache_AdvisorConfig_IgnoresUnversionedReasoningEffort(t *testing.T) {
+	t.Parallel()
+
+	ctx := testutil.Context(t, testutil.WaitShort)
+	clock := quartz.NewMock(t)
+	store := &stubChatConfigStore{
+		getChatAdvisorConfig: func(context.Context) (string, error) {
+			return `{"reasoning_effort":"high"}`, nil
+		},
+	}
+	cache := newChatConfigCache(ctx, store, clock)
+
+	cfg, err := cache.AdvisorConfig(ctx)
+	require.NoError(t, err)
+	require.Nil(t, cfg.ReasoningEffort)
 }
 
 // Guards the pubsub-driven invalidation path. Without this, an admin

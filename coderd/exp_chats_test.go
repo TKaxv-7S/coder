@@ -13967,6 +13967,94 @@ func TestChatAdvisorConfig_RoundTripModelConfigID(t *testing.T) {
 	require.Equal(t, want, resp)
 }
 
+func TestChatAdvisorConfig_RoundTripReasoningEffort(t *testing.T) {
+	t.Parallel()
+
+	ctx := testutil.Context(t, testutil.WaitLong)
+	adminClient := newChatClient(t)
+	coderdtest.CreateFirstUser(t, adminClient.Client)
+	modelConfig := createAdditionalChatModelConfigWithReasoningEffort(
+		t,
+		adminClient,
+		coderdtest.TestChatProviderOpenAICompat,
+		"advisor-reasoning",
+		codersdk.ChatModelReasoningEffortMedium,
+		codersdk.ChatModelReasoningEffortHigh,
+	)
+	want := codersdk.AdvisorConfig{
+		Enabled:         true,
+		MaxUsesPerRun:   3,
+		MaxOutputTokens: 2048,
+		ModelConfigID:   modelConfig.ID,
+		ReasoningEffort: ptr.Ref(codersdk.ChatModelReasoningEffortHigh),
+	}
+
+	err := adminClient.UpdateChatAdvisorConfig(ctx, want)
+	require.NoError(t, err)
+
+	resp, err := adminClient.GetChatAdvisorConfig(ctx)
+	require.NoError(t, err)
+	require.Equal(t, want, resp)
+}
+
+func TestChatAdvisorConfig_ReasoningEffortRequiresModel(t *testing.T) {
+	t.Parallel()
+
+	ctx := testutil.Context(t, testutil.WaitLong)
+	adminClient := newChatClient(t)
+	coderdtest.CreateFirstUser(t, adminClient.Client)
+
+	err := adminClient.UpdateChatAdvisorConfig(ctx, codersdk.UpdateAdvisorConfigRequest{
+		ReasoningEffort: ptr.Ref(codersdk.ChatModelReasoningEffortHigh),
+	})
+	sdkErr := requireSDKError(t, err, http.StatusBadRequest)
+	require.Contains(t, sdkErr.Message, "reasoning_effort requires model_config_id")
+}
+
+func TestChatAdvisorConfig_RejectsUnsupportedReasoningEffort(t *testing.T) {
+	t.Parallel()
+
+	ctx := testutil.Context(t, testutil.WaitLong)
+	adminClient := newChatClient(t)
+	coderdtest.CreateFirstUser(t, adminClient.Client)
+	modelConfig := createAdditionalChatModelConfigWithReasoningEffort(
+		t,
+		adminClient,
+		coderdtest.TestChatProviderOpenAICompat,
+		"advisor-limited-reasoning",
+		codersdk.ChatModelReasoningEffortLow,
+		codersdk.ChatModelReasoningEffortMedium,
+	)
+
+	err := adminClient.UpdateChatAdvisorConfig(ctx, codersdk.UpdateAdvisorConfigRequest{
+		ModelConfigID:   modelConfig.ID,
+		ReasoningEffort: ptr.Ref(codersdk.ChatModelReasoningEffortHigh),
+	})
+	sdkErr := requireSDKError(t, err, http.StatusBadRequest)
+	require.Contains(t, sdkErr.Message, "Invalid reasoning_effort value")
+	require.Contains(t, sdkErr.Detail, "none, minimal, low, medium")
+}
+
+func TestChatAdvisorConfig_RejectsDisabledModel(t *testing.T) {
+	t.Parallel()
+
+	ctx := testutil.Context(t, testutil.WaitLong)
+	adminClient := newChatClient(t)
+	coderdtest.CreateFirstUser(t, adminClient.Client)
+	modelConfig := createDisabledChatModelConfig(
+		t,
+		adminClient,
+		coderdtest.TestChatProviderOpenAICompat,
+		"advisor-disabled",
+	)
+
+	err := adminClient.UpdateChatAdvisorConfig(ctx, codersdk.UpdateAdvisorConfigRequest{
+		ModelConfigID: modelConfig.ID,
+	})
+	sdkErr := requireSDKError(t, err, http.StatusBadRequest)
+	require.Contains(t, sdkErr.Message, "enabled model config")
+}
+
 func TestChatAdvisorConfig_InvalidModelConfigID(t *testing.T) {
 	t.Parallel()
 
@@ -13980,7 +14068,7 @@ func TestChatAdvisorConfig_InvalidModelConfigID(t *testing.T) {
 	})
 	sdkErr := requireSDKError(t, err, http.StatusBadRequest)
 	require.Contains(t, sdkErr.Message, unknownID.String())
-	require.Contains(t, sdkErr.Message, "does not match any existing model config")
+	require.Contains(t, sdkErr.Message, "does not match any enabled model config")
 }
 
 func TestChatAdvisorConfig_RoundTripZeroValues(t *testing.T) {
@@ -14015,13 +14103,21 @@ func TestChatAdvisorConfig_OverwriteClearsPreviousValues(t *testing.T) {
 	adminClient := newChatClient(t)
 	coderdtest.CreateFirstUser(t, adminClient.Client)
 
-	modelConfig := createChatModelConfig(t, adminClient)
+	modelConfig := createAdditionalChatModelConfigWithReasoningEffort(
+		t,
+		adminClient,
+		coderdtest.TestChatProviderOpenAICompat,
+		"advisor-overwrite",
+		codersdk.ChatModelReasoningEffortMedium,
+		codersdk.ChatModelReasoningEffortHigh,
+	)
 
 	rich := codersdk.AdvisorConfig{
 		Enabled:         true,
 		MaxUsesPerRun:   5,
 		MaxOutputTokens: 1024,
 		ModelConfigID:   modelConfig.ID,
+		ReasoningEffort: ptr.Ref(codersdk.ChatModelReasoningEffortHigh),
 	}
 	err := adminClient.UpdateChatAdvisorConfig(ctx, rich)
 	require.NoError(t, err)

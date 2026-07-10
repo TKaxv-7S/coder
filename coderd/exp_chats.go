@@ -5562,8 +5562,8 @@ func (api *API) getChatAdvisorConfig(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var resp codersdk.AdvisorConfig
-	if err := json.Unmarshal([]byte(raw), &resp); err != nil {
+	resp, err := chatd.DecodeAdvisorConfig([]byte(raw))
+	if err != nil {
 		httpapi.Write(ctx, rw, http.StatusInternalServerError, codersdk.Response{
 			Message: "Stored advisor configuration is invalid.",
 			Detail:  err.Error(),
@@ -5601,16 +5601,19 @@ func (api *API) putChatAdvisorConfig(rw http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	if req.ModelConfigID != uuid.Nil {
-		// Use system context because GetChatModelConfigByID requires
-		// deployment-config read access, which can be broader than the
-		// handler's explicit update check. The lookup only validates that
-		// the referenced model exists before persisting deployment config.
-		//nolint:gocritic // This admin-authorized validation lookup intentionally bypasses read authz.
-		if _, err := api.Database.GetChatModelConfigByID(dbauthz.AsSystemRestricted(ctx), req.ModelConfigID); err != nil {
+	if req.ModelConfigID == uuid.Nil {
+		if req.ReasoningEffort != nil {
+			httpapi.Write(ctx, rw, http.StatusBadRequest, codersdk.Response{
+				Message: "reasoning_effort requires model_config_id.",
+			})
+			return
+		}
+	} else {
+		modelConfig, err := lookupEnabledChatModelConfigByID(ctx, api.Database, req.ModelConfigID)
+		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) || httpapi.Is404Error(err) {
 				httpapi.Write(ctx, rw, http.StatusBadRequest, codersdk.Response{
-					Message: fmt.Sprintf("model_config_id %q does not match any existing model config.", req.ModelConfigID),
+					Message: fmt.Sprintf("model_config_id %q does not match any enabled model config.", req.ModelConfigID),
 				})
 				return
 			}
@@ -5620,9 +5623,13 @@ func (api *API) putChatAdvisorConfig(rw http.ResponseWriter, r *http.Request) {
 			})
 			return
 		}
+		if status, resp := validateChatModelOverrideEffort(modelConfig, req.ReasoningEffort); resp != nil {
+			httpapi.Write(ctx, rw, status, resp)
+			return
+		}
 	}
 
-	raw, err := json.Marshal(req)
+	raw, err := chatd.EncodeAdvisorConfig(req)
 	if err != nil {
 		httpapi.Write(ctx, rw, http.StatusInternalServerError, codersdk.Response{
 			Message: "Internal error encoding advisor configuration.",

@@ -39,11 +39,21 @@ export interface ModelSelectorOption {
 	reasoningEfforts?: readonly string[];
 }
 
+export interface ModelSelectorSpecialOption {
+	value: string;
+	dropdownLabel: string;
+	selectedLabel?: string;
+	description?: string;
+	disabled?: boolean;
+}
+
 interface ModelSelectorProps {
 	options: readonly ModelSelectorOption[];
+	specialOptions?: readonly ModelSelectorSpecialOption[];
 	value: string;
 	onValueChange: (value: string) => void;
 	disabled?: boolean;
+	ariaLabel?: string;
 	placeholder?: string;
 	emptyMessage?: string;
 	formatProviderLabel?: (provider: string) => string;
@@ -82,11 +92,23 @@ const getSearchText = (option: ModelSelectorOption, providerLabel: string) =>
 		.join(" ")
 		.toLowerCase();
 
+const getSpecialOptionSearchText = (option: ModelSelectorSpecialOption) =>
+	[
+		option.value,
+		option.dropdownLabel,
+		option.selectedLabel ?? "",
+		option.description ?? "",
+	]
+		.join(" ")
+		.toLowerCase();
+
 export const ModelSelector: FC<ModelSelectorProps> = ({
 	options,
+	specialOptions = [],
 	value,
 	onValueChange,
 	disabled = false,
+	ariaLabel,
 	placeholder = "Select model",
 	emptyMessage = "No models found.",
 	formatProviderLabel = defaultFormatProviderLabel,
@@ -108,8 +130,20 @@ export const ModelSelector: FC<ModelSelectorProps> = ({
 		setOpen(nextOpen);
 	};
 	const selectedModel = options.find((option) => option.id === value);
-	const isDisabled = disabled || options.length === 0;
+	const selectedSpecialOption = specialOptions.find(
+		(option) => option.value === value,
+	);
+	const selectedLabel = selectedModel
+		? selectedModel.displayName
+		: (selectedSpecialOption?.selectedLabel ??
+			selectedSpecialOption?.dropdownLabel ??
+			placeholder);
+	const isDisabled =
+		disabled || (options.length === 0 && specialOptions.length === 0);
 	const query = search.trim().toLowerCase();
+	const filteredSpecialOptions = specialOptions.filter(
+		(option) => !query || getSpecialOptionSearchText(option).includes(query),
+	);
 	const optionsByProvider = (() => {
 		const grouped = new Map<string, ModelSelectorOption[]>();
 
@@ -135,7 +169,7 @@ export const ModelSelector: FC<ModelSelectorProps> = ({
 		<Popover open={open} onOpenChange={handleOpenChange}>
 			<PopoverTrigger asChild disabled={isDisabled}>
 				<Button
-					aria-label={selectedModel ? selectedModel.displayName : placeholder}
+					aria-label={ariaLabel ?? selectedLabel}
 					aria-expanded={open}
 					aria-haspopup="listbox"
 					disabled={isDisabled}
@@ -148,13 +182,13 @@ export const ModelSelector: FC<ModelSelectorProps> = ({
 					)}
 					onTouchStart={onTriggerTouchStart}
 				>
-					<span className="truncate">
-						{selectedModel ? selectedModel.displayName : placeholder}
-					</span>
+					<span className="truncate">{selectedLabel}</span>
 					<ChevronDownIcon open={open} className="size-icon-sm" />
 				</Button>
 			</PopoverTrigger>
 			<PopoverContent
+				forceMount
+				hidden={!open}
 				side={dropdownSide}
 				align={dropdownAlign}
 				className={cn(
@@ -196,6 +230,21 @@ export const ModelSelector: FC<ModelSelectorProps> = ({
 						<CommandEmpty className="py-3 text-xs font-normal leading-[18px] text-content-secondary">
 							{emptyMessage}
 						</CommandEmpty>
+						{filteredSpecialOptions.length > 0 && (
+							<CommandGroup className="p-1">
+								{filteredSpecialOptions.map((option) => (
+									<SpecialOptionItem
+										key={option.value}
+										option={option}
+										isSelected={option.value === value}
+										onSelect={() => {
+											onValueChange(option.value);
+											handleOpenChange(false);
+										}}
+									/>
+								))}
+							</CommandGroup>
+						)}
 						{optionsByProvider.map(([providerKey, providerOptions], index) => {
 							const firstOption = providerOptions[0];
 							const providerLabel = getProviderLabel(
@@ -217,7 +266,7 @@ export const ModelSelector: FC<ModelSelectorProps> = ({
 									}
 									className={cn(
 										"p-1 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:leading-[18px] [&_[cmdk-group-heading]]:text-content-secondary",
-										index > 0 &&
+										(index > 0 || filteredSpecialOptions.length > 0) &&
 											"border-0 border-t border-solid border-border-default",
 									)}
 								>
@@ -313,6 +362,42 @@ const ReasoningEffortRow: FC<ReasoningEffortRowProps> = ({
 		</div>
 	);
 };
+
+interface SpecialOptionItemProps {
+	option: ModelSelectorSpecialOption;
+	isSelected: boolean;
+	onSelect: () => void;
+}
+
+const SpecialOptionItem: FC<SpecialOptionItemProps> = ({
+	option,
+	isSelected,
+	onSelect,
+}) => (
+	<CommandItem
+		value={option.value}
+		disabled={option.disabled}
+		onSelect={onSelect}
+		className={cn(
+			"gap-2 px-2 py-1 font-medium text-content-secondary data-[selected=true]:bg-surface-tertiary",
+			isSelected && "bg-surface-secondary",
+		)}
+	>
+		<span className="flex min-w-0 flex-col text-left">
+			<span className="truncate text-xs font-medium leading-[18px] text-content-secondary">
+				{option.dropdownLabel}
+			</span>
+			{option.description && (
+				<span className="truncate text-xs font-normal leading-[18px] text-content-secondary">
+					{option.description}
+				</span>
+			)}
+		</span>
+		<CheckIcon
+			className={cn("ml-auto size-4 shrink-0", !isSelected && "opacity-0")}
+		/>
+	</CommandItem>
+);
 
 interface ModelOptionItemProps {
 	option: ModelSelectorOption;

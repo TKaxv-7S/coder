@@ -3,7 +3,6 @@ package chatd
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
@@ -463,8 +462,8 @@ func (c *chatConfigCache) AdvisorConfig(ctx context.Context) (codersdk.AdvisorCo
 			if err != nil {
 				return codersdk.AdvisorConfig{}, err
 			}
-			var cfg codersdk.AdvisorConfig
-			if err := json.Unmarshal([]byte(raw), &cfg); err != nil {
+			cfg, err := DecodeAdvisorConfig([]byte(raw))
+			if err != nil {
 				return codersdk.AdvisorConfig{}, err
 			}
 			c.storeAdvisorConfig(generation, cfg)

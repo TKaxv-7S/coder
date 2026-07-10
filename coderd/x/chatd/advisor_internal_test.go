@@ -112,7 +112,7 @@ func (p *Server) resolveAdvisorModelOverrideOrFallback(
 	modelOpts modelBuildOptions,
 	logger slog.Logger,
 ) (fantasy.LanguageModel, codersdk.ChatModelCallConfig) {
-	model, cfg, err := p.resolveAdvisorModelOverride(
+	model, cfg, _, err := p.resolveAdvisorModelOverride(
 		ctx,
 		chat,
 		advisorCfg,
@@ -435,7 +435,7 @@ func TestResolveAdvisorModelOverridePromotesAIBridgeErrors(t *testing.T) {
 	p := newAdvisorTestServer(ctx, t, store)
 
 	ctx = aibridge.WithDelegatedAPIKeyID(ctx, uuid.NewString())
-	model, _, err := p.resolveAdvisorModelOverride(
+	model, _, _, err := p.resolveAdvisorModelOverride(
 		ctx,
 		database.Chat{ID: uuid.New(), OwnerID: uuid.New()},
 		codersdk.AdvisorConfig{ModelConfigID: configID},
@@ -611,7 +611,7 @@ func TestNewAdvisorRuntime(t *testing.T) {
 			"zero max output tokens must be replaced with defaultAdvisorMaxOutputTokens")
 	})
 
-	t.Run("AppliesReasoningEffortToProviderOptions", func(t *testing.T) {
+	t.Run("FallbackUsesModelDefaultReasoningEffort", func(t *testing.T) {
 		t.Parallel()
 		ctx := testutil.Context(t, testutil.WaitShort)
 		store := &advisorOverrideStubStore{}
@@ -624,6 +624,7 @@ func TestNewAdvisorRuntime(t *testing.T) {
 				Enabled:         true,
 				MaxUsesPerRun:   3,
 				MaxOutputTokens: 16384,
+				ReasoningEffort: ptr.Ref(codersdk.ChatModelReasoningEffortLow),
 			},
 			fallbackModel,
 			codersdk.ChatModelCallConfig{
@@ -644,5 +645,57 @@ func TestNewAdvisorRuntime(t *testing.T) {
 		providerOptions := rt.ProviderOptions()[fantasyopenai.Name].(*fantasyopenai.ResponsesProviderOptions)
 		require.Equal(t, "advisor-user", *providerOptions.User)
 		require.Equal(t, fantasyopenai.ReasoningEffortHigh, *providerOptions.ReasoningEffort)
+	})
+
+	t.Run("ExplicitModelUsesConfiguredReasoningEffort", func(t *testing.T) {
+		t.Parallel()
+		ctx := testutil.Context(t, testutil.WaitShort)
+		configID := uuid.New()
+		providerID := uuid.New()
+		rawOptions, err := json.Marshal(codersdk.ChatModelCallConfig{
+			ReasoningEffort: &codersdk.ChatModelReasoningEffortConfig{
+				Default: ptr.Ref(codersdk.ChatModelReasoningEffortMedium),
+				Max:     ptr.Ref(codersdk.ChatModelReasoningEffortHigh),
+			},
+		})
+		require.NoError(t, err)
+		store := &advisorOverrideStubStore{
+			getEnabledChatModelConfigByID: func(context.Context, uuid.UUID) (database.ChatModelConfig, error) {
+				return database.ChatModelConfig{
+					ID:           configID,
+					Model:        "gpt-5.2",
+					Enabled:      true,
+					Options:      rawOptions,
+					DisplayName:  "gpt-5.2",
+					AIProviderID: uuid.NullUUID{UUID: providerID, Valid: true},
+				}, nil
+			},
+			getAIProviderByID: func(context.Context, uuid.UUID) (database.AIProvider, error) {
+				return aibridgeTestAIProvider(providerID, "primary-openai", database.AIProviderTypeOpenai), nil
+			},
+		}
+		p := newAdvisorTestServer(ctx, t, store)
+		p.aibridgeTransportFactory = aibridgeTestFactoryPointer(&aibridgeTestFactory{rt: roundTripFunc(func(*http.Request) (*http.Response, error) {
+			return &http.Response{StatusCode: http.StatusOK, Body: http.NoBody}, nil
+		})})
+
+		rt := p.newAdvisorRuntimeOrFallback(
+			ctx,
+			database.Chat{},
+			codersdk.AdvisorConfig{
+				Enabled:         true,
+				MaxUsesPerRun:   3,
+				MaxOutputTokens: 16384,
+				ModelConfigID:   configID,
+				ReasoningEffort: ptr.Ref(codersdk.ChatModelReasoningEffortLow),
+			},
+			fallbackModel,
+			fallbackCallConfig,
+			modelBuildOptions{ActiveAPIKeyID: uuid.NewString()},
+			logger,
+		)
+		require.NotNil(t, rt)
+		providerOptions := rt.ProviderOptions()[fantasyopenai.Name].(*fantasyopenai.ResponsesProviderOptions)
+		require.Equal(t, fantasyopenai.ReasoningEffortLow, *providerOptions.ReasoningEffort)
 	})
 }

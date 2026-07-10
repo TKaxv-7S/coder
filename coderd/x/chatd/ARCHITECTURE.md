@@ -717,6 +717,12 @@ State updates processed by the loop come from:
 
 The runner is responsible for subscribing to the `chat:update:{chat_id}` pubsub channel. During bootstrap, it must first subscribe to the channel and then fetch the initial state of the chat from the database to avoid missing any updates.
 
+### Advisor model and reasoning effort resolution
+
+When the advisor is enabled for a root chat turn, generation preparation loads the deployment-wide advisor configuration. An explicit advisor model is resolved from the enabled model and provider configuration at the start of the turn. If the configured model or provider is unavailable, malformed, or cannot be resolved, the advisor uses the outer chat model instead.
+
+A configured advisor `reasoning_effort` applies only when the explicit advisor model resolves successfully. The selected effort is validated against that model's configured selectable values when the advisor configuration is saved. When the advisor uses the outer chat model, including any fallback caused by an unavailable explicit model, the advisor effort is ignored and the outer model's configured default effort applies.
+
 ### Event shape
 
 Every event that the runner loop processes has the following shape:

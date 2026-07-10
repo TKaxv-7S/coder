@@ -272,9 +272,9 @@ func (p *Server) resolveAdvisorModelOverride(
 	fallbackCallConfig codersdk.ChatModelCallConfig,
 	modelOpts modelBuildOptions,
 	logger slog.Logger,
-) (fantasy.LanguageModel, codersdk.ChatModelCallConfig, error) {
+) (fantasy.LanguageModel, codersdk.ChatModelCallConfig, bool, error) {
 	if advisorCfg.ModelConfigID == uuid.Nil {
-		return fallbackModel, fallbackCallConfig, nil
+		return fallbackModel, fallbackCallConfig, false, nil
 	}
 
 	// Re-read the override instead of using the cache so disabled models
@@ -290,7 +290,7 @@ func (p *Server) resolveAdvisorModelOverride(
 				"advisor model config is disabled or unavailable, continuing with chat model",
 				slog.F("model_config_id", advisorCfg.ModelConfigID),
 			)
-			return fallbackModel, fallbackCallConfig, nil
+			return fallbackModel, fallbackCallConfig, false, nil
 		}
 		logger.Warn(
 			ctx,
@@ -298,7 +298,7 @@ func (p *Server) resolveAdvisorModelOverride(
 			slog.F("model_config_id", advisorCfg.ModelConfigID),
 			slog.Error(err),
 		)
-		return fallbackModel, fallbackCallConfig, nil
+		return fallbackModel, fallbackCallConfig, false, nil
 	}
 
 	overrideCallConfig := codersdk.ChatModelCallConfig{}
@@ -310,7 +310,7 @@ func (p *Server) resolveAdvisorModelOverride(
 				slog.F("model_config_id", advisorCfg.ModelConfigID),
 				slog.Error(err),
 			)
-			return fallbackModel, fallbackCallConfig, nil
+			return fallbackModel, fallbackCallConfig, false, nil
 		}
 	}
 
@@ -321,7 +321,7 @@ func (p *Server) resolveAdvisorModelOverride(
 	)
 	if err != nil {
 		if overrideConfig.AIProviderID.Valid {
-			return nil, codersdk.ChatModelCallConfig{}, xerrors.Errorf("resolve advisor override route: %w", err)
+			return nil, codersdk.ChatModelCallConfig{}, false, xerrors.Errorf("resolve advisor override route: %w", err)
 		}
 		logger.Warn(
 			ctx,
@@ -329,7 +329,7 @@ func (p *Server) resolveAdvisorModelOverride(
 			slog.F("model_config_id", advisorCfg.ModelConfigID),
 			slog.Error(err),
 		)
-		return fallbackModel, fallbackCallConfig, nil
+		return fallbackModel, fallbackCallConfig, false, nil
 	}
 	overrideModel, err := p.newModel(ctx, modelClientRequest{
 		Chat:         chat,
@@ -339,7 +339,7 @@ func (p *Server) resolveAdvisorModelOverride(
 	}, route, modelOpts)
 	if err != nil {
 		if overrideConfig.AIProviderID.Valid {
-			return nil, codersdk.ChatModelCallConfig{}, xerrors.Errorf("create advisor override model: %w", err)
+			return nil, codersdk.ChatModelCallConfig{}, false, xerrors.Errorf("create advisor override model: %w", err)
 		}
 		logger.Warn(
 			ctx,
@@ -347,10 +347,10 @@ func (p *Server) resolveAdvisorModelOverride(
 			slog.F("model_config_id", advisorCfg.ModelConfigID),
 			slog.Error(err),
 		)
-		return fallbackModel, fallbackCallConfig, nil
+		return fallbackModel, fallbackCallConfig, false, nil
 	}
 
-	return overrideModel, overrideCallConfig, nil
+	return overrideModel, overrideCallConfig, true, nil
 }
 
 func (p *Server) newAdvisorRuntime(
@@ -362,7 +362,7 @@ func (p *Server) newAdvisorRuntime(
 	modelOpts modelBuildOptions,
 	logger slog.Logger,
 ) (*chatadvisor.Runtime, error) {
-	advisorModel, advisorCallConfig, err := p.resolveAdvisorModelOverride(
+	advisorModel, advisorCallConfig, overrideResolved, err := p.resolveAdvisorModelOverride(
 		ctx,
 		chat,
 		advisorCfg,
@@ -398,10 +398,12 @@ func (p *Server) newAdvisorRuntime(
 	}
 
 	advisorCallConfig.MaxOutputTokens = ptr.Ref(maxOutputTokens)
-	// The advisor has no per-turn effort selection; its model config's
-	// default effort applies.
+	var requestedReasoningEffort *string
+	if overrideResolved {
+		requestedReasoningEffort = advisorCfg.ReasoningEffort
+	}
 	advisorReasoningEffort := chatprovider.ResolveReasoningEffort(
-		nil,
+		requestedReasoningEffort,
 		advisorCallConfig.ReasoningEffort,
 	)
 	providerOptions := chatprovider.ProviderOptionsFromChatModelConfig(

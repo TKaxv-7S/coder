@@ -177,6 +177,68 @@ export const MultipleProviderInstances: Story = {
 	},
 };
 
+export const SpecialOptions: Story = {
+	args: {
+		options: [...allModels, effortModel],
+		specialOptions: [
+			{
+				value: "chat-default",
+				dropdownLabel: "Chat default",
+				selectedLabel: "Chat default: GPT-4o",
+				description: "Use the model selected for the current chat",
+			},
+			{
+				value: "invalid-default",
+				dropdownLabel: "Invalid deployment default",
+				description: "Choose another value to replace it",
+				disabled: true,
+			},
+		],
+		value: "chat-default",
+		reasoningEffort: "medium",
+		onReasoningEffortChange: fn(),
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		const body = within(document.body);
+		const trigger = canvas.getByRole("combobox", {
+			name: "Chat default: GPT-4o",
+		});
+		expect(trigger).toHaveTextContent("Chat default: GPT-4o");
+
+		await userEvent.click(trigger);
+		const listbox = await body.findByRole("listbox");
+		expect(
+			within(listbox).getByRole("option", { name: /Chat default/ }),
+		).toBeInTheDocument();
+		expect(
+			within(listbox).getByText("Use the model selected for the current chat"),
+		).toBeInTheDocument();
+		expect(
+			within(listbox).getByRole("option", {
+				name: /Invalid deployment default/,
+			}),
+		).toHaveAttribute("data-disabled");
+		expect(body.queryByRole("slider")).not.toBeInTheDocument();
+
+		const search = body.getByPlaceholderText("Search...");
+		await userEvent.type(search, "replace it");
+		await waitFor(() => {
+			expect(
+				within(listbox).getByRole("option", {
+					name: /Invalid deployment default/,
+				}),
+			).toBeVisible();
+			expect(
+				within(listbox).queryByRole("option", { name: /Chat default/ }),
+			).not.toBeInTheDocument();
+			expect(
+				within(listbox).queryByRole("option", { name: /GPT-4o Mini/ }),
+			).not.toBeInTheDocument();
+		});
+	},
+};
+
 // ---------------------------------------------------------------------------
 // Empty state
 // ---------------------------------------------------------------------------
