@@ -1,4 +1,5 @@
-import { type FC, Fragment } from "react";
+import type { FC } from "react";
+import type { UrlTransform } from "streamdown";
 import { cn } from "#/utils/cn";
 import { Message, MessageContent } from "../ChatElements";
 import { FileReferenceChip } from "../ChatMessageInput/FileReferenceChip";
@@ -11,6 +12,7 @@ import {
 	AttachmentBlock,
 	type PreviewTextAttachment,
 } from "./AttachmentBlocks";
+import { LinkifiedText } from "./LinkifiedText";
 import type {
 	MessageDisplayState,
 	UserInlineRenderBlock,
@@ -31,9 +33,16 @@ const renderUserInlineBlock = (
 	inlineParts: readonly InlinePart[],
 	block: UserInlineRenderBlock,
 	index: number,
+	urlTransform?: UrlTransform,
 ) => {
 	if (block.type === "response") {
-		return <Fragment key={index}>{block.text}</Fragment>;
+		return (
+			<LinkifiedText
+				key={index}
+				text={block.text}
+				urlTransform={urlTransform}
+			/>
+		);
 	}
 
 	return (
@@ -50,10 +59,13 @@ const renderUserInlineBlock = (
 	);
 };
 
-const renderUserInlineContent = (blocks: readonly UserInlineRenderBlock[]) => {
+const renderUserInlineContent = (
+	blocks: readonly UserInlineRenderBlock[],
+	urlTransform?: UrlTransform,
+) => {
 	const inlineParts = getInlineParts(blocks);
 	return blocks.map((block, index) =>
-		renderUserInlineBlock(inlineParts, block, index),
+		renderUserInlineBlock(inlineParts, block, index, urlTransform),
 	);
 };
 
@@ -62,6 +74,7 @@ export const UserMessageContent: FC<{
 	markdown: string;
 	isEditing?: boolean;
 	fadeFromBottom?: boolean;
+	urlTransform?: UrlTransform;
 	onImageClick?: (src: string) => void;
 	onTextFileClick?: (attachment: PreviewTextAttachment) => void;
 }> = ({
@@ -69,6 +82,7 @@ export const UserMessageContent: FC<{
 	markdown,
 	isEditing = false,
 	fadeFromBottom = false,
+	urlTransform,
 	onImageClick,
 	onTextFileClick,
 }) => {
@@ -90,9 +104,17 @@ export const UserMessageContent: FC<{
 						<div className="flex items-start gap-2">
 							{displayState.hasUserMessageBody && (
 								<span className="min-w-0 flex-1">
-									{displayState.userInlineContent.length > 0
-										? renderUserInlineContent(displayState.userInlineContent)
-										: markdown || ""}
+									{displayState.userInlineContent.length > 0 ? (
+										renderUserInlineContent(
+											displayState.userInlineContent,
+											urlTransform,
+										)
+									) : (
+										<LinkifiedText
+											text={markdown || ""}
+											urlTransform={urlTransform}
+										/>
+									)}
 								</span>
 							)}
 						</div>

@@ -1062,6 +1062,79 @@ export const UserMessageWithMixedAttachments: Story = {
 	},
 };
 
+export const UserMessageLinksStayLiteralAndSafe: Story = {
+	args: {
+		...buildStoryArgs(
+			buildUserMessage({
+				text: "Visit https://coder.com, www.coder.com, see https://coder.com/docs. Literal [docs](https://coder.com/docs) <script>alert(1)</script>",
+			}),
+		),
+		urlTransform: fn((url) =>
+			url === "https://coder.com" ? "https://proxy.example" : url,
+		),
+	},
+	play: async ({ args, canvasElement }) => {
+		const canvas = within(canvasElement);
+		expect(args.urlTransform).toHaveBeenCalled();
+		const secureLink = canvas.getByRole("link", { name: "https://coder.com" });
+		expect(secureLink).toHaveAttribute("href", "https://proxy.example");
+		expect(secureLink).toHaveAttribute("target", "_blank");
+		expect(secureLink).toHaveAttribute(
+			"rel",
+			expect.stringContaining("noopener"),
+		);
+		expect(secureLink).toHaveAttribute(
+			"rel",
+			expect.stringContaining("noreferrer"),
+		);
+
+		expect(canvas.getByRole("link", { name: "www.coder.com" })).toHaveAttribute(
+			"href",
+			"https://www.coder.com",
+		);
+		const docsLinks = canvas.getAllByRole("link", {
+			name: "https://coder.com/docs",
+		});
+		expect(docsLinks).toHaveLength(2);
+		for (const link of docsLinks) {
+			expect(link).toHaveAttribute("href", "https://coder.com/docs");
+		}
+
+		const userRow = secureLink.closest('[data-role="user"]');
+		expect(userRow).not.toBeNull();
+		expect(userRow).toHaveTextContent("see https://coder.com/docs.");
+		expect(userRow).toHaveTextContent("[docs](https://coder.com/docs)");
+		expect(userRow).toHaveTextContent("<script>alert(1)</script>");
+		expect(userRow?.querySelector("script")).toBeNull();
+	},
+};
+
+export const AssistantMessageBareURLIsLinked: Story = {
+	args: {
+		...defaultArgs,
+		parsedMessages: buildMessages([
+			{
+				...baseMessage,
+				id: 1,
+				role: "assistant",
+				content: [
+					{
+						type: "text",
+						text: "Read more at https://coder.com/docs",
+					},
+				],
+			},
+		]),
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		const link = canvas.getByRole("link", { name: "https://coder.com/docs" });
+		expect(link).toHaveAttribute("href", "https://coder.com/docs");
+		expect(link).toHaveAttribute("target", "_blank");
+		expect(link).toHaveAttribute("rel", expect.stringContaining("noopener"));
+	},
+};
+
 /** Text-only messages must not produce spurious image thumbnails. */
 export const UserMessageTextOnly: Story = {
 	args: {
@@ -1197,6 +1270,38 @@ export const UserMessageWithImagesAndFileRefs: Story = {
 		expect(images).toHaveLength(1);
 		expect(canvas.getByText(/main\.go/)).toBeInTheDocument();
 		expectNoCopyMessageButtonForElement(images[0]);
+	},
+};
+
+export const UserMessageLinkWithInlineFileRef: Story = {
+	args: {
+		...defaultArgs,
+		parsedMessages: buildMessages([
+			{
+				...baseMessage,
+				id: 1,
+				role: "user",
+				content: [
+					{ type: "text", text: "Review https://coder.com/docs with " },
+					{
+						type: "file-reference",
+						file_name: "site/src/components/Button.tsx",
+						start_line: 42,
+						end_line: 42,
+						content: "export const Button = ...",
+					},
+					{ type: "text", text: " before shipping." },
+				],
+			},
+		]),
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		expect(
+			canvas.getByRole("link", { name: "https://coder.com/docs" }),
+		).toHaveAttribute("href", "https://coder.com/docs");
+		expect(canvas.getByText(/Button\.tsx/)).toBeInTheDocument();
+		expect(canvas.getByText(/before shipping/)).toBeInTheDocument();
 	},
 };
 

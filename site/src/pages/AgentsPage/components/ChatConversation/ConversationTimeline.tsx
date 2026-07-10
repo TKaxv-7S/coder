@@ -610,6 +610,7 @@ const ChatMessageItem = memo<{
 							markdown={parsed.markdown}
 							isEditing={editingMessageId === message.id}
 							fadeFromBottom={fadeFromBottom}
+							urlTransform={urlTransform}
 							onImageClick={setPreviewImage}
 							onTextFileClick={setPreviewText}
 						/>
@@ -778,6 +779,7 @@ const StickyUserMessage = memo<{
 	prevUserMessageId?: number;
 	nextUserMessageId?: number;
 	onJumpToUserMessage?: (messageId: number) => void;
+	urlTransform?: UrlTransform;
 	registerSentinel?: (messageId: number, el: HTMLDivElement | null) => void;
 }>(
 	({
@@ -789,6 +791,7 @@ const StickyUserMessage = memo<{
 		prevUserMessageId,
 		nextUserMessageId,
 		onJumpToUserMessage,
+		urlTransform,
 		registerSentinel,
 	}) => {
 		const [isStuck, setIsStuck] = useState(false);
@@ -1028,6 +1031,7 @@ const StickyUserMessage = memo<{
 							prevUserMessageId={prevUserMessageId}
 							nextUserMessageId={nextUserMessageId}
 							onJumpToUserMessage={onJumpToUserMessage}
+							urlTransform={urlTransform}
 						/>
 					</div>
 
@@ -1073,6 +1077,7 @@ const StickyUserMessage = memo<{
 									prevUserMessageId={prevUserMessageId}
 									nextUserMessageId={nextUserMessageId}
 									onJumpToUserMessage={onJumpToUserMessage}
+									urlTransform={urlTransform}
 									fadeFromBottom
 								/>
 							</div>
@@ -1266,6 +1271,7 @@ export const ConversationTimeline = memo<ConversationTimelineProps>(
 									prevUserMessageId={userNeighborsById.get(message.id)?.prevId}
 									nextUserMessageId={userNeighborsById.get(message.id)?.nextId}
 									onJumpToUserMessage={jumpToUserMessage}
+									urlTransform={urlTransform}
 									registerSentinel={registerSentinel}
 								/>
 							);
