@@ -18,12 +18,14 @@ end
 # claude-mythos-5: not listed upstream. Anthropic documents it as sharing
 # claude-fable-5's specs and pricing, so inject it as a copy with its own
 # id and display name.
-| if .anthropic.models | has("claude-fable-5") then
+| if (.anthropic.models | has("claude-fable-5") | not) then
+    error("overrides.jq: claude-fable-5 gone from upstream; the claude-mythos-5 copy has no source")
+  elif (.anthropic.models | has("claude-mythos-5")) then
+    error("overrides.jq: claude-mythos-5 now present upstream; drop the injection")
+  else
     .anthropic.models."claude-mythos-5" = (
       .anthropic.models."claude-fable-5"
       | .id = "claude-mythos-5"
       | .name = "Claude Mythos 5"
     )
-  else
-    error("overrides.jq: claude-fable-5 gone from upstream; the claude-mythos-5 copy has no source")
   end

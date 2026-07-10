@@ -29,6 +29,11 @@ func fixtureUpstream(t *testing.T) map[string]upstreamProvider {
 				"claude-costless": {
 					"name": "Claude Costless",
 					"limit": {"context": 200000, "output": 64000}
+				},
+				"claude-nameless": {
+					"name": "",
+					"limit": {"context": 200000, "output": 64000},
+					"cost": {"input": 1, "output": 5}
 				}
 			}
 		},
@@ -42,6 +47,11 @@ func fixtureUpstream(t *testing.T) map[string]upstreamProvider {
 				"gpt-partial": {
 					"name": "GPT Partial",
 					"limit": {"context": 400000, "output": 128000},
+					"cost": {"input": 0.2, "output": 1.25}
+				},
+				"gpt-limitless": {
+					"name": "GPT Limitless",
+					"limit": {"context": 400000},
 					"cost": {"input": 0.2, "output": 1.25}
 				}
 			}
@@ -62,7 +72,7 @@ func TestBuildCatalog(t *testing.T) {
 		},
 		"anthropic": {
 			{ModelIdentifier: "claude-fable-5", ReasoningEffort: "high"},
-			{ModelIdentifier: "claude-mythos-5", ReasoningEffort: "high"},
+			{ModelIdentifier: "claude-mythos-5", DisplayName: "Mythos 5 Override", ThinkingBudgetTokens: 8192},
 		},
 	}
 
@@ -90,11 +100,11 @@ func TestBuildCatalog(t *testing.T) {
     {
       "provider": "anthropic",
       "modelIdentifier": "claude-mythos-5",
-      "displayName": "Claude Mythos 5",
+      "displayName": "Mythos 5 Override",
       "aliases": [],
       "contextLimit": 1000000,
       "maxOutputTokens": 128000,
-      "reasoningEffort": "high",
+      "thinkingBudgetTokens": 8192,
       "inputCost": 10,
       "outputCost": 50,
       "cacheReadCost": 1,
@@ -146,7 +156,7 @@ func TestBuildCatalogErrors(t *testing.T) {
 			curation: map[string][]curatedModel{
 				"openai": {{ModelIdentifier: "gpt-nonexistent"}},
 			},
-			wantErr: "missing from upstream",
+			wantErr: "model missing from upstream",
 		},
 		{
 			name: "NoCostBlock",
@@ -154,6 +164,20 @@ func TestBuildCatalogErrors(t *testing.T) {
 				"anthropic": {{ModelIdentifier: "claude-costless"}},
 			},
 			wantErr: "no cost block",
+		},
+		{
+			name: "MissingUpstreamLimit",
+			curation: map[string][]curatedModel{
+				"openai": {{ModelIdentifier: "gpt-limitless"}},
+			},
+			wantErr: "missing limit.context or limit.output",
+		},
+		{
+			name: "EmptyUpstreamName",
+			curation: map[string][]curatedModel{
+				"anthropic": {{ModelIdentifier: "claude-nameless"}},
+			},
+			wantErr: "upstream name is empty",
 		},
 		{
 			name: "EffortAndBudgetBothSet",
@@ -218,7 +242,7 @@ func TestBuildCatalogErrors(t *testing.T) {
 			curation: map[string][]curatedModel{
 				"google": {{ModelIdentifier: "gemini"}},
 			},
-			wantErr: "missing from upstream",
+			wantErr: `provider "google" missing`,
 		},
 		{
 			name: "EmptyModelIdentifier",

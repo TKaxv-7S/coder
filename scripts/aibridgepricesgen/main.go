@@ -1,6 +1,11 @@
-// aibridgepricesgen converts a models.dev api.json snapshot into a JSON
-// seed file consumable by the AI Bridge cost-control loader. Output is sorted
-// by (provider, model) so regenerations produce minimal diffs.
+// aibridgepricesgen converts a models.dev api.json snapshot into generated
+// artifacts, selected by -format:
+//
+//   - "prices": a JSON seed file consumable by the AI Bridge cost-control
+//     loader, sorted by (provider, model) so regenerations produce minimal
+//     diffs.
+//   - "catalog": the frontend known-models JSON, joining the snapshot with
+//     the editorial curation in curation.json and preserving its entry order.
 //
 // Run via the gen/aibridge-prices Make target, which fetches and patches the
 // snapshot (_gen/models-dev.json). Kept out of `make gen` because the output

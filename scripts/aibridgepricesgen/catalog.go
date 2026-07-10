@@ -11,10 +11,10 @@ import (
 
 // curationJSON is the checked-in editorial curation input for the frontend
 // known-models catalog. Entry order within each provider controls suggestion
-// order in the UI. Everything factual (display name, limits, pricing,
-// last_updated) is joined from models.dev at generation time; the curation
-// file only carries editorial choices: which models to suggest, aliases,
-// reasoning defaults, and overrides.
+// order in the UI. Everything factual (display name, limits, pricing) is
+// joined from models.dev at generation time; the curation file only carries
+// editorial choices: which models to suggest, aliases, reasoning defaults,
+// and overrides.
 //
 //go:embed curation.json
 var curationJSON []byte
@@ -101,6 +101,9 @@ func buildCatalog(upstream map[string]upstreamProvider, curation map[string][]cu
 			}
 			if !m.Cost.hasPricing() {
 				return nil, xerrors.Errorf("%s/%s: upstream model has no cost block", providerID, c.ModelIdentifier)
+			}
+			if m.Limit.Context == nil || m.Limit.Output == nil {
+				return nil, xerrors.Errorf("%s/%s: upstream model missing limit.context or limit.output", providerID, c.ModelIdentifier)
 			}
 			displayName := cmp.Or(c.DisplayName, m.Name)
 			if displayName == "" {
