@@ -322,6 +322,22 @@ func New(ctx context.Context, options *Options) (_ *API, err error) {
 		})
 	})
 
+	// Chat persona and agent management. Reads (list endpoints) are
+	// registered in AGPL coderd so builtin entries work everywhere;
+	// writes are premium-gated and reuse the AGPL handlers.
+	api.AGPL.ExperimentalHandler.Group(func(r chi.Router) {
+		r.Use(
+			apiKeyMiddleware,
+			api.RequireFeatureMW(codersdk.FeatureChatAgents),
+		)
+		r.Post("/chats/personas", api.AGPL.CreateChatPersona)
+		r.Patch("/chats/personas/{persona}", api.AGPL.UpdateChatPersona)
+		r.Delete("/chats/personas/{persona}", api.AGPL.DeleteChatPersona)
+		r.Post("/chats/agents", api.AGPL.CreateChatAgent)
+		r.Patch("/chats/agents/{agent}", api.AGPL.UpdateChatAgent)
+		r.Delete("/chats/agents/{agent}", api.AGPL.DeleteChatAgent)
+	})
+
 	// /ai-gateway/serve provides the DRPC-over-WebSocket that standalone AI Gateway
 	// replicas connect to. It authenticates with a gateway key instead of a user session.
 	api.AGPL.APIHandler.Group(func(r chi.Router) {

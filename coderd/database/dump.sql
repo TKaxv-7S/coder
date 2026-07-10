@@ -1837,7 +1837,7 @@ CREATE TABLE chat_agents (
 
 COMMENT ON COLUMN chat_agents.organization_id IS 'NULL means the agent is deployment-scoped; otherwise it belongs to the organization.';
 
-COMMENT ON COLUMN chat_agents.persona_id IS 'The persona supplying the base system prompt for chats created with this agent.';
+COMMENT ON COLUMN chat_agents.persona_id IS 'The persona supplying the base system prompt for chats created with this agent. May reference an in-memory builtin persona, so no foreign key exists.';
 
 COMMENT ON COLUMN chat_agents.prompt_append IS 'Additional system prompt text appended after the persona prompt.';
 
@@ -2160,7 +2160,7 @@ COMMENT ON COLUMN chats.context_error IS 'Snapshot-level error copied from the p
 
 COMMENT ON COLUMN chats.last_reasoning_effort IS 'Stores the most recent message effort once per-turn selection is wired.';
 
-COMMENT ON COLUMN chats.chat_agent_id IS 'The chat agent the chat was created as, if any. Distinct from agent_id, which is the workspace agent.';
+COMMENT ON COLUMN chats.chat_agent_id IS 'The chat agent the chat was created as, if any. Distinct from agent_id, which is the workspace agent. May reference an in-memory builtin agent, so no foreign key exists.';
 
 CREATE TABLE users (
     id uuid NOT NULL,
@@ -5166,9 +5166,6 @@ ALTER TABLE ONLY chat_agents
 ALTER TABLE ONLY chat_agents
     ADD CONSTRAINT chat_agents_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
 
-ALTER TABLE ONLY chat_agents
-    ADD CONSTRAINT chat_agents_persona_id_fkey FOREIGN KEY (persona_id) REFERENCES chat_personas(id);
-
 ALTER TABLE ONLY chat_context_resources
     ADD CONSTRAINT chat_context_resources_chat_id_fkey FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE;
 
@@ -5234,9 +5231,6 @@ ALTER TABLE ONLY chats
 
 ALTER TABLE ONLY chats
     ADD CONSTRAINT chats_build_id_fkey FOREIGN KEY (build_id) REFERENCES workspace_builds(id) ON DELETE SET NULL;
-
-ALTER TABLE ONLY chats
-    ADD CONSTRAINT chats_chat_agent_id_fkey FOREIGN KEY (chat_agent_id) REFERENCES chat_agents(id);
 
 ALTER TABLE ONLY chats
     ADD CONSTRAINT chats_last_model_config_id_fkey FOREIGN KEY (last_model_config_id) REFERENCES chat_model_configs(id);

@@ -199,6 +199,9 @@ const (
 	FeatureBoundary               FeatureName = "boundary"
 	FeatureServiceAccounts        FeatureName = "service_accounts"
 	FeatureAIGovernanceUserLimit  FeatureName = "ai_governance_user_limit"
+	// FeatureChatAgents gates management (write) APIs for chat personas
+	// and agents. Reads and builtin entries work without it.
+	FeatureChatAgents FeatureName = "chat_agents"
 )
 
 var (
@@ -231,6 +234,7 @@ var (
 		FeatureBoundary,
 		FeatureServiceAccounts,
 		FeatureAIGovernanceUserLimit,
+		FeatureChatAgents,
 	}
 
 	// FeatureNamesMap is a map of all feature names for quick lookups.
@@ -279,6 +283,7 @@ func (n FeatureName) AlwaysEnable() bool {
 		FeatureWorkspaceExternalAgent:     true,
 		FeatureBoundary:                   true,
 		FeatureServiceAccounts:            true,
+		FeatureChatAgents:                 true,
 	}[n]
 }
 
@@ -286,7 +291,7 @@ func (n FeatureName) AlwaysEnable() bool {
 func (n FeatureName) Enterprise() bool {
 	switch n {
 	// Add all features that should be excluded in the Enterprise feature set.
-	case FeatureMultipleOrganizations, FeatureCustomRoles, FeatureServiceAccounts:
+	case FeatureMultipleOrganizations, FeatureCustomRoles, FeatureServiceAccounts, FeatureChatAgents:
 		return false
 	default:
 		return true

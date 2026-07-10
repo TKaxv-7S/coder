@@ -145,6 +145,158 @@ const docTemplate = `{
                 ]
             }
         },
+        "/api/experimental/chats/agents": {
+            "get": {
+                "description": "Experimental: this endpoint is subject to change.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Chats"
+                ],
+                "summary": "List chat agents",
+                "operationId": "list-chat-agents",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Organization ID to include organization-scoped agents",
+                        "name": "organization",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/codersdk.ChatAgent"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "CoderSessionToken": []
+                    }
+                ]
+            },
+            "post": {
+                "description": "Experimental: this endpoint is subject to change.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Chats"
+                ],
+                "summary": "Create chat agent",
+                "operationId": "create-chat-agent",
+                "parameters": [
+                    {
+                        "description": "Create chat agent request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/codersdk.CreateChatAgentRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/codersdk.ChatAgent"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "CoderSessionToken": []
+                    }
+                ]
+            }
+        },
+        "/api/experimental/chats/agents/{agent}": {
+            "delete": {
+                "description": "Experimental: this endpoint is subject to change.",
+                "tags": [
+                    "Chats"
+                ],
+                "summary": "Delete chat agent",
+                "operationId": "delete-chat-agent",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Chat agent ID",
+                        "name": "agent",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "security": [
+                    {
+                        "CoderSessionToken": []
+                    }
+                ]
+            },
+            "patch": {
+                "description": "Experimental: this endpoint is subject to change.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Chats"
+                ],
+                "summary": "Update chat agent",
+                "operationId": "update-chat-agent",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Chat agent ID",
+                        "name": "agent",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Update chat agent request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/codersdk.UpdateChatAgentRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/codersdk.ChatAgent"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "CoderSessionToken": []
+                    }
+                ]
+            }
+        },
         "/api/experimental/chats/config/retention-days": {
             "get": {
                 "produces": [
@@ -311,6 +463,158 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/codersdk.ChatModelsResponse"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "CoderSessionToken": []
+                    }
+                ]
+            }
+        },
+        "/api/experimental/chats/personas": {
+            "get": {
+                "description": "Experimental: this endpoint is subject to change.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Chats"
+                ],
+                "summary": "List chat personas",
+                "operationId": "list-chat-personas",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Organization ID to include organization-scoped personas",
+                        "name": "organization",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/codersdk.ChatPersona"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "CoderSessionToken": []
+                    }
+                ]
+            },
+            "post": {
+                "description": "Experimental: this endpoint is subject to change.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Chats"
+                ],
+                "summary": "Create chat persona",
+                "operationId": "create-chat-persona",
+                "parameters": [
+                    {
+                        "description": "Create chat persona request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/codersdk.CreateChatPersonaRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/codersdk.ChatPersona"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "CoderSessionToken": []
+                    }
+                ]
+            }
+        },
+        "/api/experimental/chats/personas/{persona}": {
+            "delete": {
+                "description": "Experimental: this endpoint is subject to change.",
+                "tags": [
+                    "Chats"
+                ],
+                "summary": "Delete chat persona",
+                "operationId": "delete-chat-persona",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Chat persona ID",
+                        "name": "persona",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "security": [
+                    {
+                        "CoderSessionToken": []
+                    }
+                ]
+            },
+            "patch": {
+                "description": "Experimental: this endpoint is subject to change.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Chats"
+                ],
+                "summary": "Update chat persona",
+                "operationId": "update-chat-persona",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Chat persona ID",
+                        "name": "persona",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Update chat persona request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/codersdk.UpdateChatPersonaRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/codersdk.ChatPersona"
                         }
                     }
                 },
@@ -16854,6 +17158,56 @@ const docTemplate = `{
                 }
             }
         },
+        "codersdk.ChatAgent": {
+            "type": "object",
+            "properties": {
+                "builtin": {
+                    "type": "boolean"
+                },
+                "created_at": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "icon": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "model_config_id": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "organization_id": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "persona_id": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "prompt_append": {
+                    "type": "string"
+                },
+                "slug": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string",
+                    "format": "date-time"
+                }
+            }
+        },
         "codersdk.ChatBusyBehavior": {
             "type": "string",
             "enum": [
@@ -17635,6 +17989,52 @@ const docTemplate = `{
                 }
             }
         },
+        "codersdk.ChatPersona": {
+            "type": "object",
+            "properties": {
+                "builtin": {
+                    "type": "boolean"
+                },
+                "created_at": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "icon": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "model_config_id": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "organization_id": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "slug": {
+                    "type": "string"
+                },
+                "system_prompt": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string",
+                    "format": "date-time"
+                }
+            }
+        },
         "codersdk.ChatPlanMode": {
             "type": "string",
             "enum": [
@@ -18213,6 +18613,41 @@ const docTemplate = `{
                 }
             }
         },
+        "codersdk.CreateChatAgentRequest": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "icon": {
+                    "type": "string"
+                },
+                "model_config_id": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "organization_id": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "persona_id": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "prompt_append": {
+                    "type": "string"
+                },
+                "slug": {
+                    "type": "string"
+                }
+            }
+        },
         "codersdk.CreateChatMessageRequest": {
             "type": "object",
             "properties": {
@@ -18274,6 +18709,37 @@ const docTemplate = `{
                     "items": {
                         "type": "string"
                     }
+                }
+            }
+        },
+        "codersdk.CreateChatPersonaRequest": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "icon": {
+                    "type": "string"
+                },
+                "model_config_id": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "organization_id": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "slug": {
+                    "type": "string"
+                },
+                "system_prompt": {
+                    "type": "string"
                 }
             }
         },
@@ -25060,6 +25526,58 @@ const docTemplate = `{
                     "additionalProperties": {
                         "$ref": "#/definitions/codersdk.ChatRole"
                     }
+                }
+            }
+        },
+        "codersdk.UpdateChatAgentRequest": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "icon": {
+                    "type": "string"
+                },
+                "model_config_id": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "persona_id": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "prompt_append": {
+                    "type": "string"
+                }
+            }
+        },
+        "codersdk.UpdateChatPersonaRequest": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "icon": {
+                    "type": "string"
+                },
+                "model_config_id": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "system_prompt": {
+                    "type": "string"
                 }
             }
         },

@@ -108,6 +108,58 @@ func Chat(t testing.TB, db database.Store, seed database.Chat) database.Chat {
 	return chat
 }
 
+func ChatPersona(t testing.TB, db database.Store, seed database.ChatPersona) database.ChatPersona {
+	t.Helper()
+
+	createdBy := seed.CreatedBy
+	if createdBy == uuid.Nil {
+		createdBy = User(t, db, database.User{}).ID
+	}
+	persona, err := db.InsertChatPersona(genCtx, database.InsertChatPersonaParams{
+		OrganizationID: seed.OrganizationID,
+		Slug:           takeFirst(seed.Slug, strings.ToLower(testutil.GetRandomName(t))),
+		Name:           takeFirst(seed.Name, testutil.GetRandomName(t)),
+		Description:    seed.Description,
+		Icon:           seed.Icon,
+		SystemPrompt:   takeFirst(seed.SystemPrompt, "You are a test persona."),
+		ModelConfigID:  seed.ModelConfigID,
+		Enabled:        takeFirst(seed.Enabled, true),
+		CreatedBy:      createdBy,
+	})
+	require.NoError(t, err, "insert chat persona")
+	return persona
+}
+
+func ChatAgent(t testing.TB, db database.Store, seed database.ChatAgent) database.ChatAgent {
+	t.Helper()
+
+	createdBy := seed.CreatedBy
+	if createdBy == uuid.Nil {
+		createdBy = User(t, db, database.User{}).ID
+	}
+	personaID := seed.PersonaID
+	if personaID == uuid.Nil {
+		personaID = ChatPersona(t, db, database.ChatPersona{
+			OrganizationID: seed.OrganizationID,
+			CreatedBy:      createdBy,
+		}).ID
+	}
+	agent, err := db.InsertChatAgent(genCtx, database.InsertChatAgentParams{
+		OrganizationID: seed.OrganizationID,
+		Slug:           takeFirst(seed.Slug, strings.ToLower(testutil.GetRandomName(t))),
+		Name:           takeFirst(seed.Name, testutil.GetRandomName(t)),
+		Description:    seed.Description,
+		Icon:           seed.Icon,
+		PersonaID:      personaID,
+		PromptAppend:   seed.PromptAppend,
+		ModelConfigID:  seed.ModelConfigID,
+		Enabled:        takeFirst(seed.Enabled, true),
+		CreatedBy:      createdBy,
+	})
+	require.NoError(t, err, "insert chat agent")
+	return agent
+}
+
 func ChatMessage(t testing.TB, db database.Store, seed database.ChatMessage) database.ChatMessage {
 	t.Helper()
 

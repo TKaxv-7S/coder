@@ -2313,6 +2313,44 @@ AuthorizationObject can represent a "set" of objects, such as: all workspaces in
 | `groups` | array of [codersdk.ChatGroup](#codersdkchatgroup) | false    |              |             |
 | `users`  | array of [codersdk.ChatUser](#codersdkchatuser)   | false    |              |             |
 
+## codersdk.ChatAgent
+
+```json
+{
+  "builtin": true,
+  "created_at": "2019-08-24T14:15:22Z",
+  "description": "string",
+  "enabled": true,
+  "icon": "string",
+  "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
+  "model_config_id": "f5fb4d91-62ca-4377-9ee6-5d43ba00d205",
+  "name": "string",
+  "organization_id": "7c60d51f-b44e-4682-87d6-449835ea4de6",
+  "persona_id": "84321d19-6cb7-45af-a8d3-0bb38b11a872",
+  "prompt_append": "string",
+  "slug": "string",
+  "updated_at": "2019-08-24T14:15:22Z"
+}
+```
+
+### Properties
+
+| Name              | Type    | Required | Restrictions | Description |
+|-------------------|---------|----------|--------------|-------------|
+| `builtin`         | boolean | false    |              |             |
+| `created_at`      | string  | false    |              |             |
+| `description`     | string  | false    |              |             |
+| `enabled`         | boolean | false    |              |             |
+| `icon`            | string  | false    |              |             |
+| `id`              | string  | false    |              |             |
+| `model_config_id` | string  | false    |              |             |
+| `name`            | string  | false    |              |             |
+| `organization_id` | string  | false    |              |             |
+| `persona_id`      | string  | false    |              |             |
+| `prompt_append`   | string  | false    |              |             |
+| `slug`            | string  | false    |              |             |
+| `updated_at`      | string  | false    |              |             |
+
 ## codersdk.ChatBusyBehavior
 
 ```json
@@ -3233,6 +3271,42 @@ AuthorizationObject can represent a "set" of objects, such as: all workspaces in
 |-------------------------|-------------------------------------------------------------------------------|----------|--------------|------------------------------------------------------------------------------------------------------------------------|
 | `providers`             | array of [codersdk.ChatModelProvider](#codersdkchatmodelprovider)             | false    |              |                                                                                                                        |
 | `unsupported_providers` | array of [codersdk.ChatUnsupportedProvider](#codersdkchatunsupportedprovider) | false    |              | Unsupported providers lists configured providers the Agents harness cannot use, so the UI can explain the empty state. |
+
+## codersdk.ChatPersona
+
+```json
+{
+  "builtin": true,
+  "created_at": "2019-08-24T14:15:22Z",
+  "description": "string",
+  "enabled": true,
+  "icon": "string",
+  "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
+  "model_config_id": "f5fb4d91-62ca-4377-9ee6-5d43ba00d205",
+  "name": "string",
+  "organization_id": "7c60d51f-b44e-4682-87d6-449835ea4de6",
+  "slug": "string",
+  "system_prompt": "string",
+  "updated_at": "2019-08-24T14:15:22Z"
+}
+```
+
+### Properties
+
+| Name              | Type    | Required | Restrictions | Description |
+|-------------------|---------|----------|--------------|-------------|
+| `builtin`         | boolean | false    |              |             |
+| `created_at`      | string  | false    |              |             |
+| `description`     | string  | false    |              |             |
+| `enabled`         | boolean | false    |              |             |
+| `icon`            | string  | false    |              |             |
+| `id`              | string  | false    |              |             |
+| `model_config_id` | string  | false    |              |             |
+| `name`            | string  | false    |              |             |
+| `organization_id` | string  | false    |              |             |
+| `slug`            | string  | false    |              |             |
+| `system_prompt`   | string  | false    |              |             |
+| `updated_at`      | string  | false    |              |             |
 
 ## codersdk.ChatPlanMode
 
@@ -4375,6 +4449,36 @@ AuthorizationObject can represent a "set" of objects, such as: all workspaces in
 | `settings`     | [codersdk.AIProviderSettings](#codersdkaiprovidersettings) | false    |              |             |
 | `type`         | [codersdk.AIProviderType](#codersdkaiprovidertype)         | false    |              |             |
 
+## codersdk.CreateChatAgentRequest
+
+```json
+{
+  "description": "string",
+  "enabled": true,
+  "icon": "string",
+  "model_config_id": "f5fb4d91-62ca-4377-9ee6-5d43ba00d205",
+  "name": "string",
+  "organization_id": "7c60d51f-b44e-4682-87d6-449835ea4de6",
+  "persona_id": "84321d19-6cb7-45af-a8d3-0bb38b11a872",
+  "prompt_append": "string",
+  "slug": "string"
+}
+```
+
+### Properties
+
+| Name              | Type    | Required | Restrictions | Description |
+|-------------------|---------|----------|--------------|-------------|
+| `description`     | string  | false    |              |             |
+| `enabled`         | boolean | false    |              |             |
+| `icon`            | string  | false    |              |             |
+| `model_config_id` | string  | false    |              |             |
+| `name`            | string  | false    |              |             |
+| `organization_id` | string  | false    |              |             |
+| `persona_id`      | string  | false    |              |             |
+| `prompt_append`   | string  | false    |              |             |
+| `slug`            | string  | false    |              |             |
+
 ## codersdk.CreateChatMessageRequest
 
 ```json
@@ -4587,6 +4691,34 @@ AuthorizationObject can represent a "set" of objects, such as: all workspaces in
 | `queued`         | boolean                                                  | false    |              |             |
 | `queued_message` | [codersdk.ChatQueuedMessage](#codersdkchatqueuedmessage) | false    |              |             |
 | `warnings`       | array of string                                          | false    |              |             |
+
+## codersdk.CreateChatPersonaRequest
+
+```json
+{
+  "description": "string",
+  "enabled": true,
+  "icon": "string",
+  "model_config_id": "f5fb4d91-62ca-4377-9ee6-5d43ba00d205",
+  "name": "string",
+  "organization_id": "7c60d51f-b44e-4682-87d6-449835ea4de6",
+  "slug": "string",
+  "system_prompt": "string"
+}
+```
+
+### Properties
+
+| Name              | Type    | Required | Restrictions | Description |
+|-------------------|---------|----------|--------------|-------------|
+| `description`     | string  | false    |              |             |
+| `enabled`         | boolean | false    |              |             |
+| `icon`            | string  | false    |              |             |
+| `model_config_id` | string  | false    |              |             |
+| `name`            | string  | false    |              |             |
+| `organization_id` | string  | false    |              |             |
+| `slug`            | string  | false    |              |             |
+| `system_prompt`   | string  | false    |              |             |
 
 ## codersdk.CreateChatRequest
 
@@ -13252,6 +13384,56 @@ Restarts will only happen on weekdays in this list on weeks which line up with W
 | » `[any property]` | [codersdk.ChatRole](#codersdkchatrole) | false    |              |             |
 | `user_roles`       | object                                 | false    |              |             |
 | » `[any property]` | [codersdk.ChatRole](#codersdkchatrole) | false    |              |             |
+
+## codersdk.UpdateChatAgentRequest
+
+```json
+{
+  "description": "string",
+  "enabled": true,
+  "icon": "string",
+  "model_config_id": "f5fb4d91-62ca-4377-9ee6-5d43ba00d205",
+  "name": "string",
+  "persona_id": "84321d19-6cb7-45af-a8d3-0bb38b11a872",
+  "prompt_append": "string"
+}
+```
+
+### Properties
+
+| Name              | Type    | Required | Restrictions | Description |
+|-------------------|---------|----------|--------------|-------------|
+| `description`     | string  | false    |              |             |
+| `enabled`         | boolean | false    |              |             |
+| `icon`            | string  | false    |              |             |
+| `model_config_id` | string  | false    |              |             |
+| `name`            | string  | false    |              |             |
+| `persona_id`      | string  | false    |              |             |
+| `prompt_append`   | string  | false    |              |             |
+
+## codersdk.UpdateChatPersonaRequest
+
+```json
+{
+  "description": "string",
+  "enabled": true,
+  "icon": "string",
+  "model_config_id": "f5fb4d91-62ca-4377-9ee6-5d43ba00d205",
+  "name": "string",
+  "system_prompt": "string"
+}
+```
+
+### Properties
+
+| Name              | Type    | Required | Restrictions | Description |
+|-------------------|---------|----------|--------------|-------------|
+| `description`     | string  | false    |              |             |
+| `enabled`         | boolean | false    |              |             |
+| `icon`            | string  | false    |              |             |
+| `model_config_id` | string  | false    |              |             |
+| `name`            | string  | false    |              |             |
+| `system_prompt`   | string  | false    |              |             |
 
 ## codersdk.UpdateChatRequest
 

@@ -507,6 +507,243 @@ Experimental: this endpoint is subject to change.
 
 To perform this operation, you must be authenticated. [Learn more](authentication.md).
 
+## List chat agents
+
+### Code samples
+
+```shell
+# Example request using curl
+curl -X GET http://coder-server:8080/api/experimental/chats/agents \
+  -H 'Accept: application/json' \
+  -H 'Coder-Session-Token: API_KEY'
+```
+
+`GET /api/experimental/chats/agents`
+
+Experimental: this endpoint is subject to change.
+
+### Parameters
+
+| Name           | In    | Type         | Required | Description                                           |
+|----------------|-------|--------------|----------|-------------------------------------------------------|
+| `organization` | query | string(uuid) | false    | Organization ID to include organization-scoped agents |
+
+### Example responses
+
+> 200 Response
+
+```json
+[
+  {
+    "builtin": true,
+    "created_at": "2019-08-24T14:15:22Z",
+    "description": "string",
+    "enabled": true,
+    "icon": "string",
+    "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
+    "model_config_id": "f5fb4d91-62ca-4377-9ee6-5d43ba00d205",
+    "name": "string",
+    "organization_id": "7c60d51f-b44e-4682-87d6-449835ea4de6",
+    "persona_id": "84321d19-6cb7-45af-a8d3-0bb38b11a872",
+    "prompt_append": "string",
+    "slug": "string",
+    "updated_at": "2019-08-24T14:15:22Z"
+  }
+]
+```
+
+### Responses
+
+| Status | Meaning                                                 | Description | Schema                                                      |
+|--------|---------------------------------------------------------|-------------|-------------------------------------------------------------|
+| 200    | [OK](https://tools.ietf.org/html/rfc7231#section-6.3.1) | OK          | array of [codersdk.ChatAgent](schemas.md#codersdkchatagent) |
+
+<h3 id="list-chat-agents-responseschema">Response Schema</h3>
+
+Status Code **200**
+
+| Name                | Type              | Required | Restrictions | Description |
+|---------------------|-------------------|----------|--------------|-------------|
+| `[array item]`      | array             | false    |              |             |
+| `» builtin`         | boolean           | false    |              |             |
+| `» created_at`      | string(date-time) | false    |              |             |
+| `» description`     | string            | false    |              |             |
+| `» enabled`         | boolean           | false    |              |             |
+| `» icon`            | string            | false    |              |             |
+| `» id`              | string(uuid)      | false    |              |             |
+| `» model_config_id` | string(uuid)      | false    |              |             |
+| `» name`            | string            | false    |              |             |
+| `» organization_id` | string(uuid)      | false    |              |             |
+| `» persona_id`      | string(uuid)      | false    |              |             |
+| `» prompt_append`   | string            | false    |              |             |
+| `» slug`            | string            | false    |              |             |
+| `» updated_at`      | string(date-time) | false    |              |             |
+
+To perform this operation, you must be authenticated. [Learn more](authentication.md).
+
+## Create chat agent
+
+### Code samples
+
+```shell
+# Example request using curl
+curl -X POST http://coder-server:8080/api/experimental/chats/agents \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json' \
+  -H 'Coder-Session-Token: API_KEY'
+```
+
+`POST /api/experimental/chats/agents`
+
+Experimental: this endpoint is subject to change.
+
+> Body parameter
+
+```json
+{
+  "description": "string",
+  "enabled": true,
+  "icon": "string",
+  "model_config_id": "f5fb4d91-62ca-4377-9ee6-5d43ba00d205",
+  "name": "string",
+  "organization_id": "7c60d51f-b44e-4682-87d6-449835ea4de6",
+  "persona_id": "84321d19-6cb7-45af-a8d3-0bb38b11a872",
+  "prompt_append": "string",
+  "slug": "string"
+}
+```
+
+### Parameters
+
+| Name   | In   | Type                                                                         | Required | Description               |
+|--------|------|------------------------------------------------------------------------------|----------|---------------------------|
+| `body` | body | [codersdk.CreateChatAgentRequest](schemas.md#codersdkcreatechatagentrequest) | true     | Create chat agent request |
+
+### Example responses
+
+> 201 Response
+
+```json
+{
+  "builtin": true,
+  "created_at": "2019-08-24T14:15:22Z",
+  "description": "string",
+  "enabled": true,
+  "icon": "string",
+  "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
+  "model_config_id": "f5fb4d91-62ca-4377-9ee6-5d43ba00d205",
+  "name": "string",
+  "organization_id": "7c60d51f-b44e-4682-87d6-449835ea4de6",
+  "persona_id": "84321d19-6cb7-45af-a8d3-0bb38b11a872",
+  "prompt_append": "string",
+  "slug": "string",
+  "updated_at": "2019-08-24T14:15:22Z"
+}
+```
+
+### Responses
+
+| Status | Meaning                                                      | Description | Schema                                             |
+|--------|--------------------------------------------------------------|-------------|----------------------------------------------------|
+| 201    | [Created](https://tools.ietf.org/html/rfc7231#section-6.3.2) | Created     | [codersdk.ChatAgent](schemas.md#codersdkchatagent) |
+
+To perform this operation, you must be authenticated. [Learn more](authentication.md).
+
+## Delete chat agent
+
+### Code samples
+
+```shell
+# Example request using curl
+curl -X DELETE http://coder-server:8080/api/experimental/chats/agents/{agent} \
+  -H 'Coder-Session-Token: API_KEY'
+```
+
+`DELETE /api/experimental/chats/agents/{agent}`
+
+Experimental: this endpoint is subject to change.
+
+### Parameters
+
+| Name    | In   | Type         | Required | Description   |
+|---------|------|--------------|----------|---------------|
+| `agent` | path | string(uuid) | true     | Chat agent ID |
+
+### Responses
+
+| Status | Meaning                                                         | Description | Schema |
+|--------|-----------------------------------------------------------------|-------------|--------|
+| 204    | [No Content](https://tools.ietf.org/html/rfc7231#section-6.3.5) | No Content  |        |
+
+To perform this operation, you must be authenticated. [Learn more](authentication.md).
+
+## Update chat agent
+
+### Code samples
+
+```shell
+# Example request using curl
+curl -X PATCH http://coder-server:8080/api/experimental/chats/agents/{agent} \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json' \
+  -H 'Coder-Session-Token: API_KEY'
+```
+
+`PATCH /api/experimental/chats/agents/{agent}`
+
+Experimental: this endpoint is subject to change.
+
+> Body parameter
+
+```json
+{
+  "description": "string",
+  "enabled": true,
+  "icon": "string",
+  "model_config_id": "f5fb4d91-62ca-4377-9ee6-5d43ba00d205",
+  "name": "string",
+  "persona_id": "84321d19-6cb7-45af-a8d3-0bb38b11a872",
+  "prompt_append": "string"
+}
+```
+
+### Parameters
+
+| Name    | In   | Type                                                                         | Required | Description               |
+|---------|------|------------------------------------------------------------------------------|----------|---------------------------|
+| `agent` | path | string(uuid)                                                                 | true     | Chat agent ID             |
+| `body`  | body | [codersdk.UpdateChatAgentRequest](schemas.md#codersdkupdatechatagentrequest) | true     | Update chat agent request |
+
+### Example responses
+
+> 200 Response
+
+```json
+{
+  "builtin": true,
+  "created_at": "2019-08-24T14:15:22Z",
+  "description": "string",
+  "enabled": true,
+  "icon": "string",
+  "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
+  "model_config_id": "f5fb4d91-62ca-4377-9ee6-5d43ba00d205",
+  "name": "string",
+  "organization_id": "7c60d51f-b44e-4682-87d6-449835ea4de6",
+  "persona_id": "84321d19-6cb7-45af-a8d3-0bb38b11a872",
+  "prompt_append": "string",
+  "slug": "string",
+  "updated_at": "2019-08-24T14:15:22Z"
+}
+```
+
+### Responses
+
+| Status | Meaning                                                 | Description | Schema                                             |
+|--------|---------------------------------------------------------|-------------|----------------------------------------------------|
+| 200    | [OK](https://tools.ietf.org/html/rfc7231#section-6.3.1) | OK          | [codersdk.ChatAgent](schemas.md#codersdkchatagent) |
+
+To perform this operation, you must be authenticated. [Learn more](authentication.md).
+
 ## Upload chat file
 
 ### Code samples
@@ -624,6 +861,237 @@ Experimental: this endpoint is subject to change.
 | Status | Meaning                                                 | Description | Schema                                                               |
 |--------|---------------------------------------------------------|-------------|----------------------------------------------------------------------|
 | 200    | [OK](https://tools.ietf.org/html/rfc7231#section-6.3.1) | OK          | [codersdk.ChatModelsResponse](schemas.md#codersdkchatmodelsresponse) |
+
+To perform this operation, you must be authenticated. [Learn more](authentication.md).
+
+## List chat personas
+
+### Code samples
+
+```shell
+# Example request using curl
+curl -X GET http://coder-server:8080/api/experimental/chats/personas \
+  -H 'Accept: application/json' \
+  -H 'Coder-Session-Token: API_KEY'
+```
+
+`GET /api/experimental/chats/personas`
+
+Experimental: this endpoint is subject to change.
+
+### Parameters
+
+| Name           | In    | Type         | Required | Description                                             |
+|----------------|-------|--------------|----------|---------------------------------------------------------|
+| `organization` | query | string(uuid) | false    | Organization ID to include organization-scoped personas |
+
+### Example responses
+
+> 200 Response
+
+```json
+[
+  {
+    "builtin": true,
+    "created_at": "2019-08-24T14:15:22Z",
+    "description": "string",
+    "enabled": true,
+    "icon": "string",
+    "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
+    "model_config_id": "f5fb4d91-62ca-4377-9ee6-5d43ba00d205",
+    "name": "string",
+    "organization_id": "7c60d51f-b44e-4682-87d6-449835ea4de6",
+    "slug": "string",
+    "system_prompt": "string",
+    "updated_at": "2019-08-24T14:15:22Z"
+  }
+]
+```
+
+### Responses
+
+| Status | Meaning                                                 | Description | Schema                                                          |
+|--------|---------------------------------------------------------|-------------|-----------------------------------------------------------------|
+| 200    | [OK](https://tools.ietf.org/html/rfc7231#section-6.3.1) | OK          | array of [codersdk.ChatPersona](schemas.md#codersdkchatpersona) |
+
+<h3 id="list-chat-personas-responseschema">Response Schema</h3>
+
+Status Code **200**
+
+| Name                | Type              | Required | Restrictions | Description |
+|---------------------|-------------------|----------|--------------|-------------|
+| `[array item]`      | array             | false    |              |             |
+| `» builtin`         | boolean           | false    |              |             |
+| `» created_at`      | string(date-time) | false    |              |             |
+| `» description`     | string            | false    |              |             |
+| `» enabled`         | boolean           | false    |              |             |
+| `» icon`            | string            | false    |              |             |
+| `» id`              | string(uuid)      | false    |              |             |
+| `» model_config_id` | string(uuid)      | false    |              |             |
+| `» name`            | string            | false    |              |             |
+| `» organization_id` | string(uuid)      | false    |              |             |
+| `» slug`            | string            | false    |              |             |
+| `» system_prompt`   | string            | false    |              |             |
+| `» updated_at`      | string(date-time) | false    |              |             |
+
+To perform this operation, you must be authenticated. [Learn more](authentication.md).
+
+## Create chat persona
+
+### Code samples
+
+```shell
+# Example request using curl
+curl -X POST http://coder-server:8080/api/experimental/chats/personas \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json' \
+  -H 'Coder-Session-Token: API_KEY'
+```
+
+`POST /api/experimental/chats/personas`
+
+Experimental: this endpoint is subject to change.
+
+> Body parameter
+
+```json
+{
+  "description": "string",
+  "enabled": true,
+  "icon": "string",
+  "model_config_id": "f5fb4d91-62ca-4377-9ee6-5d43ba00d205",
+  "name": "string",
+  "organization_id": "7c60d51f-b44e-4682-87d6-449835ea4de6",
+  "slug": "string",
+  "system_prompt": "string"
+}
+```
+
+### Parameters
+
+| Name   | In   | Type                                                                             | Required | Description                 |
+|--------|------|----------------------------------------------------------------------------------|----------|-----------------------------|
+| `body` | body | [codersdk.CreateChatPersonaRequest](schemas.md#codersdkcreatechatpersonarequest) | true     | Create chat persona request |
+
+### Example responses
+
+> 201 Response
+
+```json
+{
+  "builtin": true,
+  "created_at": "2019-08-24T14:15:22Z",
+  "description": "string",
+  "enabled": true,
+  "icon": "string",
+  "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
+  "model_config_id": "f5fb4d91-62ca-4377-9ee6-5d43ba00d205",
+  "name": "string",
+  "organization_id": "7c60d51f-b44e-4682-87d6-449835ea4de6",
+  "slug": "string",
+  "system_prompt": "string",
+  "updated_at": "2019-08-24T14:15:22Z"
+}
+```
+
+### Responses
+
+| Status | Meaning                                                      | Description | Schema                                                 |
+|--------|--------------------------------------------------------------|-------------|--------------------------------------------------------|
+| 201    | [Created](https://tools.ietf.org/html/rfc7231#section-6.3.2) | Created     | [codersdk.ChatPersona](schemas.md#codersdkchatpersona) |
+
+To perform this operation, you must be authenticated. [Learn more](authentication.md).
+
+## Delete chat persona
+
+### Code samples
+
+```shell
+# Example request using curl
+curl -X DELETE http://coder-server:8080/api/experimental/chats/personas/{persona} \
+  -H 'Coder-Session-Token: API_KEY'
+```
+
+`DELETE /api/experimental/chats/personas/{persona}`
+
+Experimental: this endpoint is subject to change.
+
+### Parameters
+
+| Name      | In   | Type         | Required | Description     |
+|-----------|------|--------------|----------|-----------------|
+| `persona` | path | string(uuid) | true     | Chat persona ID |
+
+### Responses
+
+| Status | Meaning                                                         | Description | Schema |
+|--------|-----------------------------------------------------------------|-------------|--------|
+| 204    | [No Content](https://tools.ietf.org/html/rfc7231#section-6.3.5) | No Content  |        |
+
+To perform this operation, you must be authenticated. [Learn more](authentication.md).
+
+## Update chat persona
+
+### Code samples
+
+```shell
+# Example request using curl
+curl -X PATCH http://coder-server:8080/api/experimental/chats/personas/{persona} \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json' \
+  -H 'Coder-Session-Token: API_KEY'
+```
+
+`PATCH /api/experimental/chats/personas/{persona}`
+
+Experimental: this endpoint is subject to change.
+
+> Body parameter
+
+```json
+{
+  "description": "string",
+  "enabled": true,
+  "icon": "string",
+  "model_config_id": "f5fb4d91-62ca-4377-9ee6-5d43ba00d205",
+  "name": "string",
+  "system_prompt": "string"
+}
+```
+
+### Parameters
+
+| Name      | In   | Type                                                                             | Required | Description                 |
+|-----------|------|----------------------------------------------------------------------------------|----------|-----------------------------|
+| `persona` | path | string(uuid)                                                                     | true     | Chat persona ID             |
+| `body`    | body | [codersdk.UpdateChatPersonaRequest](schemas.md#codersdkupdatechatpersonarequest) | true     | Update chat persona request |
+
+### Example responses
+
+> 200 Response
+
+```json
+{
+  "builtin": true,
+  "created_at": "2019-08-24T14:15:22Z",
+  "description": "string",
+  "enabled": true,
+  "icon": "string",
+  "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
+  "model_config_id": "f5fb4d91-62ca-4377-9ee6-5d43ba00d205",
+  "name": "string",
+  "organization_id": "7c60d51f-b44e-4682-87d6-449835ea4de6",
+  "slug": "string",
+  "system_prompt": "string",
+  "updated_at": "2019-08-24T14:15:22Z"
+}
+```
+
+### Responses
+
+| Status | Meaning                                                 | Description | Schema                                                 |
+|--------|---------------------------------------------------------|-------------|--------------------------------------------------------|
+| 200    | [OK](https://tools.ietf.org/html/rfc7231#section-6.3.1) | OK          | [codersdk.ChatPersona](schemas.md#codersdkchatpersona) |
 
 To perform this operation, you must be authenticated. [Learn more](authentication.md).
 

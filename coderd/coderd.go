@@ -1277,6 +1277,8 @@ func New(options *Options) *API {
 			r.Get("/", api.listChats)
 			r.Post("/", api.postChats)
 			r.Get("/models", api.listChatModels)
+			r.Get("/personas", api.listChatPersonas)
+			r.Get("/agents", api.listChatAgents)
 			r.Get("/watch", api.watchChats)
 			r.Route("/cost", func(r chi.Router) {
 				r.Get("/users", api.chatCostUsers)

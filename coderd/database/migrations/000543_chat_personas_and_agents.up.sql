@@ -30,7 +30,11 @@ CREATE UNIQUE INDEX idx_chat_personas_deployment_slug
     WHERE NOT deleted AND organization_id IS NULL;
 
 -- Chat agents are named invocable entries that point at a persona and
--- optionally append to its prompt or override its model.
+-- optionally append to its prompt or override its model. persona_id has
+-- no foreign key because agents may reference in-memory builtin
+-- personas that are not database rows; referential validation for
+-- database personas happens at the API layer, and personas are
+-- soft-deleted so dangling references cannot occur either way.
 CREATE TABLE chat_agents (
     id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID        REFERENCES organizations(id) ON DELETE CASCADE,
@@ -38,7 +42,7 @@ CREATE TABLE chat_agents (
     name            TEXT        NOT NULL,
     description     TEXT        NOT NULL DEFAULT '',
     icon            TEXT        NOT NULL DEFAULT '',
-    persona_id      UUID        NOT NULL REFERENCES chat_personas(id),
+    persona_id      UUID        NOT NULL,
     prompt_append   TEXT        NOT NULL DEFAULT '',
     model_config_id UUID        REFERENCES chat_model_configs(id),
     enabled         BOOLEAN     NOT NULL DEFAULT TRUE,
@@ -49,7 +53,7 @@ CREATE TABLE chat_agents (
 );
 
 COMMENT ON COLUMN chat_agents.organization_id IS 'NULL means the agent is deployment-scoped; otherwise it belongs to the organization.';
-COMMENT ON COLUMN chat_agents.persona_id IS 'The persona supplying the base system prompt for chats created with this agent.';
+COMMENT ON COLUMN chat_agents.persona_id IS 'The persona supplying the base system prompt for chats created with this agent. May reference an in-memory builtin persona, so no foreign key exists.';
 COMMENT ON COLUMN chat_agents.prompt_append IS 'Additional system prompt text appended after the persona prompt.';
 COMMENT ON COLUMN chat_agents.model_config_id IS 'Overrides the persona model preference when set.';
 
@@ -65,10 +69,12 @@ CREATE UNIQUE INDEX idx_chat_agents_deployment_slug
 DROP VIEW IF EXISTS chats_expanded;
 
 -- The existing chats.agent_id column is the workspace agent, so the
--- chat agent reference uses a distinct name.
-ALTER TABLE chats ADD COLUMN chat_agent_id UUID REFERENCES chat_agents(id);
+-- chat agent reference uses a distinct name. It has no foreign key
+-- because chats may reference in-memory builtin agents that are not
+-- database rows.
+ALTER TABLE chats ADD COLUMN chat_agent_id UUID;
 
-COMMENT ON COLUMN chats.chat_agent_id IS 'The chat agent the chat was created as, if any. Distinct from agent_id, which is the workspace agent.';
+COMMENT ON COLUMN chats.chat_agent_id IS 'The chat agent the chat was created as, if any. Distinct from agent_id, which is the workspace agent. May reference an in-memory builtin agent, so no foreign key exists.';
 
 CREATE VIEW chats_expanded AS
  SELECT c.id,

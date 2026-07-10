@@ -1675,6 +1675,28 @@ export interface ChatACL {
 	readonly groups: readonly ChatGroup[];
 }
 
+// From codersdk/chatagents.go
+/**
+ * ChatAgent is a named invocable entry that points at a persona and
+ * optionally appends to its prompt or overrides its model. A nil
+ * OrganizationID means the agent is deployment-scoped.
+ */
+export interface ChatAgent {
+	readonly id: string;
+	readonly organization_id?: string;
+	readonly slug: string;
+	readonly name: string;
+	readonly description: string;
+	readonly icon: string;
+	readonly persona_id: string;
+	readonly prompt_append: string;
+	readonly model_config_id?: string;
+	readonly builtin: boolean;
+	readonly enabled: boolean;
+	readonly created_at: string;
+	readonly updated_at: string;
+}
+
 // From codersdk/chats.go
 export type ChatAttachmentMediaType =
 	| "application/json"
@@ -2827,6 +2849,28 @@ export interface ChatModelsResponse {
 	readonly unsupported_providers: readonly ChatUnsupportedProvider[];
 }
 
+// From codersdk/chatagents.go
+/**
+ * ChatPersona bundles a system prompt with a preferred model. Builtin
+ * personas are served from an in-memory catalog; deployment and
+ * organization personas are stored in the database. A nil
+ * OrganizationID means the persona is deployment-scoped.
+ */
+export interface ChatPersona {
+	readonly id: string;
+	readonly organization_id?: string;
+	readonly slug: string;
+	readonly name: string;
+	readonly description: string;
+	readonly icon: string;
+	readonly system_prompt: string;
+	readonly model_config_id?: string;
+	readonly builtin: boolean;
+	readonly enabled: boolean;
+	readonly created_at: string;
+	readonly updated_at: string;
+}
+
 // From codersdk/chats.go
 /**
  * ChatPersonalModelOverride is a resolved user personal model override.
@@ -3606,6 +3650,23 @@ export interface CreateAIProviderRequest {
 	readonly settings?: AIProviderSettings;
 }
 
+// From codersdk/chatagents.go
+/**
+ * CreateChatAgentRequest creates a chat agent. A nil or zero
+ * OrganizationID creates a deployment-scoped agent.
+ */
+export interface CreateChatAgentRequest {
+	readonly organization_id?: string;
+	readonly slug: string;
+	readonly name: string;
+	readonly description?: string;
+	readonly icon?: string;
+	readonly persona_id: string;
+	readonly prompt_append?: string;
+	readonly model_config_id?: string;
+	readonly enabled?: boolean;
+}
+
 // From codersdk/chats.go
 /**
  * CreateChatMessageRequest is the request to add a message to a chat.
@@ -3647,6 +3708,22 @@ export interface CreateChatModelConfigRequest {
 	readonly context_limit?: number;
 	readonly compression_threshold?: number;
 	readonly model_config?: ChatModelCallConfig;
+}
+
+// From codersdk/chatagents.go
+/**
+ * CreateChatPersonaRequest creates a chat persona. A nil or zero
+ * OrganizationID creates a deployment-scoped persona.
+ */
+export interface CreateChatPersonaRequest {
+	readonly organization_id?: string;
+	readonly slug: string;
+	readonly name: string;
+	readonly description?: string;
+	readonly icon?: string;
+	readonly system_prompt: string;
+	readonly model_config_id?: string;
+	readonly enabled?: boolean;
 }
 
 // From codersdk/chats.go
@@ -4976,6 +5053,7 @@ export type FeatureName =
 	| "audit_log"
 	| "boundary"
 	| "browser_only"
+	| "chat_agents"
 	| "connection_log"
 	| "control_shared_ports"
 	| "custom_roles"
@@ -5005,6 +5083,7 @@ export const FeatureNames: FeatureName[] = [
 	"audit_log",
 	"boundary",
 	"browser_only",
+	"chat_agents",
 	"connection_log",
 	"control_shared_ports",
 	"custom_roles",
@@ -9054,6 +9133,22 @@ export interface UpdateChatACL {
 	readonly group_roles?: Record<string, ChatRole>;
 }
 
+// From codersdk/chatagents.go
+/**
+ * UpdateChatAgentRequest updates a chat agent. Nil fields are left
+ * unchanged. Setting ModelConfigID to the zero UUID clears the model
+ * override. The slug and scope are immutable.
+ */
+export interface UpdateChatAgentRequest {
+	readonly name?: string;
+	readonly description?: string;
+	readonly icon?: string;
+	readonly persona_id?: string;
+	readonly prompt_append?: string;
+	readonly model_config_id?: string;
+	readonly enabled?: boolean;
+}
+
 // From codersdk/chats.go
 /**
  * UpdateChatAutoArchiveDaysRequest is a request to update the chat
@@ -9113,6 +9208,21 @@ export interface UpdateChatModelConfigRequest {
 export interface UpdateChatModelOverrideRequest {
 	readonly model_config_id: string;
 	readonly reasoning_effort?: string;
+}
+
+// From codersdk/chatagents.go
+/**
+ * UpdateChatPersonaRequest updates a chat persona. Nil fields are left
+ * unchanged. Setting ModelConfigID to the zero UUID clears the model
+ * preference. The slug and scope are immutable.
+ */
+export interface UpdateChatPersonaRequest {
+	readonly name?: string;
+	readonly description?: string;
+	readonly icon?: string;
+	readonly system_prompt?: string;
+	readonly model_config_id?: string;
+	readonly enabled?: boolean;
 }
 
 // From codersdk/chats.go

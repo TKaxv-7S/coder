@@ -5042,7 +5042,7 @@ type ChatAgent struct {
 	Name           string        `db:"name" json:"name"`
 	Description    string        `db:"description" json:"description"`
 	Icon           string        `db:"icon" json:"icon"`
-	// The persona supplying the base system prompt for chats created with this agent.
+	// The persona supplying the base system prompt for chats created with this agent. May reference an in-memory builtin persona, so no foreign key exists.
 	PersonaID uuid.UUID `db:"persona_id" json:"persona_id"`
 	// Additional system prompt text appended after the persona prompt.
 	PromptAppend string `db:"prompt_append" json:"prompt_append"`
@@ -5292,7 +5292,7 @@ type ChatTable struct {
 	ContextError string `db:"context_error" json:"context_error"`
 	// Stores the most recent message effort once per-turn selection is wired.
 	LastReasoningEffort NullChatReasoningEffort `db:"last_reasoning_effort" json:"last_reasoning_effort"`
-	// The chat agent the chat was created as, if any. Distinct from agent_id, which is the workspace agent.
+	// The chat agent the chat was created as, if any. Distinct from agent_id, which is the workspace agent. May reference an in-memory builtin agent, so no foreign key exists.
 	ChatAgentID uuid.NullUUID `db:"chat_agent_id" json:"chat_agent_id"`
 }
 
