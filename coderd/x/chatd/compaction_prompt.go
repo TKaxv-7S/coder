@@ -36,7 +36,7 @@ func sanitizeCompactionPrompt(
 ) []fantasy.Message {
 	messages := prompt
 	if !sameCompactionProviderIdentity(chatConfig, overrideConfig) {
-		messages = stripProviderExecutedToolParts(ctx, logger, messages)
+		messages = flattenProviderExecutedToolParts(ctx, logger, messages)
 	}
 	messages = replaceUnsupportedFileParts(ctx, logger, messages, func(mediaType string) bool {
 		return chatprovider.AcceptsFilePartMediaType(
@@ -60,30 +60,61 @@ func sanitizeCompactionPrompt(
 	return sanitized
 }
 
-// stripProviderExecutedToolParts removes provider-executed tool calls and
-// results from a copy of messages. Provider-executed blocks produced by
-// one provider can be rejected when replayed to another, and compaction
-// only needs the conversation text. Messages emptied by stripping are
-// dropped.
-func stripProviderExecutedToolParts(
+// flattenProviderExecutedToolParts rewrites provider-executed tool calls
+// and results in assistant messages into plain text parts on a copy of
+// messages. Provider-executed blocks carry provider-specific wire shapes and
+// ids (for example Anthropic srvtoolu_... ids) that other providers reject
+// on replay, but their content is still useful to the summary, so it is kept
+// as text instead of dropped. Mirrors flattenProviderExecutedToolParts in
+// coder/mux.
+//
+// Assistant messages are the only legitimate home for provider-executed
+// parts (chatsanitize flags other roles as violations). Anomalous parts in
+// other roles are dropped rather than flattened, because a text part is not
+// valid tool-message content for every provider; messages emptied by that
+// drop are removed.
+func flattenProviderExecutedToolParts(
 	ctx context.Context,
 	logger slog.Logger,
 	messages []fantasy.Message,
 ) []fantasy.Message {
-	removed := 0
+	flattened := 0
+	dropped := 0
+	// Tool names live on the call part only; results reference the call by ID.
+	toolNamesByCallID := make(map[string]string)
 	out := make([]fantasy.Message, 0, len(messages))
 	for _, msg := range messages {
+		flattenToText := msg.Role == fantasy.MessageRoleAssistant
 		parts := make([]fantasy.MessagePart, 0, len(msg.Content))
 		for _, part := range msg.Content {
 			switch typed := part.(type) {
 			case fantasy.ToolCallPart:
 				if typed.ProviderExecuted {
-					removed++
+					if !flattenToText {
+						dropped++
+						continue
+					}
+					toolNamesByCallID[typed.ToolCallID] = typed.ToolName
+					flattened++
+					parts = append(parts, fantasy.TextPart{
+						Text: fmt.Sprintf("[Server tool call: %s] %s", typed.ToolName, typed.Input),
+					})
 					continue
 				}
 			case fantasy.ToolResultPart:
 				if typed.ProviderExecuted {
-					removed++
+					if !flattenToText {
+						dropped++
+						continue
+					}
+					flattened++
+					parts = append(parts, fantasy.TextPart{
+						Text: fmt.Sprintf(
+							"[Server tool result: %s] %s",
+							toolNamesByCallID[typed.ToolCallID],
+							stringifyToolResultOutput(typed.Output),
+						),
+					})
 					continue
 				}
 			}
@@ -95,12 +126,35 @@ func stripProviderExecutedToolParts(
 		msg.Content = parts
 		out = append(out, msg)
 	}
-	if removed > 0 {
-		logger.Debug(ctx, "stripped provider-executed tool history from compaction prompt",
-			slog.F("removed_parts", removed),
+	if flattened > 0 || dropped > 0 {
+		logger.Debug(ctx, "flattened provider-executed tool history in compaction prompt",
+			slog.F("flattened_parts", flattened),
+			slog.F("dropped_parts", dropped),
 		)
 	}
 	return out
+}
+
+// stringifyToolResultOutput renders a tool result output as prompt text.
+// Media payloads are summarized instead of inlined so base64 data does not
+// enter the compaction prompt as text.
+func stringifyToolResultOutput(output fantasy.ToolResultOutputContent) string {
+	switch typed := output.(type) {
+	case fantasy.ToolResultOutputContentText:
+		return typed.Text
+	case fantasy.ToolResultOutputContentError:
+		if typed.Error == nil {
+			return "error"
+		}
+		return typed.Error.Error()
+	case fantasy.ToolResultOutputContentMedia:
+		if typed.Text != "" {
+			return fmt.Sprintf("%s [media %s omitted]", typed.Text, typed.MediaType)
+		}
+		return fmt.Sprintf("[media %s omitted]", typed.MediaType)
+	default:
+		return "[unserializable tool output]"
+	}
 }
 
 // replaceUnsupportedFileParts swaps file parts the compaction model does

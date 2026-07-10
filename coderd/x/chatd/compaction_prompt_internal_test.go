@@ -29,7 +29,7 @@ func configWithProvider(id uuid.UUID) database.ChatModelConfig {
 	return database.ChatModelConfig{AIProviderID: uuid.NullUUID{UUID: id, Valid: true}}
 }
 
-func TestSanitizeCompactionPrompt_StripsForeignProviderExecutedToolParts(t *testing.T) {
+func TestSanitizeCompactionPrompt_FlattensForeignProviderExecutedToolParts(t *testing.T) {
 	t.Parallel()
 
 	ctx := testutil.Context(t, testutil.WaitShort)
@@ -74,20 +74,32 @@ func TestSanitizeCompactionPrompt_StripsForeignProviderExecutedToolParts(t *test
 	sanitized := sanitizeCompactionPrompt(ctx, logger, prompt, compactionModel, configWithProvider(uuid.New()), configWithProvider(uuid.New()))
 
 	require.Len(t, sanitized, 3)
-	require.Len(t, sanitized[1].Content, 1)
+	// Provider-executed parts are flattened to text so the summary keeps
+	// their content without the provider-specific wire shape.
+	require.Len(t, sanitized[1].Content, 3)
 	require.Equal(t, fantasy.TextPart{Text: "searching"}, sanitized[1].Content[0])
+	require.Equal(t, fantasy.TextPart{Text: `[Server tool call: web_search] {"query":"coder"}`}, sanitized[1].Content[1])
+	require.Equal(t, fantasy.TextPart{Text: "[Server tool result: web_search] results"}, sanitized[1].Content[2])
 	// Local tool calls replay fine across providers and must survive.
 	require.Len(t, sanitized[2].Content, 1)
+	require.Equal(t, "read_file", sanitized[2].Content[0].(fantasy.ToolCallPart).ToolName)
 
 	// The original prompt used for assistant generation is untouched.
-	require.Len(t, prompt[1].Content, 3)
+	require.Equal(t, fantasy.ToolCallPart{
+		ToolCallID:       "ws-1",
+		ToolName:         "web_search",
+		Input:            `{"query":"coder"}`,
+		ProviderExecuted: true,
+	}, prompt[1].Content[1])
 }
 
-func TestSanitizeCompactionPrompt_DropsEmptiedMessages(t *testing.T) {
+func TestSanitizeCompactionPrompt_DropsNonAssistantProviderExecutedParts(t *testing.T) {
 	t.Parallel()
 
 	ctx := testutil.Context(t, testutil.WaitShort)
 	logger := slogtest.Make(t, &slogtest.Options{IgnoreErrors: true})
+	// Provider-executed parts outside assistant messages are anomalous; a
+	// flattened text part is not valid tool-message content, so they drop.
 	prompt := []fantasy.Message{
 		{
 			Role: fantasy.MessageRoleTool,
