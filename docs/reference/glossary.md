@@ -489,15 +489,18 @@ Refer to [OIDC authentication](../admin/users/oidc-auth/index.md).
 A curated example template that ships with Coder for a common platform, such as Docker, Kubernetes, AWS, GCP, or Azure.
 Refer to [Create templates](../admin/templates/creating-templates.md).
 
-### Sub-agent
-
-A nested agent for a dev container that runs inside a parent workspace agent.
-Refer to [Dev containers](../admin/templates/extending-templates/devcontainers.md).
-
-### Subagent
+### Sub-agent (Coder Agents)
 
 A delegated child chat that a parent Coder Agents chat spawns to perform a sub-task, with its own tool allowlist.
+Not to be confused with a [dev container sub-agent](#sub-agent-dev-containers).
 Refer to [Coder Agents architecture](../ai-coder/agents/architecture.md).
+
+### Sub-agent (dev containers)
+
+The nested workspace agent that Coder runs for a dev container inside a parent workspace, so you can connect to the dev container directly.
+This is a Coder term, not part of the Development Container Specification.
+Not to be confused with a [Coder Agents sub-agent](#sub-agent-coder-agents).
+Refer to [Dev containers](../admin/integrations/devcontainers/integration.md).
 
 ### Subdomain apps
 
