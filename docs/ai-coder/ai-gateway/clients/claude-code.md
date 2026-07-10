@@ -9,7 +9,7 @@ Claude Code can be configured using environment variables. All modes require a *
 
 ## Centralized API Key
 
-```bash
+```sh
 # AI Gateway base URL.
 export ANTHROPIC_BASE_URL="<your-deployment-url>/api/v2/ai-gateway/anthropic"
 
@@ -19,7 +19,7 @@ export ANTHROPIC_AUTH_TOKEN="<your-coder-api-token>"
 
 ## BYOK (Personal API Key)
 
-```bash
+```sh
 # AI Gateway base URL.
 export ANTHROPIC_BASE_URL="<your-deployment-url>/api/v2/ai-gateway/anthropic"
 
@@ -35,7 +35,7 @@ unset ANTHROPIC_AUTH_TOKEN
 
 ## BYOK (Claude Subscription)
 
-```bash
+```sh
 # AI Gateway base URL.
 export ANTHROPIC_BASE_URL="<your-deployment-url>/api/v2/ai-gateway/anthropic"
 

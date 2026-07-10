@@ -97,7 +97,7 @@ spec:
 User namespaces are often disabled (`user.max_user_namespaces=0`) on Bottlerocket
 nodes. Check and enable user namespaces:
 
-```bash
+```sh
 # Check current value
 sysctl user.max_user_namespaces
 

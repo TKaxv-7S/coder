@@ -95,7 +95,7 @@ trust store present on your local machine as well as to the Coder plugin setting
 
    Use the `keytool` utility that ships with Java:
 
-   ```shell
+   ```sh
    keytool -import -alias coder -file <certificate> -keystore /path/to/trust/store
    ```
 
@@ -108,7 +108,7 @@ trust store present on your local machine as well as to the Coder plugin setting
 
    Use the `keytool` included in the JetBrains Gateway installation:
 
-   ```shell
+   ```sh
    keytool -import -alias coder -file cacert.pem -keystore /Applications/JetBrains\ Gateway.app/Contents/jbr/Contents/Home/lib/security/cacerts
    ```
 

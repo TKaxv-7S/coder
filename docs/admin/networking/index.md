@@ -126,7 +126,7 @@ for both public and [Air-gapped deployments](../../install/airgap.md).
 However, Tailscale maintains a global fleet of [DERP relays](https://tailscale.com/kb/1118/custom-derp-servers/#what-are-derp-servers) intended for their product, and has allowed Coder to access and use them.
 You can launch `coder server` with Tailscale's DERPs like so:
 
-```bash
+```sh
 coder server --derp-config-url https://controlplane.tailscale.com/derpmap/default
 ```
 
@@ -159,7 +159,7 @@ After you have custom DERP servers, you can launch Coder with them like so:
 }
 ```
 
-```bash
+```sh
 coder server --derp-config-path derpmap.json
 ```
 

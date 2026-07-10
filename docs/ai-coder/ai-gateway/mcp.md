@@ -26,7 +26,7 @@ AI Gateway makes use of [External Auth](../../admin/external-auth/index.md) appl
 
 For example, GitHub has a [remote MCP server](https://github.com/github/github-mcp-server?tab=readme-ov-file#remote-github-mcp-server) and we can use it as follows.
 
-```bash
+```sh
 CODER_EXTERNAL_AUTH_0_TYPE=github
 CODER_EXTERNAL_AUTH_0_CLIENT_ID=...
 CODER_EXTERNAL_AUTH_0_CLIENT_SECRET=...

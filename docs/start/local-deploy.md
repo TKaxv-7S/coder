@@ -47,7 +47,7 @@ winget install Coder.Coder
 
 To start or restart the Coder deployment, use the following command:
 
-```shell
+```sh
 coder server
 ```
 

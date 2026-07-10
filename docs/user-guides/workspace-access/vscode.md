@@ -137,7 +137,7 @@ Web or using the workspace's terminal.
 
 1. Add the `vsix` extension files to the same folder as your Dockerfile.
 
-   ```shell
+   ```sh
    ~/images/base
     ➜  ls -l
     -rw-r--r-- 1 coder coder       0 Aug 1 19:23 Dockerfile

@@ -459,7 +459,7 @@ to prevent creating excess groups.
 CODER_OIDC_GROUP_AUTO_CREATE=true
 ```
 
-```shell
+```sh
 # as a flag
 --oidc-group-auto-create=true
 ```
@@ -476,7 +476,7 @@ set the following environment variable.
 CODER_OIDC_GROUP_REGEX_FILTER="^my-group-.*$"
 ```
 
-```shell
+```sh
 # as a flag
 --oidc-group-regex-filter="^my-group-.*$"
 ```

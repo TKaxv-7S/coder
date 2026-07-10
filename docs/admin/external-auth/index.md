@@ -67,7 +67,7 @@ Reference the documentation for your chosen provider for more information on how
 
 Use [`external-auth`](../../reference/cli/external-auth.md) in the Coder CLI to access a token within the workspace:
 
-```shell
+```sh
 coder external-auth access-token <USER_DEFINED_ID>
 ```
 
@@ -101,7 +101,7 @@ Behind the scenes, Coder:
 
 To manually access these tokens within a workspace:
 
-```shell
+```sh
 coder external-auth access-token <USER_DEFINED_ID>
 ```
 
@@ -124,7 +124,7 @@ You must add the SSH key to your Git provider.
 
 1. View your Coder Git SSH key:
 
-   ```shell
+   ```sh
    coder publickey
    ```
 

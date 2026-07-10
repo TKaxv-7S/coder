@@ -22,7 +22,7 @@ Installing Coder on Rancher involves four key steps:
 
 Create a namespace for the Coder control plane. In this tutorial, we call it `coder`:
 
-```shell
+```sh
 kubectl create namespace coder
 ```
 
@@ -78,7 +78,7 @@ For more advanced PostgreSQL management, consider using the
 
 Create a Kubernetes secret with your PostgreSQL connection URL:
 
-```shell
+```sh
 kubectl create secret generic coder-db-url -n coder \
   --from-literal=url="postgres://coder:coder@coder-db-postgresql.coder.svc.cluster.local:5432/coder?sslmode=disable"
 ```

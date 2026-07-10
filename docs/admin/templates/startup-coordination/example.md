@@ -6,7 +6,7 @@ This example shows a complete, production-ready script that starts Claude Code
 only after a repository has been cloned. It includes error handling, graceful
 degradation, and cleanup on exit:
 
-```bash
+```sh
 #!/bin/bash
 set -euo pipefail
 

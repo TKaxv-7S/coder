@@ -289,13 +289,13 @@ To send a custom notification, execute [`coder notifications custom <title> <mes
 
 - Send yourself a quick update:
 
-```shell
+```sh
 coder templates push -y && coder notifications custom "Template push complete" "Template version uploaded."
 ```
 
 - Use in a script after a long-running task:
 
-```shell
+```sh
 #!/usr/bin/env bash
 set -o pipefail
 

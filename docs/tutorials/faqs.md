@@ -42,7 +42,7 @@ Visit <https://coder.com/trial> or contact
 1. Open a terminal.
 1. Log in to your Coder deployment:
 
-   ```shell
+   ```sh
    coder login <access url>
    ```
 
@@ -50,7 +50,7 @@ Visit <https://coder.com/trial> or contact
 
    - For a `.jwt` license file:
 
-     ```shell
+     ```sh
      coder licenses add -f <path to your license key>
      ```
 

@@ -144,13 +144,20 @@ Use the most specific language tag available:
   `terraform` and `hcl` are not the canonical tag; use `tf`.
   Shiki ships `terraform` and `hcl` as two distinct grammars; `tf` is an alias of the more specific `terraform` grammar (not `hcl`), and matches what nearly every Coder docs code block actually is.
 - `yaml` for YAML.
+  `yml` is not the canonical tag; use `yaml`.
 - `go` for Go.
 - `json` for JSON.
+  `jsonc` is a distinct Shiki grammar for JSON that permits comments; use it only for blocks that actually contain comments, otherwise use `json`.
 - `dotenv` for `.env`-style `KEY=VALUE` blocks.
 - `txt` for command output shown on its own, and for any block with no syntax to highlight.
   `text`, `output`, `none`, and `url` are not the canonical tag; use `txt`.
 - `dockerfile` for Dockerfiles, lowercase.
   `Dockerfile` (capitalized) is not a valid tag.
+- `md` for Markdown, including Markdown shown as a fenced example inside another Markdown file.
+  `markdown` is not the canonical tag; use `md`.
+- `tsx` for TypeScript, including plain (non-JSX) TypeScript.
+  `ts` and `typescript` are not the canonical tag; use `tsx`.
+  `tsx` mis-tokenizes the legacy angle-bracket type-assertion syntax (`<Type>value`), which is invalid in real `.tsx` files anyway; write casts as `value as Type` instead, which is unambiguous under both grammars and is already the idiomatic style.
 
 `bash` and `shell` are aliases of `sh`.
 Use `sh` so the corpus stays consistent.
@@ -276,13 +283,13 @@ If one item is a complete sentence, rewrite the rest so every item is a complete
 
 **Do**:
 
-```markdown
+```md
 1. Run `coder login` to authenticate.
 2. Create the workspace template.
 3. Build the workspace from the template.
 ```
 
-```markdown
+```md
 The provisioner supports:
 
 - AWS
@@ -290,7 +297,7 @@ The provisioner supports:
 - Google Cloud
 ```
 
-```markdown
+```md
 The agent reconnect logic uses the following timeouts:
 
 - Initial reconnect: 1 second.
@@ -300,13 +307,13 @@ The agent reconnect logic uses the following timeouts:
 
 **Don't**:
 
-```markdown
+```md
 1. The user runs `coder login` to authenticate
 2. Creating the workspace template comes next.
 3. Then the workspace gets built from the template
 ```
 
-```markdown
+```md
 The provisioner supports:
 
 - AWS.
@@ -322,14 +329,14 @@ When such a list needs a lead-in, end the lead-in with a colon on a clause that 
 
 **Do**:
 
-```markdown
+```md
 You have two options:
 
 - Install the tool with `apt-get` in the template's startup script.
 - Bake the tool into the workspace image.
 ```
 
-```markdown
+```md
 ## Learn more
 
 - [Extending templates](./extending-templates.md)
@@ -338,7 +345,7 @@ You have two options:
 
 **Don't**:
 
-```markdown
+```md
 Install it where it persists across rebuilds:
 
 - Add it to the template's startup script with `apt-get`.
@@ -393,7 +400,7 @@ Reference the asset with a relative path from the Markdown source.
 
 Captions follow the image in a `<small>` tag.
 
-```markdown
+```md
 ![Template Insights dashboard with weekly active users and connection latency charts](../../images/admin/templates/template-insights.png)
 
 <small>The Template Insights dashboard with active-user and connection-latency widgets.</small>

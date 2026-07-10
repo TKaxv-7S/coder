@@ -39,18 +39,18 @@ The host machine must be running a Linux kernel >= 5.8 with the kernel config
 
 To check your kernel version, run:
 
-```shell
+```sh
 uname -r
 ```
 
 To validate the required kernel config is enabled, run either of the following
 commands on your nodes directly (_not_ from a workspace terminal):
 
-```shell
+```sh
 cat /proc/config.gz | gunzip | grep CONFIG_DEBUG_INFO_BTF
 ```
 
-```shell
+```sh
 cat "/boot/config-$(uname -r)" | grep CONFIG_DEBUG_INFO_BTF
 ```
 
@@ -248,7 +248,7 @@ restarted.
 To view the process logs for a specific workspace you can use `kubectl` to print
 the logs:
 
-```bash
+```sh
 kubectl logs pod-name --container exectrace
 ```
 

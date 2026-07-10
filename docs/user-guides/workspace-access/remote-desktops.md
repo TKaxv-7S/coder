@@ -149,7 +149,7 @@ Use a VNC client (e.g., [TigerVNC](https://tigervnc.org/)) by forwarding the VNC
 
 Use the following command to forward the VNC port to your local machine:
 
-```bash
+```sh
 coder port-forward <workspace-name> --tcp 5900:5900
 ```
 

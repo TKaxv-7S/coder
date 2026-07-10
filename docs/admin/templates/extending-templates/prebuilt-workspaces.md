@@ -295,7 +295,7 @@ The troubleshooting steps below will help you assess and resolve this situation:
 
 Run:
 
-```bash
+```sh
 coder prebuilds pause
 ```
 
@@ -307,7 +307,7 @@ This prevents further pollution of your provisioner queues by stopping the prebu
 
 Next, run:
 
-```bash
+```sh
 coder provisioner jobs list --status=pending --initiator=prebuilds
 ```
 
@@ -321,7 +321,7 @@ Human-initiated jobs are prioritized above prebuild jobs in the provisioner queu
 
 To expedite fixing a broken template by ensuring maximum provisioner availability, cancel all pending prebuild jobs:
 
-```bash
+```sh
 coder provisioner jobs list --status=pending --initiator=prebuilds | jq -r '.[].id' | xargs -n1 -P2 -I{} coder provisioner jobs cancel {}
 ```
 
@@ -333,7 +333,7 @@ At this stage, most prebuild related impact will have been mitigated. There may 
 
 If you need to expedite the processing of human-related jobs at the cost of some infrastructure housekeeping, you can run:
 
-```bash
+```sh
 coder provisioner jobs list --status=running --initiator=prebuilds | jq -r '.[].id' | xargs -n1 -P2 -I{} coder provisioner jobs cancel {}
 ```
 
@@ -343,7 +343,7 @@ Once the provisioner queue has been cleared and all templates have been fixed, r
 
 #### Resume prebuild reconciliation
 
-```bash
+```sh
 coder prebuilds resume
 ```
 

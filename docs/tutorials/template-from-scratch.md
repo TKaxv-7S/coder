@@ -414,7 +414,7 @@ through the CLI, or through the Coder dashboard:
 
    - To zip the files through the command line:
 
-     ```shell
+     ```sh
      zip templates.zip Dockerfile main.tf
      ```
 

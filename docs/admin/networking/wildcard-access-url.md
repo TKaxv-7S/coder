@@ -24,7 +24,7 @@ The following tools require wildcard access URL:
 
 `CODER_WILDCARD_ACCESS_URL` is necessary for [port forwarding](port-forwarding.md#dashboard) via the dashboard or running [coder_apps](../templates/index.md) on an absolute path. Set this to a wildcard subdomain that resolves to Coder (e.g. `*.coder.example.com`).
 
-```bash
+```sh
 export CODER_WILDCARD_ACCESS_URL="*.coder.example.com"
 coder server
 ```
@@ -40,7 +40,7 @@ Wildcard access URLs require a TLS certificate that covers the wildcard domain. 
 
 Configure Coder to handle TLS directly using the wildcard certificate:
 
-```bash
+```sh
 export CODER_TLS_ENABLE=true
 export CODER_TLS_CERT_FILE=/path/to/wildcard.crt
 export CODER_TLS_KEY_FILE=/path/to/wildcard.key
@@ -86,7 +86,7 @@ Or alternatively, using a CNAME record:
 
 If you're using [workspace proxies](workspace-proxies.md) for geo-distributed teams, each proxy requires its own wildcard access URL configuration:
 
-```bash
+```sh
 # Main Coder server
 export CODER_WILDCARD_ACCESS_URL="*.coder.example.com"
 
@@ -132,7 +132,7 @@ If workspace applications are not working:
    - Restart the Coder server if you made changes to the environment variable
 2. Check DNS resolution for wildcard subdomains:
 
-   ```bash
+   ```sh
    dig test.coder.example.com
    nslookup test.coder.example.com
    ```

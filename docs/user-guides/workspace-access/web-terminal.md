@@ -104,7 +104,7 @@ webTerminalRenderer: "canvas"  # Options: canvas, webgl, dom
 
 Or via environment variable:
 
-```bash
+```sh
 CODER_WEB_TERMINAL_RENDERER=canvas
 ```
 
@@ -215,7 +215,7 @@ End-users can customize:
 
 The terminal respects your shell's configuration files:
 
-```bash
+```sh
 # ~/.bashrc or ~/.zshrc
 export PS1="\u@\h:\w\$ "  # Custom prompt
 alias ll="ls -lah"         # Custom aliases

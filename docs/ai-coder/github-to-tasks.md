@@ -96,7 +96,7 @@ You must also set `coder-template-name` as part of this. The GHA example has thi
 - By viewing the URL of the template in the UI, e.g. `https://<your-coder-url>/templates/<org-name>/<template-name>`
 - Using the Coder CLI:
 
-```bash
+```sh
 # List all templates in your organization
 coder templates list
 
@@ -165,7 +165,7 @@ We recommend that you further adapt this workflow to better match your process. 
 - Modify the underlying use case to handle updating documentation, implementing a small feature, reviewing bug reports for completeness, or even writing unit tests
 - Modify the workflow trigger for other scenarios such as:
 
-```yml
+```yaml
 # Comment-based trigger slash commands
 on:
   issue_comment:
@@ -251,7 +251,7 @@ Generate a new token with these permissions at `https://<your-coder-url>/deploym
 
 From within the running task workspace, check if the token is still valid:
 
-```bash
+```sh
 # Check if the token still works
 curl -H "Authorization: token ${GITHUB_TOKEN}" \
   https://api.github.com/user
