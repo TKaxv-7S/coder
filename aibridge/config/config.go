@@ -1,9 +1,9 @@
 package config
 
 import (
-	"errors"
-	"fmt"
 	"time"
+
+	"golang.org/x/xerrors"
 
 	"github.com/coder/coder/v2/aibridge/keypool"
 )
@@ -75,23 +75,23 @@ func (c AWSBedrock) Validate() error {
 	switch c.Protocol {
 	case "", BedrockProtocolInvokeModel:
 		if c.Region == "" && c.BaseURL == "" {
-			return errors.New("region or base url required")
+			return xerrors.New("region or base url required")
 		}
 		if c.Model == "" {
-			return errors.New("model required")
+			return xerrors.New("model required")
 		}
 		if c.SmallFastModel == "" {
-			return errors.New("small fast model required")
+			return xerrors.New("small fast model required")
 		}
 	case BedrockProtocolMantle:
 		if c.Region == "" {
-			return errors.New("region required")
+			return xerrors.New("region required")
 		}
 		if c.BaseURL == "" {
-			return errors.New("base_url required")
+			return xerrors.New("base_url required")
 		}
 	default:
-		return fmt.Errorf("unknown bedrock protocol: %q", c.Protocol)
+		return xerrors.Errorf("unknown bedrock protocol: %q", c.Protocol)
 	}
 	return nil
 }
