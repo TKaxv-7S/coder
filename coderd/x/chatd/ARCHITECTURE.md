@@ -13,7 +13,7 @@ Chatd attributes AI Gateway requests with a synthetic API key owned by the chat 
 
 Synthetic keys expire after 30 days and renew when less than 24 hours remain. Renewal replaces the mapping but does not delete the previous key, because an in-flight request may still use it. Concurrent mints use conditional insert/update operations, and losing keys are deleted. The generated token is discarded, so the stored key cannot be used as a bearer credential.
 
-The legacy `api_key_id` columns on messages and queued messages are still stamped with the synthetic key for rolling deployment compatibility, but they no longer have foreign keys to `api_keys`. They are not the source of gateway routing. Stale IDs are harmless because chatd resolves attribution from `chats.owner_id`.
+The legacy `api_key_id` columns on messages and queued messages have no foreign keys and are not read or written. Any IDs stamped by older replicas remain inert because chatd resolves attribution from `chats.owner_id`.
 
 Deleting a synthetic key removes its mapping without updating chat messages, queued messages, or their version fields. Deleting all user API keys or resetting a password therefore causes chatd to mint a replacement on the next request without mutating history. User suspension and deletion still block delegated gateway authorization.
 
