@@ -38,7 +38,7 @@ coder://coder.example.com/v0/open/ws/myworkspace/agent/main/rdp?username=Adminis
 
 To include a Coder Desktop button on the workspace dashboard page, add a `coder_app` resource to the template:
 
-```tf
+```hcl
 locals {
   server_name = regex("https?:\\/\\/([^\\/]+)", data.coder_workspace.me.access_url)[0]
 }

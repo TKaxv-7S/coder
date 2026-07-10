@@ -123,7 +123,7 @@ This allows you to reduce resource costs during off-hours while maintaining avai
 
 Configure scheduling by adding a `scheduling` block within your `prebuilds` configuration:
 
-```tf
+```hcl
 data "coder_workspace_preset" "goland" {
    name = "GoLand: Large"
    parameters {
@@ -187,7 +187,7 @@ Cron expressions follow the format: `* HOUR DOM MONTH DAY-OF-WEEK`
 
 **Example schedules:**
 
-```tf
+```hcl
 # Business hours only (8AM-6:59PM, Mon-Fri)
 schedule {
   cron = "* 8-18 * * 1-5"

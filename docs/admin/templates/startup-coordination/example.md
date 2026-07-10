@@ -81,7 +81,7 @@ We've omitted some details (such as persistent storage) for brevity, but these a
 
 ### Before
 
-```terraform
+```hcl
 data "coder_provisioner" "me" {}
 data "coder_workspace" "me" {}
 data "coder_workspace_owner" "me" {}
@@ -139,7 +139,7 @@ Based on the above, we can improve both the startup time and reliability of the 
 
 Here is the updated version of the template:
 
-```terraform
+```hcl
 data "coder_provisioner" "me" {}
 data "coder_workspace" "me" {}
 data "coder_workspace_owner" "me" {}

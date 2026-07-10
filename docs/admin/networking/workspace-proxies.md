@@ -194,7 +194,7 @@ docker run --rm -it --entrypoint /opt/coder ghcr.io/coder/coder:latest wsproxy s
 
 #### Custom Dockerfile
 
-```Dockerfile
+```dockerfile
 FROM ghcr.io/coder/coder:latest
 ENTRYPOINT ["/opt/coder", "wsproxy", "server"]
 ```

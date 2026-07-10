@@ -36,7 +36,7 @@ The `id` points at a provider configured on the Coder deployment, and the local 
 
 Add this `coder_external_auth` block to `main.tf`:
 
-```tf
+```hcl
 data "coder_external_auth" "github" {
   id = "github"
 }
@@ -140,7 +140,7 @@ Both are data sources, and neither creates infrastructure.
 
 Your `main.tf` after this guide's changes, starting from the Quickstart template:
 
-```tf
+```hcl
 terraform {
   required_providers {
     coder = {

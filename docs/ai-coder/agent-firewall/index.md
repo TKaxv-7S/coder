@@ -45,7 +45,7 @@ maintain allow lists and share detailed policies with teammates.
 
 In your Terraform module, install Agent Firewall with minimal configuration:
 
-```tf
+```hcl
 module "agent-firewall" {
   source   = "registry.coder.com/coder/agent-firewall/coder"
   version  = "0.0.1"
@@ -55,7 +55,7 @@ module "agent-firewall" {
 
 To use a custom policy, pass it inline via `agent_firewall_config`, below is an example of minimal configuration for Claude Code module:
 
-```tf
+```hcl
 module "agent-firewall" {
   source   = "registry.coder.com/coder/agent-firewall/coder"
   version  = "0.0.1"
@@ -93,7 +93,7 @@ launches Agent Firewall manually inside the workspace picks up the same
 configuration without extra flags. This is especially convenient for managing
 extensive allow lists in version control.
 
-```tf
+```hcl
 module "agent-firewall" {
   source   = "registry.coder.com/coder/agent-firewall/coder"
   version  = "0.0.1"

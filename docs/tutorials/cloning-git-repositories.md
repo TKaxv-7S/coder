@@ -29,7 +29,7 @@ With the authentication in place, it is time to set up the template to use the
 [Coder Registry](https://registry.coder.com/) by adding it to our template's
 Terraform configuration.
 
-```tf
+```hcl
 module "git-clone" {
   source   = "registry.coder.com/modules/git-clone/coder"
   version  = "1.0.12"
@@ -47,7 +47,7 @@ You can also use
 customize the Git URL and make it dynamic for use cases where a template
 supports multiple projects.
 
-```tf
+```hcl
 data "coder_parameter" "git_repo" {
   name         = "git_repo"
   display_name = "Git repository"

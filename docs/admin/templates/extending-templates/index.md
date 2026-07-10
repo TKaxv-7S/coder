@@ -18,7 +18,7 @@ The associated agent will facilitate
 port forwarding, and IDEs. The agent may also display real-time
 [workspace metadata](./agent-metadata.md) like resource usage.
 
-```tf
+```hcl
 resource "coder_agent" "dev" {
   os   = "linux"
   arch = "amd64"
@@ -168,7 +168,7 @@ on a scheduled basis. It provides more control than the deprecated
 
 ### Basic example
 
-```tf
+```hcl
 resource "coder_script" "install_dependencies" {
   agent_id           = coder_agent.main.id
   display_name       = "Install Dependencies"
@@ -209,7 +209,7 @@ internally. For example:
 
 You can also reference external script files:
 
-```tf
+```hcl
 resource "coder_script" "init_docker" {
   agent_id     = coder_agent.main.id
   display_name = "Initialize Docker"

@@ -28,7 +28,7 @@ coder server --experiments oauth2
 
 Or set the environment variable:
 
-```env
+```text
 CODER_EXPERIMENTS=oauth2
 ```
 

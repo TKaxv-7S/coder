@@ -24,7 +24,7 @@ You can also present automatically updating, dynamic values with
 Expose the disk size, deployment name, and persistent directory in a Kubernetes
 template with:
 
-```tf
+```hcl
 resource "kubernetes_persistent_volume_claim" "root" {
     ...
 }
@@ -63,7 +63,7 @@ Some resources don't need to be exposed in the dashboard's UI. This helps keep
 the workspace view clean for developers. To hide a resource, use the `hide`
 attribute:
 
-```tf
+```hcl
 resource "coder_metadata" "hide_serviceaccount" {
   count = data.coder_workspace.me.start_count
   resource_id = kubernetes_service_account.user_data.id
@@ -80,7 +80,7 @@ resource "coder_metadata" "hide_serviceaccount" {
 To use custom icons for your resource metadata, use the `icon` attribute. It
 must be a valid path or URL.
 
-```tf
+```hcl
 resource "coder_metadata" "resource_with_icon" {
   count = data.coder_workspace.me.start_count
   resource_id = kubernetes_service_account.user_data.id

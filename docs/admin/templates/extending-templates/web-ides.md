@@ -5,7 +5,7 @@ In Coder, web IDEs are defined as
 resources in the template. With our generic model, any web application can be
 used as a Coder application. For example:
 
-```tf
+```hcl
 # Add button to open Portainer in the workspace dashboard
 # Note: Portainer must be already running in the workspace
 resource "coder_app" "portainer" {
@@ -35,7 +35,7 @@ cd your-template/
 vim main.tf
 ```
 
-```tf
+```hcl
 resource "coder_agent" "main" {
     arch           = "amd64"
     os             = "linux"
@@ -57,7 +57,7 @@ For advanced use, we recommend installing code-server in your VM snapshot or
 container image. Here's a Dockerfile which leverages some special
 [code-server features](https://coder.com/docs/code-server):
 
-```Dockerfile
+```dockerfile
 FROM codercom/enterprise-base:ubuntu
 
 # install the latest version
@@ -75,7 +75,7 @@ RUN code-server --install-extension eamodio.gitlens
 You'll also need to specify a `coder_app` resource related to the agent. This is
 how code-server is displayed on the workspace page.
 
-```tf
+```hcl
 resource "coder_app" "code-server" {
   agent_id     = coder_agent.main.id
   slug         = "code-server"
@@ -156,7 +156,7 @@ To use Jupyter Notebook in your workspace, you can install it by using the
 [Jupyter Notebook module](https://registry.coder.com/modules/jupyter-notebook)
 from the Coder registry:
 
-```tf
+```hcl
 module "jupyter-notebook" {
   source   = "registry.coder.com/modules/jupyter-notebook/coder"
   version  = "1.0.19"
@@ -171,7 +171,7 @@ module "jupyter-notebook" {
 Configure your agent and `coder_app` like so to use Jupyter. Notice the
 `subdomain=true` configuration:
 
-```tf
+```hcl
 data "coder_workspace" "me" {}
 
 resource "coder_agent" "coder" {
@@ -203,7 +203,7 @@ resource "coder_app" "jupyter" {
 
 Or Alternatively, you can use the JupyterLab module from the Coder registry:
 
-```tf
+```hcl
 module "jupyter" {
   source   = "registry.coder.com/modules/jupyter-lab/coder"
   version  = "1.0.0"
@@ -225,7 +225,7 @@ value substitution to recreate the path structure.
 Configure your agent and `coder_app` like so to use RStudio. Notice the
 `subdomain=true` configuration:
 
-```tf
+```hcl
 resource "coder_agent" "coder" {
   os             = "linux"
   arch           = "amd64"
@@ -272,7 +272,7 @@ community template example.
 Configure your agent and `coder_app` like so to use Airflow. Notice the
 `subdomain=true` configuration:
 
-```tf
+```hcl
 resource "coder_agent" "coder" {
   os   = "linux"
   arch = "amd64"
@@ -305,7 +305,7 @@ resource "coder_app" "airflow" {
 or use the [Airflow module](https://registry.coder.com/modules/apache-airflow)
 from the Coder registry:
 
-```tf
+```hcl
 module "airflow" {
   source   = "registry.coder.com/modules/airflow/coder"
   version  = "1.0.13"
@@ -323,7 +323,7 @@ manipulate files in a web browser.
 
 Show and manipulate the contents of the `/home/coder` directory in a browser.
 
-```tf
+```hcl
 resource "coder_agent" "coder" {
   os   = "linux"
   arch = "amd64"
@@ -358,7 +358,7 @@ Or alternatively, you can use the
 [`filebrowser`](https://registry.coder.com/modules/filebrowser) module from the
 Coder registry:
 
-```tf
+```hcl
 module "filebrowser" {
   source   = "registry.coder.com/modules/filebrowser/coder"
   version  = "1.0.8"

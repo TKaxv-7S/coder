@@ -454,7 +454,7 @@ If you enable this, your OIDC provider might be sending over many unnecessary
 groups. Use filtering options on the OIDC provider to limit the groups sent over
 to prevent creating excess groups.
 
-```env
+```text
 # as an environment variable
 CODER_OIDC_GROUP_AUTO_CREATE=true
 ```
@@ -471,7 +471,7 @@ want to filter out groups that do not match a certain pattern. For example, if
 you want to only allow groups that start with `my-group-` to be created, you can
 set the following environment variable.
 
-```env
+```text
 # as an environment variable
 CODER_OIDC_GROUP_REGEX_FILTER="^my-group-.*$"
 ```

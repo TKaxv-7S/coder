@@ -22,7 +22,7 @@ usage about the workspace's host.
 
 Here's a standard set of metadata snippets for Linux agents:
 
-```tf
+```hcl
 resource "coder_agent" "main" {
   os             = "linux"
   ...

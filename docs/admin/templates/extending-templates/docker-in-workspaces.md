@@ -23,7 +23,7 @@ inside Coder workspaces. See [Systemd in Docker](#systemd-in-docker).
 After [installing Sysbox](https://github.com/nestybox/sysbox#installation) on
 the Coder host, modify your template to use the sysbox-runc runtime:
 
-```tf
+```hcl
 resource "docker_container" "workspace" {
   # ...
   name    = "coder-${data.coder_workspace.me.owner}-${lower(data.coder_workspace.me.name)}"
@@ -52,7 +52,7 @@ After
 modify your template to use the sysbox-runc RuntimeClass. This requires the
 Kubernetes Terraform provider version 2.16.0 or greater.
 
-```tf
+```hcl
 terraform {
   required_providers {
     coder = {
@@ -169,7 +169,7 @@ $ kubectl create secret docker-registry <name> \
   --docker-email=<service-account-email>
 ```
 
-```tf
+```hcl
 env {
   name = "CODER_IMAGE_PULL_SECRET"
   value_from {
@@ -265,7 +265,7 @@ Before using Podman, please review the following documentation:
 Rootless containers rely on Linux user-namespaces.
 [Bottlerocket](https://github.com/bottlerocket-os/bottlerocket) disables them by default (`user.max_user_namespaces = 0`), so Podman commands will return an error until you raise the limit:
 
-```output
+```text
 cannot clone: Invalid argument
 user namespaces are not enabled in /proc/sys/user/max_user_namespaces
 ```
@@ -311,7 +311,7 @@ your nodes cannot run Sysbox.
 
 ### Use a privileged sidecar container in Docker-based templates
 
-```tf
+```hcl
 resource "coder_agent" "main" {
   os             = "linux"
   arch           = "amd64"
@@ -348,7 +348,7 @@ resource "docker_container" "workspace" {
 
 ### Use a privileged sidecar container in Kubernetes-based templates
 
-```tf
+```hcl
 terraform {
   required_providers {
     coder = {
@@ -420,7 +420,7 @@ After
 modify your template to use the sysbox-runc RuntimeClass. This requires the
 Kubernetes Terraform provider version 2.16.0 or greater.
 
-```tf
+```hcl
 terraform {
   required_providers {
     coder = {

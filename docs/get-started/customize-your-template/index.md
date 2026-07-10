@@ -29,7 +29,7 @@ It consists of one or more Terraform files (`*.tf`), and it can include template
 
 Every Coder template declares the `coder` provider inside a `required_providers` block:
 
-```tf
+```hcl
 terraform {
   required_providers {
     coder = {

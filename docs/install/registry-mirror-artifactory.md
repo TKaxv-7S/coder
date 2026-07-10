@@ -79,7 +79,7 @@ Replace:
 
 Update your Coder templates to use Artifactory instead of the public registry:
 
-```tf
+```hcl
 # Before: Direct from Coder registry
 module "code-server" {
   source   = "registry.coder.com/coder/code-server/coder"
@@ -170,7 +170,7 @@ The Artifactory mirror supports all namespaces from the Coder registry:
 
 All modules use the same source format:
 
-```tf
+```hcl
 source = "<your-artifactory-host>/<namespace>/<module>/coder"
 ```
 

@@ -36,7 +36,7 @@ this case, you need to:
 
 Example configuration:
 
-```tf
+```hcl
 module "claude-code" {
   source              = "dev.registry.coder.com/coder/claude-code/coder"
   version             = "4.7.0"
@@ -52,7 +52,7 @@ If you're using Claude Code module before v4.7.0, the module expects to use
 Agent Firewall directly. You need to explicitly set `boundary_version` in your
 Terraform configuration:
 
-```tf
+```hcl
 module "claude-code" {
   source              = "dev.registry.coder.com/coder/claude-code/coder"
   version             = "4.6.0"

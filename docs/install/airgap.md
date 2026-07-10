@@ -39,7 +39,7 @@ following:
 
 Here's an example Dockerfile:
 
-```Dockerfile
+```dockerfile
 FROM ghcr.io/coder/coder:latest
 
 USER root
@@ -118,7 +118,7 @@ ENV TF_CLI_CONFIG_FILE=/home/coder/.terraformrc
 > [example templates](../../examples/templates)
 > you intend to use.
 
-```tf
+```hcl
 # filesystem-mirror-example.tfrc
 provider_installation {
   filesystem_mirror {
@@ -127,7 +127,7 @@ provider_installation {
 }
 ```
 
-```tf
+```hcl
 # network-mirror-example.tfrc
 provider_installation {
   network_mirror {

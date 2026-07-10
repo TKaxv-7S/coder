@@ -24,7 +24,7 @@ If you have experience with a provider that is not listed here, please
 
 After you create an OAuth application, set environment variables to configure the Coder server to use it:
 
-```env
+```text
 CODER_EXTERNAL_AUTH_0_ID="<USER_DEFINED_ID>"
 CODER_EXTERNAL_AUTH_0_TYPE=<github|gitlab|azure-devops|bitbucket-cloud|bitbucket-server|etc>
 CODER_EXTERNAL_AUTH_0_CLIENT_ID=<OAuth app client ID>
@@ -47,7 +47,7 @@ configure your callback URL as `https://example.com/external-auth/primary-github
 
 Add the following code to any template to add a button to the workspace setup page which will allow you to authenticate with your provider:
 
-```tf
+```hcl
 data "coder_external_auth" "<github|gitlab|azure-devops|bitbucket-cloud|bitbucket-server|other>" {
     id = "<USER_DEFINED_ID>"
 }
@@ -142,7 +142,7 @@ acting as an OAuth client to external identity providers.
 Coder will usually assume PKCE support is available with "S256" as the code challenge method. Manual
 configuration is available to override any default behavior.
 
-```env
+```text
 # Enable PKCE with S256 (recommended when supported)
 CODER_EXTERNAL_AUTH_0_PKCE_METHODS="S256"
 
@@ -156,7 +156,7 @@ CODER_EXTERNAL_AUTH_0_PKCE_METHODS="none"
 
 Azure DevOps requires the following environment variables:
 
-```env
+```text
 CODER_EXTERNAL_AUTH_0_ID="primary-azure-devops"
 CODER_EXTERNAL_AUTH_0_TYPE=azure-devops
 CODER_EXTERNAL_AUTH_0_CLIENT_ID=xxxxxx
@@ -170,7 +170,7 @@ CODER_EXTERNAL_AUTH_0_TOKEN_URL="https://app.vssps.visualstudio.com/oauth2/token
 
 Azure DevOps (via Entra ID) requires the following environment variables:
 
-```env
+```text
 CODER_EXTERNAL_AUTH_0_ID="primary-azure-devops"
 CODER_EXTERNAL_AUTH_0_TYPE=azure-devops-entra
 CODER_EXTERNAL_AUTH_0_CLIENT_ID=xxxxxx
@@ -185,7 +185,7 @@ CODER_EXTERNAL_AUTH_0_AUTH_URL="https://login.microsoftonline.com/<TENANT ID>/oa
 
 Bitbucket Server requires the following environment variables:
 
-```env
+```text
 CODER_EXTERNAL_AUTH_0_ID="primary-bitbucket-server"
 CODER_EXTERNAL_AUTH_0_TYPE=bitbucket-server
 CODER_EXTERNAL_AUTH_0_CLIENT_ID=xxx
@@ -199,7 +199,7 @@ This callback path includes the value of `CODER_EXTERNAL_AUTH_0_ID`.
 
 ### Gitea
 
-```env
+```text
 CODER_EXTERNAL_AUTH_0_ID="gitea"
 CODER_EXTERNAL_AUTH_0_TYPE=gitea
 CODER_EXTERNAL_AUTH_0_CLIENT_ID=xxxxxxx
@@ -219,7 +219,7 @@ or to integrate with an existing GitHub authentication.
 For a more complete, step-by-step guide, follow the
 [configure a GitHub OAuth app](#configure-a-github-oauth-app) section instead.
 
-```env
+```text
 CODER_EXTERNAL_AUTH_0_ID="primary-github"
 CODER_EXTERNAL_AUTH_0_TYPE=github
 CODER_EXTERNAL_AUTH_0_CLIENT_ID=xxxxxx
@@ -236,7 +236,7 @@ as `https://example.com/external-auth/primary-github/callback`, where
 
 GitHub Enterprise requires the following environment variables:
 
-```env
+```text
 CODER_EXTERNAL_AUTH_0_ID="primary-github"
 CODER_EXTERNAL_AUTH_0_TYPE=github
 CODER_EXTERNAL_AUTH_0_CLIENT_ID=xxxxxx
@@ -255,7 +255,7 @@ as `https://example.com/external-auth/primary-github/callback`, where
 
 GitLab self-managed requires the following environment variables:
 
-```env
+```text
 CODER_EXTERNAL_AUTH_0_ID="primary-gitlab"
 CODER_EXTERNAL_AUTH_0_TYPE=gitlab
 # This value is the "Application ID"
@@ -281,7 +281,7 @@ Visit the [JFrog Artifactory](../../admin/integrations/jfrog-artifactory.md) gui
 Custom authentication and token URLs should be used for self-managed Git
 provider deployments.
 
-```env
+```text
 CODER_EXTERNAL_AUTH_0_AUTH_URL="https://github.example.com/oauth/authorize"
 CODER_EXTERNAL_AUTH_0_TOKEN_URL="https://github.example.com/oauth/token"
 CODER_EXTERNAL_AUTH_0_REVOKE_URL="https://github.example.com/oauth/revoke"
@@ -296,7 +296,7 @@ CODER_EXTERNAL_AUTH_0_REGEX=github\.company\.com
 
 Optionally, you can request custom scopes:
 
-```env
+```text
 CODER_EXTERNAL_AUTH_0_SCOPES="repo:read repo:write write:gpg_key"
 ```
 
@@ -358,7 +358,7 @@ Below is an example configuration with multiple providers:
 > git config --global credential.useHttpPath true
 > ```
 
-```env
+```text
 # Provider 1) github.com
 CODER_EXTERNAL_AUTH_0_ID=primary-github
 CODER_EXTERNAL_AUTH_0_TYPE=github

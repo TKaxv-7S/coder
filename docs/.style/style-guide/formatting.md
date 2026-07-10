@@ -138,11 +138,16 @@ Use the most specific language tag available:
   Prefix each typed line with `$`.
 - `powershell` for Windows command-line blocks.
   PowerShell is the default Windows shell in the Coder docs.
-- `tf` for Terraform and HCL.
+  `pwsh` is not a valid tag; use `powershell`.
+- `hcl` for Terraform and HCL.
+  `tf` and `terraform` are not the canonical tag; use `hcl`.
 - `yaml` for YAML.
 - `go` for Go.
 - `json` for JSON.
 - `text` for command output shown on its own, and for any block with no syntax to highlight.
+  `env`, `output`, `none`, and `url` are not valid tags; use `text`.
+- `dockerfile` for Dockerfiles, lowercase.
+  `Dockerfile` (capitalized) is not a valid tag.
 
 `bash` and `shell` are aliases of `sh`.
 Use `sh` so the corpus stays consistent.
@@ -156,7 +161,9 @@ Do not copy the pattern into hand-written pages.
 
 The docs site highlights code with [Speed-Highlight](https://github.com/speed-highlight/core), which detects the language from the code content, not from the fence label.
 The fence label still drives highlighting on GitHub and in most editors, and `markdownlint` rule `MD040` requires one, so always declare the most specific language.
+A future docs renderer may adopt [Shiki](https://shiki.style), which fails the build on a fence label it doesn't recognize as a language or alias, so use only tags Shiki supports.
 For content with no sensible language tag, fall back to `text`.
+A fence label needing a grammar Shiki doesn't bundle (for example `promql`) stays as-is; register it as a custom grammar when the site adopts Shiki, rather than degrading it to `text`.
 
 **Do**:
 
