@@ -11,6 +11,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"math"
@@ -42,10 +43,18 @@ type upstreamProvider struct {
 }
 
 type upstreamModel struct {
-	Cost *upstreamCost `json:"cost"`
+	Name        string        `json:"name"`
+	Limit       upstreamLimit `json:"limit"`
+	Cost        *upstreamCost `json:"cost"`
+	LastUpdated string        `json:"last_updated"`
 }
 
 // Pointers distinguish "key absent" (nil) from "key present and zero" (0).
+type upstreamLimit struct {
+	Context *int64 `json:"context"`
+	Output  *int64 `json:"output"`
+}
+
 type upstreamCost struct {
 	Input      *float64 `json:"input"`
 	Output     *float64 `json:"output"`
@@ -80,17 +89,30 @@ type priceRow struct {
 }
 
 func main() {
-	if err := run(); err != nil {
+	format := flag.String("format", "prices", `output format: "prices" (cost-control seed) or "catalog" (frontend known-models JSON)`)
+	flag.Parse()
+	if err := run(*format); err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "aibridgepricesgen: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func run() error {
+func run(format string) error {
 	upstream, err := fetch()
 	if err != nil {
 		return xerrors.Errorf("fetch %s: %w", sourceURL, err)
 	}
+	switch format {
+	case "prices":
+		return runPrices(upstream)
+	case "catalog":
+		return runCatalog(upstream)
+	default:
+		return xerrors.Errorf("unknown -format %q (want \"prices\" or \"catalog\")", format)
+	}
+}
+
+func runPrices(upstream map[string]upstreamProvider) error {
 	rows, err := convert(upstream, supportedProviders)
 	if err != nil {
 		return err
@@ -102,6 +124,26 @@ func run() error {
 		return err
 	}
 	_, _ = fmt.Fprintf(os.Stderr, "aibridgepricesgen: wrote %d prices for %d provider(s)\n", len(rows), len(supportedProviders))
+	return nil
+}
+
+func runCatalog(upstream map[string]upstreamProvider) error {
+	var curation map[string][]curatedModel
+	if err := json.Unmarshal(catalogJSON, &curation); err != nil {
+		return xerrors.Errorf("parse embedded catalog.json: %w", err)
+	}
+	catalog, err := buildCatalog(upstream, curation, time.Now())
+	if err != nil {
+		return err
+	}
+	if err := writeCatalog(os.Stdout, catalog); err != nil {
+		return err
+	}
+	total := 0
+	for _, entries := range catalog {
+		total += len(entries)
+	}
+	_, _ = fmt.Fprintf(os.Stderr, "aibridgepricesgen: wrote %d catalog entries for %d provider(s)\n", total, len(catalog))
 	return nil
 }
 
