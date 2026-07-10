@@ -126,16 +126,15 @@ export const ModelSelector: FC<ModelSelectorProps> = ({
 
 		return Array.from(grouped.entries());
 	})();
+	const triggerLabel = selectedModel
+		? selectedModel.displayName
+		: (defaultOptionLabel ?? placeholder);
 
 	return (
 		<Popover open={open} onOpenChange={handleOpenChange}>
 			<PopoverTrigger asChild disabled={isDisabled}>
 				<Button
-					aria-label={
-						selectedModel
-							? selectedModel.displayName
-							: (defaultOptionLabel ?? placeholder)
-					}
+					aria-label={triggerLabel}
 					aria-expanded={open}
 					aria-haspopup="listbox"
 					disabled={isDisabled}
@@ -148,11 +147,7 @@ export const ModelSelector: FC<ModelSelectorProps> = ({
 					)}
 					onTouchStart={onTriggerTouchStart}
 				>
-					<span className="truncate">
-						{selectedModel
-							? selectedModel.displayName
-							: (defaultOptionLabel ?? placeholder)}
-					</span>
+					<span className="truncate">{triggerLabel}</span>
 					<ChevronDownIcon open={open} className="size-icon-sm" />
 				</Button>
 			</PopoverTrigger>

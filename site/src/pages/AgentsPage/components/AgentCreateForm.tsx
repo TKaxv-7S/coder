@@ -392,9 +392,10 @@ export const AgentCreateForm: FC<AgentCreateFormProps> = ({
 
 	const handleSend = async (message: string, fileIDs?: string[]) => {
 		submitDraft();
-		// Runtime chats carry only the message: the server binds a
-		// workspace and the runtime manages its own model, so the
-		// picker-driven options and file attachments are not sent.
+		// Runtime chats: the server binds a workspace, so workspace,
+		// MCP, plan, and file attachments are not sent. The model is
+		// an optional explicit Anthropic pick (absent means the
+		// runtime default).
 		const options: CreateChatOptions = claudeCodeEnabled
 			? {
 					message,

@@ -1128,7 +1128,9 @@ const AgentChatPage: FC = () => {
 		chatQuery.data?.diff_status?.pr_number ?? (parsedPrNumber || undefined);
 	// Claude Code chats only honor Anthropic models (the runtime
 	// injects Anthropic credentials into the adapter).
-	const claudeModelOptions = filterAnthropicModelOptions(modelOptions);
+	const selectableModelOptions = isClaudeCodeChat
+		? filterAnthropicModelOptions(modelOptions)
+		: modelOptions;
 	// Compute an effective selected model by validating the user's
 	// explicit choice against the current model options, falling
 	// back to the chat's last model or the first available option.
@@ -1143,7 +1145,7 @@ const AgentChatPage: FC = () => {
 			// old pick again.
 			const resolvedSelectedModel = resolveModelOptionId(
 				selectedModel,
-				claudeModelOptions,
+				selectableModelOptions,
 			);
 			if (resolvedSelectedModel) {
 				return resolvedSelectedModel;
@@ -1151,7 +1153,10 @@ const AgentChatPage: FC = () => {
 			if (clearedModelToDefault) {
 				return "";
 			}
-			return resolveModelOptionId(chatLastModelConfigID, claudeModelOptions);
+			return resolveModelOptionId(
+				chatLastModelConfigID,
+				selectableModelOptions,
+			);
 		}
 
 		const resolvedSelectedModel = resolveModelOptionId(
@@ -1488,12 +1493,9 @@ const AgentChatPage: FC = () => {
 			);
 			const originalModelConfigID = originalEditedMessage?.model_config_id;
 			const pickerModelConfigID = effectiveSelectedModel || undefined;
-			const selectableOptions = isClaudeCodeChat
-				? claudeModelOptions
-				: modelOptions;
 			const originalIsSelectable =
 				originalModelConfigID !== undefined &&
-				selectableOptions.some((opt) => opt.id === originalModelConfigID);
+				selectableModelOptions.some((opt) => opt.id === originalModelConfigID);
 			// Only override the original model when the user has switched to
 			// a different selectable option. If the original is no longer
 			// selectable, the picker is showing a fallback we should not
@@ -1665,7 +1667,7 @@ const AgentChatPage: FC = () => {
 				isInputDisabled={isInputDisabled}
 				effectiveSelectedModel={effectiveSelectedModel}
 				setSelectedModel={handleModelChange}
-				modelOptions={isClaudeCodeChat ? claudeModelOptions : modelOptions}
+				modelOptions={selectableModelOptions}
 				modelSelectorPlaceholder={modelSelectorPlaceholder}
 				hasModelOptions={hasModelOptions}
 				isModelCatalogLoading={isModelCatalogLoading}
@@ -1711,7 +1713,7 @@ const AgentChatPage: FC = () => {
 			editing={editing}
 			effectiveSelectedModel={effectiveSelectedModel}
 			setSelectedModel={handleModelChange}
-			modelOptions={isClaudeCodeChat ? claudeModelOptions : modelOptions}
+			modelOptions={selectableModelOptions}
 			modelSelectorPlaceholder={modelSelectorPlaceholder}
 			modelSelectorHelp={modelSelectorHelp}
 			canConfigureAgentSetup={permissions.editDeploymentConfig}

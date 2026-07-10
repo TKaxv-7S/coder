@@ -1728,39 +1728,12 @@ func (p *Server) EditMessage(
 		// foreign-key error from the message-insert path.
 		var modelOverride uuid.NullUUID
 		if opts.ModelConfigID != uuid.Nil {
-			switch lockedChat.Runtime {
-			case database.ChatRuntimeCoder:
-				if _, err := store.GetChatModelConfigByID(
-					chatdModelConfigLookupContext(ctx),
-					opts.ModelConfigID,
-				); err != nil {
-					if errors.Is(err, sql.ErrNoRows) {
-						return xerrors.Errorf(
-							"%w: %s",
-							ErrInvalidModelConfigID,
-							opts.ModelConfigID,
-						)
-					}
-					return xerrors.Errorf(
-						"get requested model config %s: %w",
-						opts.ModelConfigID,
-						err,
-					)
-				}
-			case database.ChatRuntimeClaudeCode:
-				if _, _, err := fetchClaudeCodeModelConfig(
-					chatdModelConfigLookupContext(ctx),
-					store,
-					opts.ModelConfigID,
-				); err != nil {
-					return err
-				}
-			default:
-				return xerrors.Errorf(
-					"%w: model config cannot be set on %s runtime chats",
-					ErrInvalidModelConfigID,
-					lockedChat.Runtime,
-				)
+			// A non-zero requested ID goes through the same
+			// runtime-specific validation as the send path.
+			if _, err := resolveSendMessageModelConfigID(
+				ctx, store, lockedChat, opts.ModelConfigID,
+			); err != nil {
+				return err
 			}
 			modelOverride = uuid.NullUUID{UUID: opts.ModelConfigID, Valid: true}
 		}
