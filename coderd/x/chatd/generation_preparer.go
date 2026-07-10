@@ -571,11 +571,6 @@ func (server *Server) prepareGeneration(
 	if override, ok := server.resolveUserCompactionThreshold(ctx, chat.OwnerID, modelConfig.ID); ok {
 		effectiveThreshold = override
 	}
-	compactionModel := model
-	compactionPrompt := prompt
-	compactionResolvedProvider := resolvedProvider
-	compactionResolvedModel := debugModel
-	compactionModelConfigID := modelConfig.ID
 	// The effective compaction limit is the stricter of the chat model's
 	// and the compaction model's context limits: the history must also fit
 	// the summarizer's window. Post-compaction continuation checks keep
@@ -587,7 +582,9 @@ func (server *Server) prepareGeneration(
 		cleanup()
 		return generationPrepared{}, err
 	}
+	var compactionOverride *database.ChatModelConfig
 	if compactionOverrideSet {
+		compactionOverride = &compactionOverrideConfig
 		if overrideLimit := compactionOverrideConfig.ContextLimit; overrideLimit > 0 &&
 			(compactionContextLimit <= 0 || overrideLimit < compactionContextLimit) {
 			compactionContextLimit = overrideLimit
@@ -595,35 +592,14 @@ func (server *Server) prepareGeneration(
 	}
 	compactionStepUsage := latestPromptUsage(promptRows)
 	compactionNeeded := shouldCompactPromptUsage(compactionStepUsage, compactionContextLimit, effectiveThreshold)
-	// The override model client is built (and the prompt sanitized for it)
-	// only when this turn actually compacts: route or client construction
-	// failures are hard, and they must not fail ordinary turns that stay
-	// under the compaction threshold. Sanitizing also rewrites the full
-	// prompt, and the sanitized prompt is only consumed by the compaction
-	// generation, which only runs when compactionNeeded is true at prepare
-	// time.
-	if compactionOverrideSet && compactionNeeded {
-		compactionOverride, err := server.buildCompactionOverrideModel(ctx, chat, compactionOverrideConfig, modelOpts)
-		if err != nil {
-			cleanup()
-			return generationPrepared{}, err
-		}
-		compactionModel = compactionOverride.model
-		compactionResolvedProvider = compactionOverride.resolvedProvider
-		compactionResolvedModel = compactionOverride.resolvedModel
-		compactionModelConfigID = compactionOverride.modelConfig.ID
-		compactionPrompt = sanitizeCompactionPrompt(
-			ctx,
-			logger,
-			prompt,
-			compactionOverride.model,
-			modelConfig,
-			compactionOverride.modelConfig,
-		)
-	}
+	// The options carry the chat model; when an override is configured,
+	// generateCompaction builds the override client (a hard failure) and
+	// swaps model, identity, and sanitized prompt in the compact action
+	// path, so a broken override cannot fail turns that finish without
+	// compacting.
 	compactionOptions := chatloop.GenerateCompactionOptions{
-		Model:                compactionModel,
-		Messages:             compactionPrompt,
+		Model:                model,
+		Messages:             prompt,
 		ThresholdPercent:     effectiveThreshold,
 		ContextLimit:         compactionContextLimit,
 		ContextLimitFallback: compactionContextLimit,
@@ -632,9 +608,9 @@ func (server *Server) prepareGeneration(
 		DebugSvc:             debugSvc,
 		ChatID:               chat.ID,
 		HistoryTipMessageID:  historyTipMessageID,
-		ResolvedProvider:     compactionResolvedProvider,
-		ResolvedModel:        compactionResolvedModel,
-		ModelConfigID:        compactionModelConfigID,
+		ResolvedProvider:     resolvedProvider,
+		ResolvedModel:        debugModel,
+		ModelConfigID:        modelConfig.ID,
 		StepUsage:            compactionStepUsage,
 	}
 
@@ -669,8 +645,10 @@ func (server *Server) prepareGeneration(
 		ToolNameToConfigID:   toolNameToConfigID,
 		MaxSteps:             maxChatSteps,
 		Compaction: &generationCompaction{
-			Required: compactionNeeded,
-			Options:  compactionOptions,
+			OverrideConfig:  compactionOverride,
+			ChatModelConfig: modelConfig,
+			Required:        compactionNeeded,
+			Options:         compactionOptions,
 		},
 		Cleanup: cleanup,
 		Debug:   debug,

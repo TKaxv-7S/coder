@@ -77,9 +77,8 @@ func (p *Server) resolveCompactionOverrideConfig(
 // client for a usable compaction override config. Errors are hard failures:
 // a configured, usable override that cannot be routed or constructed must
 // fail the generation visibly instead of silently compacting with the chat
-// model. Callers invoke this only when compaction is about to run, so a
-// broken override cannot fail turns that stay under the compaction
-// threshold.
+// model. Callers invoke this from the compact generation action, so a
+// broken override cannot fail turns that finish without compacting.
 func (p *Server) buildCompactionOverrideModel(
 	ctx context.Context,
 	chat database.Chat,

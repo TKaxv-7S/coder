@@ -69,6 +69,15 @@ type generationPrepared struct {
 
 // generationCompaction contains compaction inputs prepared for generation.
 type generationCompaction struct {
+	// OverrideConfig, when non-nil, is the resolved compaction model
+	// override config. The override model client is built (and the prompt
+	// sanitized for it) in the compact action path, not at prepare time,
+	// so hard construction failures cannot fail turns that finish without
+	// compacting. ChatModelConfig is the chat model's config, needed to
+	// sanitize the prompt across provider boundaries.
+	OverrideConfig  *database.ChatModelConfig
+	ChatModelConfig database.ChatModelConfig
+
 	Required bool
 	Options  chatloop.GenerateCompactionOptions
 }
@@ -683,6 +692,28 @@ func (s *taskStarter) generateCompaction(
 		return s.finishGenerationError(ctx, machine, input, xerrors.New("compaction action missing options"), requireGenerationAttempt(attempt.number))
 	}
 	compactionOpts := prepared.Compaction.Options
+	if overrideConfig := prepared.Compaction.OverrideConfig; overrideConfig != nil {
+		override, err := s.server.buildCompactionOverrideModel(ctx, prepared.Chat, *overrideConfig, prepared.ModelBuildOptions)
+		if err != nil {
+			return xerrors.Errorf("build compaction model override: %w", err)
+		}
+		logger := s.server.logger.With(
+			slog.F("chat_id", prepared.Chat.ID),
+			slog.F("owner_id", prepared.Chat.OwnerID),
+		)
+		compactionOpts.Model = override.model
+		compactionOpts.ResolvedProvider = override.resolvedProvider
+		compactionOpts.ResolvedModel = override.resolvedModel
+		compactionOpts.ModelConfigID = override.modelConfig.ID
+		compactionOpts.Messages = sanitizeCompactionPrompt(
+			ctx,
+			logger,
+			compactionOpts.Messages,
+			override.model,
+			prepared.Compaction.ChatModelConfig,
+			override.modelConfig,
+		)
+	}
 	compactionOpts.PublishMessagePart = attempt.publish
 	// Attach the turn debug run so the compaction call records a child
 	// debug run; without it startCompactionDebugRun finds no parent and
