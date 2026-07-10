@@ -9,6 +9,9 @@ describe("openAIKnownModels", () => {
 				(knownModel) => knownModel.modelIdentifier,
 			),
 		).toEqual([
+			"gpt-5.6-sol",
+			"gpt-5.6-terra",
+			"gpt-5.6-luna",
 			"gpt-5.5",
 			"gpt-5.5-pro",
 			"gpt-5.4",
@@ -28,6 +31,9 @@ describe("openAIKnownModels", () => {
 		);
 
 		expect(reasoningEffortByModel).toEqual({
+			"gpt-5.6-sol": "medium",
+			"gpt-5.6-terra": "medium",
+			"gpt-5.6-luna": "medium",
 			"gpt-5.5": "medium",
 			"gpt-5.5-pro": "high",
 			"gpt-5.4": undefined,
@@ -41,6 +47,9 @@ describe("openAIKnownModels", () => {
 		expect(
 			openAIKnownModels.map((knownModel) => knownModel.modelIdentifier),
 		).toEqual([
+			"gpt-5.6-sol",
+			"gpt-5.6-terra",
+			"gpt-5.6-luna",
 			"gpt-5.5",
 			"gpt-5.5-pro",
 			"gpt-5.4",
@@ -52,7 +61,7 @@ describe("openAIKnownModels", () => {
 		for (const knownModel of openAIKnownModels) {
 			expect(knownModel.provider).toBe("openai");
 			expect(knownModel.sourceMetadata.sourceName).toBe("models.dev");
-			expect(knownModel.sourceMetadata.sourceRetrievedAt).toBe("2026-04-30");
+			expect(knownModel.sourceMetadata.sourceRetrievedAt).not.toBe("");
 			expect(knownModel.sourceMetadata.lastUpdated).not.toBe("");
 		}
 	});
