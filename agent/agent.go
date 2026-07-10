@@ -52,6 +52,7 @@ import (
 	"github.com/coder/coder/v2/agent/proto"
 	"github.com/coder/coder/v2/agent/proto/resourcesmonitor"
 	"github.com/coder/coder/v2/agent/reconnectingpty"
+	"github.com/coder/coder/v2/agent/unit"
 	"github.com/coder/coder/v2/agent/usershell"
 	"github.com/coder/coder/v2/agent/x/agentdesktop"
 	"github.com/coder/coder/v2/agent/x/agentmcp"
@@ -367,6 +368,7 @@ type agent struct {
 	socketServerEnabled bool
 	socketPath          string
 	socketServer        *agentsocket.Server
+	unitManager         *unit.Manager
 
 	derpTLSConfig *tls.Config
 }
@@ -449,6 +451,7 @@ func (a *agent) init() {
 		panic(err)
 	}
 	a.sshServer = sshSrv
+	a.unitManager = unit.NewManager()
 	a.scriptRunner = agentscripts.New(agentscripts.Options{
 		LogDir:      a.logDir,
 		DataDirBase: a.scriptDataDir,
@@ -458,6 +461,7 @@ func (a *agent) init() {
 		GetScriptLogger: func(logSourceID uuid.UUID) agentscripts.ScriptLogger {
 			return a.logSender.GetScriptLogger(logSourceID)
 		},
+		UnitManager: a.unitManager,
 	})
 	// Register runner metrics. If the prom registry is nil, the metrics
 	// will not report anywhere.
@@ -566,6 +570,7 @@ func (a *agent) initSocketServer() {
 		a.logger.Named("socket"),
 		agentsocket.WithPath(a.socketPath),
 		agentsocket.WithContextManager(a.contextManager),
+		agentsocket.WithUnitManager(a.unitManager),
 	)
 	if err != nil {
 		a.logger.Error(a.hardCtx, "failed to create socket server", slog.Error(err), slog.F("path", a.socketPath))
