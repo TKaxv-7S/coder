@@ -1,0 +1,10 @@
+Units:
+  ● app      pending
+  ● db       completed
+  ● migrate  started
+  ● cache    pending (ready)
+
+Dependencies:
+  app → db  (requires completed) ✓
+  app → migrate  (requires completed) ✗
+  cache → db  (requires completed) ✓

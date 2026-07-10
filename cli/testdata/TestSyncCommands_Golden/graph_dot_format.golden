@@ -1,0 +1,11 @@
+digraph sync {
+  rankdir=LR;
+  node [shape=box style=filled];
+  "app" [label="app" fillcolor="lightgray"];
+  "db" [label="db" fillcolor="palegreen"];
+  "migrate" [label="migrate" fillcolor="lightyellow"];
+  "cache" [label="cache (ready)" fillcolor="lightgray"];
+  "app" -> "db" [label="completed" style=solid];
+  "app" -> "migrate" [label="completed" style=dashed];
+  "cache" -> "db" [label="completed" style=solid];
+}

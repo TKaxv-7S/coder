@@ -1,0 +1,47 @@
+{
+  "nodes": [
+    {
+      "unit": "app",
+      "status": "pending",
+      "ready": false
+    },
+    {
+      "unit": "db",
+      "status": "completed",
+      "ready": false
+    },
+    {
+      "unit": "migrate",
+      "status": "started",
+      "ready": false
+    },
+    {
+      "unit": "cache",
+      "status": "pending",
+      "ready": true
+    }
+  ],
+  "edges": [
+    {
+      "from": "app",
+      "to": "db",
+      "required_status": "completed",
+      "current_status": "completed",
+      "satisfied": true
+    },
+    {
+      "from": "app",
+      "to": "migrate",
+      "required_status": "completed",
+      "current_status": "started",
+      "satisfied": false
+    },
+    {
+      "from": "cache",
+      "to": "db",
+      "required_status": "completed",
+      "current_status": "completed",
+      "satisfied": true
+    }
+  ]
+}

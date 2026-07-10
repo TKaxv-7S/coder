@@ -619,4 +619,122 @@ func TestSyncCommands_Golden(t *testing.T) {
 
 		clitest.TestGoldenFile(t, "TestSyncCommands_Golden/list_json_format", outBuf.Bytes(), nil)
 	})
+
+	t.Run("graph_no_units", func(t *testing.T) {
+		t.Parallel()
+		path, cleanup := setupSocketServer(t)
+		defer cleanup()
+
+		ctx := testutil.Context(t, testutil.WaitShort)
+
+		var outBuf bytes.Buffer
+		inv, _ := clitest.New(t, "exp", "sync", "graph", "--socket-path", path)
+		inv.Stdout = &outBuf
+		inv.Stderr = &outBuf
+
+		err := inv.WithContext(ctx).Run()
+		require.NoError(t, err)
+
+		clitest.TestGoldenFile(t, "TestSyncCommands_Golden/graph_no_units", outBuf.Bytes(), nil)
+	})
+
+	t.Run("graph_ascii", func(t *testing.T) {
+		t.Parallel()
+		path, cleanup := setupSocketServer(t)
+		defer cleanup()
+
+		ctx := testutil.Context(t, testutil.WaitShort)
+		setupGraphScenario(ctx, t, path)
+
+		var outBuf bytes.Buffer
+		inv, _ := clitest.New(t, "exp", "sync", "graph", "--socket-path", path)
+		inv.Stdout = &outBuf
+		inv.Stderr = &outBuf
+
+		err := inv.WithContext(ctx).Run()
+		require.NoError(t, err)
+
+		clitest.TestGoldenFile(t, "TestSyncCommands_Golden/graph_ascii", outBuf.Bytes(), nil)
+	})
+
+	t.Run("graph_json_format", func(t *testing.T) {
+		t.Parallel()
+		path, cleanup := setupSocketServer(t)
+		defer cleanup()
+
+		ctx := testutil.Context(t, testutil.WaitShort)
+		setupGraphScenario(ctx, t, path)
+
+		var outBuf bytes.Buffer
+		inv, _ := clitest.New(t, "exp", "sync", "graph", "--output", "json", "--socket-path", path)
+		inv.Stdout = &outBuf
+		inv.Stderr = &outBuf
+
+		err := inv.WithContext(ctx).Run()
+		require.NoError(t, err)
+
+		clitest.TestGoldenFile(t, "TestSyncCommands_Golden/graph_json_format", outBuf.Bytes(), nil)
+	})
+
+	t.Run("graph_table_format", func(t *testing.T) {
+		t.Parallel()
+		path, cleanup := setupSocketServer(t)
+		defer cleanup()
+
+		ctx := testutil.Context(t, testutil.WaitShort)
+		setupGraphScenario(ctx, t, path)
+
+		var outBuf bytes.Buffer
+		inv, _ := clitest.New(t, "exp", "sync", "graph", "--output", "table", "--socket-path", path)
+		inv.Stdout = &outBuf
+		inv.Stderr = &outBuf
+
+		err := inv.WithContext(ctx).Run()
+		require.NoError(t, err)
+
+		clitest.TestGoldenFile(t, "TestSyncCommands_Golden/graph_table_format", outBuf.Bytes(), nil)
+	})
+
+	t.Run("graph_dot_format", func(t *testing.T) {
+		t.Parallel()
+		path, cleanup := setupSocketServer(t)
+		defer cleanup()
+
+		ctx := testutil.Context(t, testutil.WaitShort)
+		setupGraphScenario(ctx, t, path)
+
+		var outBuf bytes.Buffer
+		inv, _ := clitest.New(t, "exp", "sync", "graph", "--output", "dot", "--socket-path", path)
+		inv.Stdout = &outBuf
+		inv.Stderr = &outBuf
+
+		err := inv.WithContext(ctx).Run()
+		require.NoError(t, err)
+
+		clitest.TestGoldenFile(t, "TestSyncCommands_Golden/graph_dot_format", outBuf.Bytes(), nil)
+	})
+}
+
+// setupGraphScenario drives a deterministic dependency graph into the
+// agent for graph golden tests. It produces units in every state
+// (completed, started, pending) with both satisfied and unsatisfied
+// edges, and a pending unit that is ready:
+//
+//   - db:      completed
+//   - migrate: started
+//   - app:     pending, depends on db (satisfied) and migrate (unsatisfied)
+//   - cache:   pending, depends on db (satisfied) so it is ready
+func setupGraphScenario(ctx context.Context, t *testing.T, path string) {
+	t.Helper()
+
+	client, err := agentsocket.NewClient(ctx, agentsocket.WithPath(path))
+	require.NoError(t, err)
+	defer client.Close()
+
+	require.NoError(t, client.SyncWant(ctx, "app", "db"))
+	require.NoError(t, client.SyncWant(ctx, "app", "migrate"))
+	require.NoError(t, client.SyncWant(ctx, "cache", "db"))
+	require.NoError(t, client.SyncStart(ctx, "db"))
+	require.NoError(t, client.SyncComplete(ctx, "db"))
+	require.NoError(t, client.SyncStart(ctx, "migrate"))
 }

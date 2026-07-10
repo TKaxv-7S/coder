@@ -1,0 +1,21 @@
+coder v0.0.0-devel
+
+USAGE:
+  coder exp sync graph [flags]
+
+  Show the unit dependency graph
+
+  Render the dependency graph of all units. Vertices are units and edges are
+  declared dependencies. The default output is a colorized ASCII summary; use
+  --output json for the raw graph, --output table for a flat listing, or
+  --output dot for Graphviz DOT that can be piped to `dot`.
+
+OPTIONS:
+  -c, --column [unit|status|ready|depends on] (default: unit,status,ready,depends on)
+          Columns to display in table output.
+
+  -o, --output text|json|table|dot (default: text)
+          Output format.
+
+———
+Run `coder --help` for a list of global options.
