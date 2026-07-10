@@ -582,28 +582,36 @@ func (server *Server) prepareGeneration(
 	// using the chat model's limit (ContextLimitFallback below), since the
 	// follow-up assistant generation runs on the chat model.
 	compactionContextLimit := modelConfig.ContextLimit
-	compactionOverride, compactionOverrideSet, err := server.resolveCompactionModelOverride(ctx, chat, modelOpts)
+	compactionOverrideConfig, compactionOverrideSet, err := server.resolveCompactionOverrideConfig(ctx, chat)
 	if err != nil {
 		cleanup()
 		return generationPrepared{}, err
 	}
 	if compactionOverrideSet {
-		compactionModel = compactionOverride.model
-		compactionResolvedProvider = compactionOverride.resolvedProvider
-		compactionResolvedModel = compactionOverride.resolvedModel
-		compactionModelConfigID = compactionOverride.modelConfig.ID
-		if overrideLimit := compactionOverride.modelConfig.ContextLimit; overrideLimit > 0 &&
+		if overrideLimit := compactionOverrideConfig.ContextLimit; overrideLimit > 0 &&
 			(compactionContextLimit <= 0 || overrideLimit < compactionContextLimit) {
 			compactionContextLimit = overrideLimit
 		}
 	}
 	compactionStepUsage := latestPromptUsage(promptRows)
 	compactionNeeded := shouldCompactPromptUsage(compactionStepUsage, compactionContextLimit, effectiveThreshold)
-	// Sanitizing rewrites the full prompt, so skip it unless this turn
-	// actually compacts. The sanitized prompt is only consumed by the
-	// compaction generation, which only runs when compactionNeeded is
-	// true at prepare time.
+	// The override model client is built (and the prompt sanitized for it)
+	// only when this turn actually compacts: route or client construction
+	// failures are hard, and they must not fail ordinary turns that stay
+	// under the compaction threshold. Sanitizing also rewrites the full
+	// prompt, and the sanitized prompt is only consumed by the compaction
+	// generation, which only runs when compactionNeeded is true at prepare
+	// time.
 	if compactionOverrideSet && compactionNeeded {
+		compactionOverride, err := server.buildCompactionOverrideModel(ctx, chat, compactionOverrideConfig, modelOpts)
+		if err != nil {
+			cleanup()
+			return generationPrepared{}, err
+		}
+		compactionModel = compactionOverride.model
+		compactionResolvedProvider = compactionOverride.resolvedProvider
+		compactionResolvedModel = compactionOverride.resolvedModel
+		compactionModelConfigID = compactionOverride.modelConfig.ID
 		compactionPrompt = sanitizeCompactionPrompt(
 			ctx,
 			logger,

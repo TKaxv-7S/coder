@@ -40,27 +40,27 @@ type compactionModelOverride struct {
 	resolvedModel    string
 }
 
-// resolveCompactionModelOverride resolves the deployment-wide compaction
-// model override. Unset, malformed, stale (deleted or disabled config or
-// provider), and credential-less overrides fall back to the chat model
-// (overrideSet is false; the shared resolver logs the reason). Errors are
-// hard failures: a configured, usable override that cannot be routed or
-// constructed must fail the generation visibly instead of silently
-// compacting with the chat model.
-func (p *Server) resolveCompactionModelOverride(
+// resolveCompactionOverrideConfig resolves the stored deployment-wide
+// compaction model override to its model config. Unset, malformed, stale
+// (deleted or disabled config or provider), and credential-less overrides
+// fall back to the chat model (overrideSet is false; the shared resolver
+// logs the reason). This runs on every generation prepare because the
+// override's context limit feeds the compaction trigger; the model client
+// is built separately by buildCompactionOverrideModel only when compaction
+// actually runs.
+func (p *Server) resolveCompactionOverrideConfig(
 	ctx context.Context,
 	chat database.Chat,
-	modelOpts modelBuildOptions,
-) (compactionModelOverride, bool, error) {
+) (database.ChatModelConfig, bool, error) {
 	raw, err := readCompactionModelOverride(ctx, p.db)
 	if err != nil {
-		return compactionModelOverride{}, false, xerrors.Errorf(
+		return database.ChatModelConfig{}, false, xerrors.Errorf(
 			"read compaction model override: %w",
 			err,
 		)
 	}
 
-	modelConfig, overrideSet, err := p.resolveConfiguredModelOverride(
+	return p.resolveConfiguredModelOverride(
 		ctx,
 		compactionOverrideContext,
 		raw,
@@ -71,17 +71,25 @@ func (p *Server) resolveCompactionModelOverride(
 		},
 		modelOverrideFailureModeSoft,
 	)
-	if err != nil {
-		return compactionModelOverride{}, false, err
-	}
-	if !overrideSet {
-		return compactionModelOverride{}, false, nil
-	}
+}
 
+// buildCompactionOverrideModel resolves the route and constructs the model
+// client for a usable compaction override config. Errors are hard failures:
+// a configured, usable override that cannot be routed or constructed must
+// fail the generation visibly instead of silently compacting with the chat
+// model. Callers invoke this only when compaction is about to run, so a
+// broken override cannot fail turns that stay under the compaction
+// threshold.
+func (p *Server) buildCompactionOverrideModel(
+	ctx context.Context,
+	chat database.Chat,
+	modelConfig database.ChatModelConfig,
+	modelOpts modelBuildOptions,
+) (compactionModelOverride, error) {
 	//nolint:gocritic // Compaction overrides need chatd-scoped provider reads for user-owned chats.
 	route, err := p.resolveModelRouteForConfig(dbauthz.AsChatd(ctx), chat.OwnerID, modelConfig)
 	if err != nil {
-		return compactionModelOverride{}, true, xerrors.Errorf(
+		return compactionModelOverride{}, xerrors.Errorf(
 			"resolve compaction model override route: %w",
 			err,
 		)
@@ -91,7 +99,7 @@ func (p *Server) resolveCompactionModelOverride(
 		route.ModelProviderHint,
 	)
 	if err != nil {
-		return compactionModelOverride{}, true, xerrors.Errorf(
+		return compactionModelOverride{}, xerrors.Errorf(
 			"resolve compaction model override metadata: %w",
 			err,
 		)
@@ -103,7 +111,7 @@ func (p *Server) resolveCompactionModelOverride(
 		ExtraHeaders: chatprovider.CoderHeaders(chat),
 	}, route, modelOpts)
 	if err != nil {
-		return compactionModelOverride{}, true, xerrors.Errorf(
+		return compactionModelOverride{}, xerrors.Errorf(
 			"create compaction model override: %w",
 			err,
 		)
@@ -113,5 +121,5 @@ func (p *Server) resolveCompactionModelOverride(
 		model:            model,
 		resolvedProvider: resolvedProvider,
 		resolvedModel:    resolvedModel,
-	}, true, nil
+	}, nil
 }

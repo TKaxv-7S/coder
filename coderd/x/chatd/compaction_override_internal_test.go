@@ -14,7 +14,7 @@ import (
 	"github.com/coder/coder/v2/testutil"
 )
 
-func TestResolveCompactionModelOverride_Unset(t *testing.T) {
+func TestResolveCompactionOverrideConfig_Unset(t *testing.T) {
 	t.Parallel()
 
 	ctx := testutil.Context(t, testutil.WaitShort)
@@ -26,13 +26,12 @@ func TestResolveCompactionModelOverride_Unset(t *testing.T) {
 	db.EXPECT().GetChatCompactionModelOverride(gomock.Any()).Return("", nil)
 
 	server := titleOverrideTestServer(db, logger)
-	override, overrideSet, err := server.resolveCompactionModelOverride(ctx, chat, modelBuildOptions{})
+	_, overrideSet, err := server.resolveCompactionOverrideConfig(ctx, chat)
 	require.NoError(t, err)
 	require.False(t, overrideSet)
-	require.Nil(t, override.model)
 }
 
-func TestResolveCompactionModelOverride_ReadDBError(t *testing.T) {
+func TestResolveCompactionOverrideConfig_ReadDBError(t *testing.T) {
 	t.Parallel()
 
 	ctx := testutil.Context(t, testutil.WaitShort)
@@ -44,13 +43,13 @@ func TestResolveCompactionModelOverride_ReadDBError(t *testing.T) {
 	db.EXPECT().GetChatCompactionModelOverride(gomock.Any()).Return("", sql.ErrConnDone)
 
 	server := titleOverrideTestServer(db, logger)
-	_, overrideSet, err := server.resolveCompactionModelOverride(ctx, chat, modelBuildOptions{})
+	_, overrideSet, err := server.resolveCompactionOverrideConfig(ctx, chat)
 	require.Error(t, err)
 	require.ErrorContains(t, err, "read compaction model override")
 	require.False(t, overrideSet)
 }
 
-func TestResolveCompactionModelOverride_MalformedFallsBack(t *testing.T) {
+func TestResolveCompactionOverrideConfig_MalformedFallsBack(t *testing.T) {
 	t.Parallel()
 
 	ctx := testutil.Context(t, testutil.WaitShort)
@@ -62,12 +61,12 @@ func TestResolveCompactionModelOverride_MalformedFallsBack(t *testing.T) {
 	db.EXPECT().GetChatCompactionModelOverride(gomock.Any()).Return("not-a-uuid", nil)
 
 	server := titleOverrideTestServer(db, logger)
-	_, overrideSet, err := server.resolveCompactionModelOverride(ctx, chat, modelBuildOptions{})
+	_, overrideSet, err := server.resolveCompactionOverrideConfig(ctx, chat)
 	require.NoError(t, err)
 	require.False(t, overrideSet)
 }
 
-func TestResolveCompactionModelOverride_DeletedConfigFallsBack(t *testing.T) {
+func TestResolveCompactionOverrideConfig_DeletedConfigFallsBack(t *testing.T) {
 	t.Parallel()
 
 	ctx := testutil.Context(t, testutil.WaitShort)
@@ -81,12 +80,12 @@ func TestResolveCompactionModelOverride_DeletedConfigFallsBack(t *testing.T) {
 	db.EXPECT().GetChatModelConfigByID(gomock.Any(), missingID).Return(database.ChatModelConfig{}, sql.ErrNoRows)
 
 	server := titleOverrideTestServer(db, logger)
-	_, overrideSet, err := server.resolveCompactionModelOverride(ctx, chat, modelBuildOptions{})
+	_, overrideSet, err := server.resolveCompactionOverrideConfig(ctx, chat)
 	require.NoError(t, err)
 	require.False(t, overrideSet)
 }
 
-func TestResolveCompactionModelOverride_DisabledConfigFallsBack(t *testing.T) {
+func TestResolveCompactionOverrideConfig_DisabledConfigFallsBack(t *testing.T) {
 	t.Parallel()
 
 	ctx := testutil.Context(t, testutil.WaitShort)
@@ -100,12 +99,12 @@ func TestResolveCompactionModelOverride_DisabledConfigFallsBack(t *testing.T) {
 	db.EXPECT().GetChatModelConfigByID(gomock.Any(), overrideConfig.ID).Return(overrideConfig, nil)
 
 	server := titleOverrideTestServer(db, logger)
-	_, overrideSet, err := server.resolveCompactionModelOverride(ctx, chat, modelBuildOptions{})
+	_, overrideSet, err := server.resolveCompactionOverrideConfig(ctx, chat)
 	require.NoError(t, err)
 	require.False(t, overrideSet)
 }
 
-func TestResolveCompactionModelOverride_MissingCredentialsFallsBack(t *testing.T) {
+func TestResolveCompactionOverrideConfig_MissingCredentialsFallsBack(t *testing.T) {
 	t.Parallel()
 
 	ctx := testutil.Context(t, testutil.WaitShort)
@@ -127,12 +126,12 @@ func TestResolveCompactionModelOverride_MissingCredentialsFallsBack(t *testing.T
 	db.EXPECT().GetAIProviderKeysByProviderID(gomock.Any(), providerID).Return(nil, nil).AnyTimes()
 
 	server := titleOverrideTestServer(db, logger)
-	_, overrideSet, err := server.resolveCompactionModelOverride(ctx, chat, modelBuildOptions{})
+	_, overrideSet, err := server.resolveCompactionOverrideConfig(ctx, chat)
 	require.NoError(t, err)
 	require.False(t, overrideSet)
 }
 
-func TestResolveCompactionModelOverride_SetUsable(t *testing.T) {
+func TestCompactionOverride_SetUsable(t *testing.T) {
 	t.Parallel()
 
 	ctx := testutil.Context(t, testutil.WaitShort)
@@ -153,13 +152,18 @@ func TestResolveCompactionModelOverride_SetUsable(t *testing.T) {
 	}}, nil).AnyTimes()
 
 	server := titleOverrideTestServer(db, logger)
-	override, overrideSet, err := server.resolveCompactionModelOverride(
+	resolvedConfig, overrideSet, err := server.resolveCompactionOverrideConfig(ctx, chat)
+	require.NoError(t, err)
+	require.True(t, overrideSet)
+	require.Equal(t, overrideConfig.ID, resolvedConfig.ID)
+
+	override, err := server.buildCompactionOverrideModel(
 		ctx,
 		chat,
+		resolvedConfig,
 		modelBuildOptions{ActiveAPIKeyID: uuid.NewString()},
 	)
 	require.NoError(t, err)
-	require.True(t, overrideSet)
 	require.NotNil(t, override.model)
 	require.Equal(t, overrideConfig.ID, override.modelConfig.ID)
 	require.Equal(t, "openai", override.resolvedProvider)
