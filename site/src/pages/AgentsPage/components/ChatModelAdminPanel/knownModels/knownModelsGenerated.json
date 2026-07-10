@@ -92,6 +92,24 @@
 		},
 		{
 			"provider": "anthropic",
+			"modelIdentifier": "claude-sonnet-5",
+			"displayName": "Claude Sonnet 5",
+			"aliases": [],
+			"contextLimit": 1000000,
+			"maxOutputTokens": 128000,
+			"reasoningEffort": "high",
+			"inputCost": 2,
+			"outputCost": 10,
+			"cacheReadCost": 0.2,
+			"cacheWriteCost": 2.5,
+			"sourceMetadata": {
+				"sourceName": "models.dev",
+				"sourceRetrievedAt": "2026-07-10",
+				"lastUpdated": "2026-06-30"
+			}
+		},
+		{
+			"provider": "anthropic",
 			"modelIdentifier": "claude-sonnet-4-6",
 			"displayName": "Claude Sonnet 4.6",
 			"aliases": [],

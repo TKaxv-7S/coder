@@ -58,6 +58,10 @@
 			"reasoningEffort": "high"
 		},
 		{
+			"modelIdentifier": "claude-sonnet-5",
+			"reasoningEffort": "high"
+		},
+		{
 			"modelIdentifier": "claude-sonnet-4-6",
 			"reasoningEffort": "medium"
 		},

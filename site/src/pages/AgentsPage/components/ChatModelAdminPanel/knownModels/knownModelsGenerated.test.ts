@@ -29,6 +29,7 @@ describe("knownModelsGenerated", () => {
 			"claude-opus-4-8": "reasoningEffort",
 			"claude-opus-4-7": "reasoningEffort",
 			"claude-opus-4-6": "reasoningEffort",
+			"claude-sonnet-5": "reasoningEffort",
 			"claude-sonnet-4-6": "reasoningEffort",
 			"claude-haiku-4-5": "thinkingBudgetTokens",
 			"claude-sonnet-4-5": "thinkingBudgetTokens",
