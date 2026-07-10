@@ -169,7 +169,7 @@ _gen/bin/apikeyscopesgen: $(wildcard scripts/apikeyscopesgen/*.go) $(RBAC_GO_FIL
 	@mkdir -p _gen/bin
 	go build -o $@ ./scripts/apikeyscopesgen
 
-_gen/bin/aibridgepricesgen: $(wildcard scripts/aibridgepricesgen/*.go) | _gen
+_gen/bin/aibridgepricesgen: $(wildcard scripts/aibridgepricesgen/*.go) scripts/aibridgepricesgen/catalog.json | _gen
 	@mkdir -p _gen/bin
 	go build -o $@ ./scripts/aibridgepricesgen
 
@@ -1029,7 +1029,16 @@ coderd/aibridge/prices/data/prices.json: _gen/bin/aibridgepricesgen | _gen
 	$(call atomic_write,_gen/bin/aibridgepricesgen)
 .PHONY: coderd/aibridge/prices/data/prices.json
 
-gen/aibridge-prices: coderd/aibridge/prices/data/prices.json
+# Frontend known-models catalog, generated from the same models.dev fetch
+# joined with the editorial curation in scripts/aibridgepricesgen/catalog.json.
+# Kept out of `make gen` for the same live-upstream-data reason as prices.json.
+site/src/pages/AgentsPage/components/ChatModelAdminPanel/knownModels/knownModelsGenerated.json: _gen/bin/aibridgepricesgen | _gen
+	$(call atomic_write,_gen/bin/aibridgepricesgen -format=catalog,./scripts/biome_format.sh)
+.PHONY: site/src/pages/AgentsPage/components/ChatModelAdminPanel/knownModels/knownModelsGenerated.json
+
+gen/aibridge-prices: \
+	coderd/aibridge/prices/data/prices.json \
+	site/src/pages/AgentsPage/components/ChatModelAdminPanel/knownModels/knownModelsGenerated.json
 .PHONY: gen/aibridge-prices
 
 gen/golden-files: \
