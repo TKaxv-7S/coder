@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"golang.org/x/xerrors"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"cdr.dev/slog/v3"
 	"github.com/coder/coder/v2/agent/agentcontext"
@@ -185,10 +186,20 @@ func (s *DRPCAgentSocketService) SyncStatus(_ context.Context, req *proto.SyncSt
 	if err != nil {
 		return nil, xerrors.Errorf("cannot get status for unit %q: %w", req.Unit, err)
 	}
+
+	var history []*proto.UnitEvent
+	for _, ev := range s.unitManager.Events() {
+		if ev.Unit != unitID {
+			continue
+		}
+		history = append(history, unitEventToProto(ev))
+	}
+
 	return &proto.SyncStatusResponse{
 		Status:       string(u.Status()),
 		IsReady:      isReady,
 		Dependencies: depInfos,
+		History:      history,
 	}, nil
 }
 
@@ -213,6 +224,36 @@ func (s *DRPCAgentSocketService) SyncList(_ context.Context, _ *proto.SyncListRe
 	}
 
 	return &proto.SyncListResponse{Units: unitInfos}, nil
+}
+
+// SyncTimeline returns the full event log of unit status transitions and
+// dependency declarations across all units, ordered by sequence number.
+func (s *DRPCAgentSocketService) SyncTimeline(_ context.Context, _ *proto.SyncTimelineRequest) (*proto.SyncTimelineResponse, error) {
+	if s.unitManager == nil {
+		return nil, xerrors.Errorf("cannot get timeline: %w", ErrUnitManagerNotAvailable)
+	}
+
+	events := s.unitManager.Events()
+	protoEvents := make([]*proto.UnitEvent, 0, len(events))
+	for _, ev := range events {
+		protoEvents = append(protoEvents, unitEventToProto(ev))
+	}
+
+	return &proto.SyncTimelineResponse{Events: protoEvents}, nil
+}
+
+// unitEventToProto converts a unit.Event to its on-wire form.
+func unitEventToProto(ev unit.Event) *proto.UnitEvent {
+	return &proto.UnitEvent{
+		Seq:            ev.Seq,
+		Time:           timestamppb.New(ev.Time),
+		Kind:           string(ev.Kind),
+		Unit:           string(ev.Unit),
+		From:           string(ev.From),
+		To:             string(ev.To),
+		DependsOn:      string(ev.DependsOn),
+		RequiredStatus: string(ev.RequiredStatus),
+	}
 }
 
 // UpdateAppStatus forwards an app status update to coderd via the

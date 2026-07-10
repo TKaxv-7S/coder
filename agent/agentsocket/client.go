@@ -2,6 +2,7 @@ package agentsocket
 
 import (
 	"context"
+	"time"
 
 	"golang.org/x/xerrors"
 	"storj.io/drpc"
@@ -134,12 +135,46 @@ func (c *Client) SyncStatus(ctx context.Context, unitName unit.ID) (SyncStatusRe
 		})
 	}
 
+	var history []UnitEvent
+	for _, ev := range resp.History {
+		history = append(history, unitEventFromProto(ev))
+	}
+
 	return SyncStatusResponse{
 		UnitName:     unitName,
 		Status:       unit.Status(resp.Status),
 		IsReady:      resp.IsReady,
 		Dependencies: dependencies,
+		History:      history,
 	}, nil
+}
+
+// SyncTimeline returns the full event log of unit status transitions and
+// dependency declarations across all units, ordered by sequence number.
+func (c *Client) SyncTimeline(ctx context.Context) ([]UnitEvent, error) {
+	resp, err := c.client.SyncTimeline(ctx, &proto.SyncTimelineRequest{})
+	if err != nil {
+		return nil, err
+	}
+
+	events := make([]UnitEvent, 0, len(resp.Events))
+	for _, ev := range resp.Events {
+		events = append(events, unitEventFromProto(ev))
+	}
+	return events, nil
+}
+
+func unitEventFromProto(ev *proto.UnitEvent) UnitEvent {
+	return UnitEvent{
+		Seq:            ev.GetSeq(),
+		Time:           ev.GetTime().AsTime(),
+		Kind:           unit.EventKind(ev.GetKind()),
+		Unit:           unit.ID(ev.GetUnit()),
+		From:           unit.Status(ev.GetFrom()),
+		To:             unit.Status(ev.GetTo()),
+		DependsOn:      unit.ID(ev.GetDependsOn()),
+		RequiredStatus: unit.Status(ev.GetRequiredStatus()),
+	}
 }
 
 // SyncList returns all registered units and their current statuses.
@@ -258,6 +293,7 @@ type SyncStatusResponse struct {
 	Status       unit.Status      `table:"status" json:"status"`
 	IsReady      bool             `table:"ready" json:"is_ready"`
 	Dependencies []DependencyInfo `table:"dependencies" json:"dependencies"`
+	History      []UnitEvent      `table:"history" json:"history"`
 }
 
 // SyncListItem contains summary information for a single unit.
@@ -273,6 +309,19 @@ type DependencyInfo struct {
 	RequiredStatus unit.Status `table:"required status" json:"required_status"`
 	CurrentStatus  unit.Status `table:"current status" json:"current_status"`
 	IsSatisfied    bool        `table:"satisfied" json:"is_satisfied"`
+}
+
+// UnitEvent is an immutable record of a change to the dependency graph:
+// either a unit status transition or a dependency declaration.
+type UnitEvent struct {
+	Seq            uint64         `table:"seq,default_sort" json:"seq"`
+	Time           time.Time      `table:"time" json:"time"`
+	Kind           unit.EventKind `table:"kind" json:"kind"`
+	Unit           unit.ID        `table:"unit" json:"unit"`
+	From           unit.Status    `table:"from" json:"from,omitempty"`
+	To             unit.Status    `table:"to" json:"to,omitempty"`
+	DependsOn      unit.ID        `table:"depends on" json:"depends_on,omitempty"`
+	RequiredStatus unit.Status    `table:"required status" json:"required_status,omitempty"`
 }
 
 // ContextSource is a registered workspace-context scan root.

@@ -8,6 +8,7 @@ import (
 	"golang.org/x/xerrors"
 
 	"github.com/coder/coder/v2/coderd/util/slice"
+	"github.com/coder/quartz"
 )
 
 var (
@@ -86,14 +87,69 @@ type Manager struct {
 
 	// Store vertex instances for each unit to ensure consistent references
 	units map[ID]Unit
+
+	// clock supplies timestamps for recorded events. Injectable for
+	// deterministic tests.
+	clock quartz.Clock
+
+	// events is an append-only log of every successful graph mutation,
+	// ordered by seq. Timestamps are captured under the write lock, so
+	// seq order equals time order.
+	events []Event
+	seq    uint64
+}
+
+// Option configures a Manager.
+type Option func(*Manager)
+
+// WithClock sets the clock used to timestamp recorded events.
+func WithClock(clock quartz.Clock) Option {
+	return func(m *Manager) {
+		m.clock = clock
+	}
 }
 
 // NewManager creates a new Manager instance.
-func NewManager() *Manager {
-	return &Manager{
+func NewManager(opts ...Option) *Manager {
+	m := &Manager{
 		graph: &Graph[Status, ID]{},
 		units: make(map[ID]Unit),
+		clock: quartz.NewReal(),
 	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// maxEvents is a defensive bound on the event log. The status state
+// machine is small and finite, so the log stays tiny in practice; the
+// cap only guards against unbounded growth if repeated transitions are
+// ever permitted. Once reached, further events are dropped rather than
+// evicting older ones, because the timeline is only reconstructable
+// from a complete prefix of the log.
+const maxEvents = 16384
+
+// appendEventUnsafe records an event with the next sequence number and
+// the current clock time. The caller must hold the write lock.
+func (m *Manager) appendEventUnsafe(ev Event) {
+	if len(m.events) >= maxEvents {
+		return
+	}
+	m.seq++
+	ev.Seq = m.seq
+	ev.Time = m.clock.Now()
+	m.events = append(m.events, ev)
+}
+
+// Events returns a copy of the full event log, ordered by Seq.
+func (m *Manager) Events() []Event {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	events := make([]Event, len(m.events))
+	copy(events, m.events)
+	return events
 }
 
 // Register adds a unit to the manager if it is not already registered.
@@ -115,6 +171,13 @@ func (m *Manager) Register(id ID) error {
 		status: StatusPending,
 		ready:  true,
 	}
+
+	m.appendEventUnsafe(Event{
+		Kind: EventStatusChange,
+		Unit: id,
+		From: StatusNotRegistered,
+		To:   StatusPending,
+	})
 
 	return nil
 }
@@ -175,6 +238,13 @@ func (m *Manager) AddDependency(unit ID, dependsOn ID, requiredStatus Status) er
 		return xerrors.Errorf("adding edge for unit %q: %w", unit, errors.Join(ErrFailedToAddDependency, err))
 	}
 
+	m.appendEventUnsafe(Event{
+		Kind:           EventDependencyAdded,
+		Unit:           unit,
+		DependsOn:      dependsOn,
+		RequiredStatus: requiredStatus,
+	})
+
 	// Recalculate readiness for the unit since it now has a new dependency
 	m.recalculateReadinessUnsafe(unit)
 
@@ -198,8 +268,16 @@ func (m *Manager) UpdateStatus(unit ID, newStatus Status) error {
 		return xerrors.Errorf("checking status for unit %q: %w", unit, ErrSameStatusAlreadySet)
 	}
 
+	oldStatus := u.status
 	u.status = newStatus
 	m.units[unit] = u
+
+	m.appendEventUnsafe(Event{
+		Kind: EventStatusChange,
+		Unit: unit,
+		From: oldStatus,
+		To:   newStatus,
+	})
 
 	// Get all units that depend on this one (reverse adjacent vertices)
 	dependents := m.graph.GetReverseAdjacentVertices(unit)

@@ -9,5 +9,22 @@
       "current_status": "completed",
       "is_satisfied": true
     }
+  ],
+  "history": [
+    {
+      "seq": 1,
+      "time": "====[timestamp]=====",
+      "kind": "status_change",
+      "unit": "test-unit",
+      "to": "pending"
+    },
+    {
+      "seq": 2,
+      "time": "====[timestamp]=====",
+      "kind": "dependency_added",
+      "unit": "test-unit",
+      "depends_on": "dep-unit",
+      "required_status": "completed"
+    }
   ]
 }

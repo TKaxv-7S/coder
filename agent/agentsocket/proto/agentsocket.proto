@@ -4,6 +4,7 @@ option go_package = "github.com/coder/coder/v2/agent/agentsocket/proto";
 package coder.agentsocket.v1;
 
 import "agent/proto/agent.proto";
+import "google/protobuf/timestamp.proto";
 
 message PingRequest {}
 
@@ -54,6 +55,34 @@ message SyncStatusResponse {
   string status = 1;
   bool is_ready = 2;
   repeated DependencyInfo dependencies = 3;
+  // history contains this unit's recorded events, ordered by seq.
+  repeated UnitEvent history = 4;
+}
+
+// UnitEvent is an immutable record of a change to the dependency graph:
+// either a unit status transition or a dependency declaration.
+message UnitEvent {
+  // seq is a monotonic, agent-global sequence number. Within one agent,
+  // seq order equals time order.
+  uint64 seq = 1;
+  google.protobuf.Timestamp time = 2;
+  // kind is "status_change" or "dependency_added".
+  string kind = 3;
+  string unit = 4;
+  // from and to are set for status_change events. from is empty for the
+  // initial registration event.
+  string from = 5;
+  string to = 6;
+  // depends_on and required_status are set for dependency_added events.
+  string depends_on = 7;
+  string required_status = 8;
+}
+
+message SyncTimelineRequest {}
+
+message SyncTimelineResponse {
+  // events contains all recorded events across all units, ordered by seq.
+  repeated UnitEvent events = 1;
 }
 
 message SyncListRequest {}
@@ -160,6 +189,9 @@ service AgentSocket {
   rpc SyncStatus(SyncStatusRequest) returns (SyncStatusResponse);
   // List all registered units and their current statuses.
   rpc SyncList(SyncListRequest) returns (SyncListResponse);
+  // Return the full event log of unit status transitions and dependency
+  // declarations across all units, ordered by sequence number.
+  rpc SyncTimeline(SyncTimelineRequest) returns (SyncTimelineResponse);
   // Update app status, forwarded to coderd.
   rpc UpdateAppStatus(coder.agent.v2.UpdateAppStatusRequest) returns (coder.agent.v2.UpdateAppStatusResponse);
   // List the workspace context sources registered on the agent.

@@ -365,6 +365,124 @@ func TestDRPCAgentSocketService(t *testing.T) {
 		})
 	})
 
+	t.Run("SyncTimeline", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("Empty", func(t *testing.T) {
+			t.Parallel()
+
+			socketPath := testutil.AgentSocketPath(t)
+			ctx := testutil.Context(t, testutil.WaitShort)
+			server, err := agentsocket.NewServer(
+				slog.Make().Leveled(slog.LevelDebug),
+				agentsocket.WithPath(socketPath),
+			)
+			require.NoError(t, err)
+			defer server.Close()
+
+			client := newSocketClient(ctx, t, socketPath)
+
+			events, err := client.SyncTimeline(ctx)
+			require.NoError(t, err)
+			require.Empty(t, events)
+		})
+
+		t.Run("RecordsEventsAcrossUnits", func(t *testing.T) {
+			t.Parallel()
+
+			socketPath := testutil.AgentSocketPath(t)
+			ctx := testutil.Context(t, testutil.WaitShort)
+			server, err := agentsocket.NewServer(
+				slog.Make().Leveled(slog.LevelDebug),
+				agentsocket.WithPath(socketPath),
+			)
+			require.NoError(t, err)
+			defer server.Close()
+
+			client := newSocketClient(ctx, t, socketPath)
+
+			// dependent-unit registers and declares a dependency on
+			// test-unit, which then runs to completion.
+			err = client.SyncWant(ctx, "dependent-unit", "test-unit")
+			require.NoError(t, err)
+			err = client.SyncStart(ctx, "test-unit")
+			require.NoError(t, err)
+			err = client.SyncComplete(ctx, "test-unit")
+			require.NoError(t, err)
+			err = client.SyncStart(ctx, "dependent-unit")
+			require.NoError(t, err)
+
+			events, err := client.SyncTimeline(ctx)
+			require.NoError(t, err)
+
+			type eventShape struct {
+				kind           unit.EventKind
+				unitID         unit.ID
+				from, to       unit.Status
+				dependsOn      unit.ID
+				requiredStatus unit.Status
+			}
+			got := make([]eventShape, 0, len(events))
+			wantSeq := uint64(1)
+			for _, ev := range events {
+				// Seq is contiguous from 1 and matches the response order.
+				require.Equal(t, wantSeq, ev.Seq)
+				wantSeq++
+				require.False(t, ev.Time.IsZero())
+				got = append(got, eventShape{
+					kind:           ev.Kind,
+					unitID:         ev.Unit,
+					from:           ev.From,
+					to:             ev.To,
+					dependsOn:      ev.DependsOn,
+					requiredStatus: ev.RequiredStatus,
+				})
+			}
+			require.Equal(t, []eventShape{
+				{kind: unit.EventStatusChange, unitID: "dependent-unit", from: unit.StatusNotRegistered, to: unit.StatusPending},
+				{kind: unit.EventDependencyAdded, unitID: "dependent-unit", dependsOn: "test-unit", requiredStatus: unit.StatusComplete},
+				{kind: unit.EventStatusChange, unitID: "test-unit", from: unit.StatusNotRegistered, to: unit.StatusPending},
+				{kind: unit.EventStatusChange, unitID: "test-unit", from: unit.StatusPending, to: unit.StatusStarted},
+				{kind: unit.EventStatusChange, unitID: "test-unit", from: unit.StatusStarted, to: unit.StatusComplete},
+				{kind: unit.EventStatusChange, unitID: "dependent-unit", from: unit.StatusPending, to: unit.StatusStarted},
+			}, got)
+		})
+	})
+
+	t.Run("SyncStatusHistory", func(t *testing.T) {
+		t.Parallel()
+
+		socketPath := testutil.AgentSocketPath(t)
+		ctx := testutil.Context(t, testutil.WaitShort)
+		server, err := agentsocket.NewServer(
+			slog.Make().Leveled(slog.LevelDebug),
+			agentsocket.WithPath(socketPath),
+		)
+		require.NoError(t, err)
+		defer server.Close()
+
+		client := newSocketClient(ctx, t, socketPath)
+
+		err = client.SyncStart(ctx, "test-unit")
+		require.NoError(t, err)
+		err = client.SyncStart(ctx, "other-unit")
+		require.NoError(t, err)
+		err = client.SyncComplete(ctx, "test-unit")
+		require.NoError(t, err)
+
+		// History contains only test-unit's events, in order.
+		status, err := client.SyncStatus(ctx, "test-unit")
+		require.NoError(t, err)
+		require.Len(t, status.History, 3)
+		for _, ev := range status.History {
+			require.Equal(t, unit.ID("test-unit"), ev.Unit)
+			require.Equal(t, unit.EventStatusChange, ev.Kind)
+		}
+		require.Equal(t, unit.StatusPending, status.History[0].To)
+		require.Equal(t, unit.StatusStarted, status.History[1].To)
+		require.Equal(t, unit.StatusComplete, status.History[2].To)
+	})
+
 	t.Run("UpdateAppStatus", func(t *testing.T) {
 		t.Parallel()
 
