@@ -6,7 +6,15 @@ import (
 	"time"
 
 	"github.com/coder/coder/v2/agent/unit"
+	"github.com/coder/coder/v2/cli/cliui"
+	"github.com/coder/pretty"
 )
+
+// laneColors is the palette used to give each timeline lane (unit) its own
+// color, cycled by lane index. cliui.Color yields a colorless profile in
+// tests and on non-TTY output, so colored lanes do not affect golden
+// files.
+var laneColors = []string{"1", "2", "3", "4", "5", "6", "9", "10", "11", "12", "13", "14"}
 
 // syncEventDescription renders a unit event as a short human-readable
 // phrase, shared by the sync status history and sync timeline views.
@@ -152,16 +160,28 @@ func (r *timelineRenderer) isReady(u unit.ID) bool {
 	return true
 }
 
+// laneStyle returns the color style for the lane at the given index.
+func laneStyle(lane int) pretty.Style {
+	return pretty.Style{pretty.FgColor(cliui.Color(laneColors[lane%len(laneColors)]))}
+}
+
+// colorizeLane colors s with the lane's color. In tests and on non-TTY
+// output this returns s unchanged.
+func colorizeLane(lane int, s string) string {
+	return pretty.Sprint(laneStyle(lane), s)
+}
+
 // glyphRow renders one graph row: mark in the target unit's lane, "|" in
-// other active lanes, and spaces elsewhere.
+// other active lanes, and spaces elsewhere. Each lane's glyph is drawn in
+// that lane's color.
 func (r *timelineRenderer) glyphRow(target unit.ID, mark string) string {
 	glyphs := make([]string, len(r.lanes))
 	for i, u := range r.lanes {
 		switch {
 		case u == target:
-			glyphs[i] = mark
+			glyphs[i] = colorizeLane(i, mark)
 		case r.active[u]:
-			glyphs[i] = "|"
+			glyphs[i] = colorizeLane(i, "|")
 		default:
 			glyphs[i] = " "
 		}
@@ -170,17 +190,17 @@ func (r *timelineRenderer) glyphRow(target unit.ID, mark string) string {
 }
 
 // connectorRow draws the dependency-satisfaction edge from lane "from"
-// toward lane "to".
+// toward lane "to". Each lane's glyph is drawn in that lane's color.
 func (r *timelineRenderer) connectorRow(from, to unit.ID) string {
 	glyphs := make([]string, len(r.lanes))
 	for i, u := range r.lanes {
 		switch {
 		case u == from && r.laneOf[from] < r.laneOf[to]:
-			glyphs[i] = `\`
+			glyphs[i] = colorizeLane(i, `\`)
 		case u == from:
-			glyphs[i] = "/"
+			glyphs[i] = colorizeLane(i, "/")
 		case r.active[u]:
-			glyphs[i] = "|"
+			glyphs[i] = colorizeLane(i, "|")
 		default:
 			glyphs[i] = " "
 		}
@@ -189,5 +209,6 @@ func (r *timelineRenderer) connectorRow(from, to unit.ID) string {
 }
 
 func (r *timelineRenderer) writeRow(sb *strings.Builder, graph string, at time.Time, u unit.ID, description string) {
-	_, _ = sb.WriteString(fmt.Sprintf("%s  [%s]  %s  %s\n", graph, syncElapsed(r.base, at), u, description))
+	name := colorizeLane(r.laneOf[u], string(u))
+	_, _ = sb.WriteString(fmt.Sprintf("%s  [%s]  %s  %s\n", graph, syncElapsed(r.base, at), name, description))
 }
