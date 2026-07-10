@@ -389,24 +389,33 @@ func TestScriptUnitsRegistered(t *testing.T) {
 
 	scripts := []codersdk.WorkspaceAgentScript{
 		{
-			ID:          uuid.New(),
-			LogSourceID: uuid.New(),
-			DisplayName: "Install Tools",
-			Script:      "echo install",
-			RunOnStart:  true,
+			ID:              uuid.New(),
+			LogSourceID:     uuid.New(),
+			DisplayName:     "Install Tools",
+			ResourceAddress: "coder_script.install_tools",
+			Script:          "echo install",
+			RunOnStart:      true,
+		},
+		{
+			ID:              uuid.New(),
+			LogSourceID:     uuid.New(),
+			DisplayName:     "Configure Environment",
+			ResourceAddress: "module.dev.coder_script.configure",
+			Script:          "echo configure",
+			RunOnStart:      true,
 		},
 		{
 			ID:          uuid.New(),
 			LogSourceID: uuid.New(),
-			DisplayName: "Configure Environment",
-			Script:      "echo configure",
-			RunOnStart:  true,
-		},
-		{
-			ID:          uuid.New(),
-			LogSourceID: uuid.New(),
-			DisplayName: "", // No display name; should be skipped.
+			DisplayName: "", // No display name or resource address; should be skipped.
 			Script:      "echo nameless",
+			RunOnStart:  true,
+		},
+		{
+			ID:          uuid.New(),
+			LogSourceID: uuid.New(),
+			DisplayName: "Fallback Only", // No resource address; falls back to display name.
+			Script:      "echo fallback",
 			RunOnStart:  true,
 		},
 	}
@@ -415,16 +424,17 @@ func TestScriptUnitsRegistered(t *testing.T) {
 	err := runner.Init(scripts, aAPI.ScriptCompleted)
 	require.NoError(t, err)
 
-	// All scripts with a display name should be registered as pending.
+	// Three scripts should be registered (two with resource address, one with display name only).
 	units := mgr.ListUnits()
-	require.Len(t, units, 2)
+	require.Len(t, units, 3)
 
 	unitsByName := make(map[unit.ID]unit.Unit)
 	for _, u := range units {
 		unitsByName[u.ID()] = u
 	}
 
-	for _, name := range []string{"Install Tools", "Configure Environment"} {
+	// ResourceAddress takes precedence over DisplayName.
+	for _, name := range []string{"coder_script.install_tools", "module.dev.coder_script.configure", "Fallback Only"} {
 		u, ok := unitsByName[unit.ID(name)]
 		require.True(t, ok, "expected unit %q to be registered", name)
 		require.Equal(t, unit.StatusPending, u.Status(), "unit %q should be pending", name)
@@ -439,14 +449,15 @@ func TestScriptUnitsLifecycle(t *testing.T) {
 	})
 	defer runner.Close()
 
-	scriptName := "My Script"
+	scriptName := "coder_script.my_script"
 	scripts := []codersdk.WorkspaceAgentScript{
 		{
-			ID:          uuid.New(),
-			LogSourceID: uuid.New(),
-			DisplayName: scriptName,
-			Script:      "echo lifecycle",
-			RunOnStart:  true,
+			ID:              uuid.New(),
+			LogSourceID:     uuid.New(),
+			DisplayName:     "My Script",
+			ResourceAddress: scriptName,
+			Script:          "echo lifecycle",
+			RunOnStart:      true,
 		},
 	}
 

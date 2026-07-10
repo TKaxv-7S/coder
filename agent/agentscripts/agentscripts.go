@@ -148,19 +148,20 @@ func (r *Runner) Init(scripts []codersdk.WorkspaceAgentScript, scriptCompleted S
 	// executes, giving observers a complete picture of pending work.
 	if r.UnitManager != nil {
 		for _, script := range scripts {
-			if script.DisplayName == "" {
-				r.Logger.Warn(r.cronCtx, "skipping unit registration for script with empty display name",
+			unitName := scriptUnitName(script)
+			if unitName == "" {
+				r.Logger.Warn(r.cronCtx, "skipping unit registration for script with no usable name",
 					slog.F("script_id", script.ID))
 				continue
 			}
-			if err := r.UnitManager.Register(unit.ID(script.DisplayName)); err != nil {
+			if err := r.UnitManager.Register(unit.ID(unitName)); err != nil {
 				if errors.Is(err, unit.ErrUnitAlreadyRegistered) {
 					r.Logger.Warn(r.cronCtx, "duplicate unit name during script registration",
-						slog.F("display_name", script.DisplayName),
+						slog.F("unit_name", unitName),
 						slog.F("script_id", script.ID))
 					continue
 				}
-				return xerrors.Errorf("register script unit %q: %w", script.DisplayName, err)
+				return xerrors.Errorf("register script unit %q: %w", unitName, err)
 			}
 		}
 	}
@@ -524,17 +525,28 @@ func (r *Runner) isClosed() bool {
 
 // setUnitStatus updates the sync unit status for a script.
 // It is a no-op when no UnitManager is configured or when the script
-// has no DisplayName.
+// has no usable unit name.
 func (r *Runner) setUnitStatus(ctx context.Context, script codersdk.WorkspaceAgentScript, status unit.Status) {
-	if r.UnitManager == nil || script.DisplayName == "" {
+	unitName := scriptUnitName(script)
+	if r.UnitManager == nil || unitName == "" {
 		return
 	}
-	if err := r.UnitManager.UpdateStatus(unit.ID(script.DisplayName), status); err != nil {
+	if err := r.UnitManager.UpdateStatus(unit.ID(unitName), status); err != nil {
 		// Log but do not fail; unit tracking is best-effort relative
 		// to script execution.
 		r.Logger.Warn(ctx, "failed to update unit status",
-			slog.F("display_name", script.DisplayName),
+			slog.F("unit_name", unitName),
 			slog.F("status", string(status)),
 			slog.Error(err))
 	}
+}
+
+// scriptUnitName returns the unit name for a script. It prefers
+// ResourceAddress (the Terraform resource address, unique across
+// modules) and falls back to DisplayName.
+func scriptUnitName(script codersdk.WorkspaceAgentScript) string {
+	if script.ResourceAddress != "" {
+		return script.ResourceAddress
+	}
+	return script.DisplayName
 }
