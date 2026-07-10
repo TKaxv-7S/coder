@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -59,6 +60,34 @@ func TestRenderTimeline(t *testing.T) {
   *  [+2.3s]  dev-server  ready (dependency satisfied)
   *  [+2.4s]  dev-server  pending → started
   *  [+8.0s]  dev-server  started → completed`, renderTimeline(events))
+	})
+
+	t.Run("IncrementalMatchesOneShot", func(t *testing.T) {
+		t.Parallel()
+
+		events := []unit.Event{
+			{Seq: 1, Time: at(0), Kind: unit.EventStatusChange, Unit: "db-migrate", From: unit.StatusNotRegistered, To: unit.StatusPending},
+			{Seq: 2, Time: at(100 * time.Millisecond), Kind: unit.EventStatusChange, Unit: "db-migrate", From: unit.StatusPending, To: unit.StatusStarted},
+			{Seq: 3, Time: at(100 * time.Millisecond), Kind: unit.EventStatusChange, Unit: "dev-server", From: unit.StatusNotRegistered, To: unit.StatusPending},
+			{Seq: 4, Time: at(100 * time.Millisecond), Kind: unit.EventDependencyAdded, Unit: "dev-server", DependsOn: "db-migrate", RequiredStatus: unit.StatusComplete},
+			{Seq: 5, Time: at(2300 * time.Millisecond), Kind: unit.EventStatusChange, Unit: "db-migrate", From: unit.StatusStarted, To: unit.StatusComplete},
+			{Seq: 6, Time: at(2400 * time.Millisecond), Kind: unit.EventStatusChange, Unit: "dev-server", From: unit.StatusPending, To: unit.StatusStarted},
+			{Seq: 7, Time: at(8 * time.Second), Kind: unit.EventStatusChange, Unit: "dev-server", From: unit.StatusStarted, To: unit.StatusComplete},
+		}
+
+		oneShot := newTimelineRenderer().renderEvents(events)
+
+		// Feeding the log in overlapping chunks, as --watch does when it
+		// repeatedly fetches the full event list, must produce identical
+		// output: already-seen events are skipped by sequence number.
+		incremental := newTimelineRenderer()
+		var got strings.Builder
+		got.WriteString(incremental.renderEvents(events[:2]))
+		got.WriteString(incremental.renderEvents(events[:2])) // no new events
+		got.WriteString(incremental.renderEvents(events[:5])) // overlap + connector boundary
+		got.WriteString(incremental.renderEvents(events))
+
+		require.Equal(t, oneShot, got.String())
 	})
 
 	t.Run("ReadyFlipNotDrawnWhenStillBlocked", func(t *testing.T) {

@@ -14,6 +14,7 @@ import (
 	"github.com/coder/coder/v2/agent/agentsocket"
 	"github.com/coder/coder/v2/agent/unit"
 	"github.com/coder/coder/v2/cli/clitest"
+	"github.com/coder/coder/v2/pty/ptytest"
 	"github.com/coder/coder/v2/testutil"
 	"github.com/coder/quartz"
 )
@@ -483,6 +484,53 @@ func TestSyncCommands_Golden(t *testing.T) {
 		require.NoError(t, err)
 
 		clitest.TestGoldenFile(t, "TestSyncCommands_Golden/timeline_with_units", outBuf.Bytes(), nil)
+	})
+
+	t.Run("timeline_watch", func(t *testing.T) {
+		t.Parallel()
+		path, cleanup := setupSocketServer(t)
+		defer cleanup()
+
+		ctx, cancel := context.WithCancel(testutil.Context(t, testutil.WaitLong))
+		defer cancel()
+
+		client, err := agentsocket.NewClient(ctx, agentsocket.WithPath(path))
+		require.NoError(t, err)
+		defer client.Close()
+		err = client.SyncStart(ctx, "dep-unit")
+		require.NoError(t, err)
+
+		inv, _ := clitest.New(t, "exp", "sync", "timeline", "--watch", "--socket-path", path)
+		pty := ptytest.New(t)
+		inv.Stdout = pty.Output()
+		inv.Stderr = pty.Output()
+
+		waiter := clitest.StartWithWaiter(t, inv.WithContext(ctx))
+
+		// Events recorded before the watch started are rendered first.
+		pty.ExpectMatch(ctx, "registered (pending)")
+		pty.ExpectMatch(ctx, "pending → started")
+
+		// Events recorded while watching are streamed as new rows.
+		err = client.SyncComplete(ctx, "dep-unit")
+		require.NoError(t, err)
+		pty.ExpectMatch(ctx, "started → completed")
+
+		// Interrupting the watch is a clean exit.
+		cancel()
+		waiter.RequireSuccess()
+	})
+
+	t.Run("timeline_watch_rejects_json", func(t *testing.T) {
+		t.Parallel()
+		path, cleanup := setupSocketServer(t)
+		defer cleanup()
+
+		ctx := testutil.Context(t, testutil.WaitShort)
+
+		inv, _ := clitest.New(t, "exp", "sync", "timeline", "--watch", "--output", "json", "--socket-path", path)
+		err := inv.WithContext(ctx).Run()
+		require.ErrorContains(t, err, "--watch only supports text output")
 	})
 
 	t.Run("timeline_json_format", func(t *testing.T) {

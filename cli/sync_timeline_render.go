@@ -29,129 +29,165 @@ func syncElapsed(base, t time.Time) string {
 	return fmt.Sprintf("+%.1fs", t.Sub(base).Seconds())
 }
 
-// renderTimeline renders the unit event log as a git-log-style ASCII
+// timelineEdge is one declared dependency of a unit.
+type timelineEdge struct {
+	dependsOn      unit.ID
+	requiredStatus unit.Status
+}
+
+// timelineRenderer renders the unit event log as a git-log-style ASCII
 // graph. Each unit gets a lane in order of first appearance; every event
 // prints a "*" row in its unit's lane with an elapsed-time label. When a
 // status change satisfies another unit's dependencies, a connector row is
 // drawn from the satisfying lane to the dependent lane, followed by a
 // derived "ready" row. Lanes disappear once a unit completes.
+//
+// The renderer is incremental: renderEvents may be called repeatedly with
+// a growing event log and only renders rows for events it has not seen
+// yet, which is how --watch streams new rows as they occur.
+type timelineRenderer struct {
+	lanes      []unit.ID
+	laneOf     map[unit.ID]int
+	active     map[unit.ID]bool
+	statuses   map[unit.ID]unit.Status
+	deps       map[unit.ID][]timelineEdge
+	dependents map[unit.ID][]unit.ID
+
+	// base is the time of the first event seen; elapsed labels are
+	// relative to it.
+	base    time.Time
+	started bool
+	// lastSeq is the highest event sequence number consumed so far.
+	lastSeq uint64
+}
+
+func newTimelineRenderer() *timelineRenderer {
+	return &timelineRenderer{
+		laneOf:     make(map[unit.ID]int),
+		active:     make(map[unit.ID]bool),
+		statuses:   make(map[unit.ID]unit.Status),
+		deps:       make(map[unit.ID][]timelineEdge),
+		dependents: make(map[unit.ID][]unit.ID),
+	}
+}
+
+// renderTimeline renders a complete event log in one shot.
 func renderTimeline(events []unit.Event) string {
 	if len(events) == 0 {
 		return "No events found"
 	}
+	return strings.TrimRight(newTimelineRenderer().renderEvents(events), "\n")
+}
 
-	type edge struct {
-		dependsOn      unit.ID
-		requiredStatus unit.Status
-	}
-	var (
-		lanes      []unit.ID
-		laneOf     = make(map[unit.ID]int)
-		active     = make(map[unit.ID]bool)
-		statuses   = make(map[unit.ID]unit.Status)
-		deps       = make(map[unit.ID][]edge)
-		dependents = make(map[unit.ID][]unit.ID)
-	)
-
-	ensureLane := func(u unit.ID) {
-		if _, ok := laneOf[u]; ok {
-			return
-		}
-		laneOf[u] = len(lanes)
-		lanes = append(lanes, u)
-		active[u] = true
-	}
-
-	// isReady mirrors the Manager's readiness semantics: a pending unit
-	// is ready when every dependency's current status equals its
-	// required status.
-	isReady := func(u unit.ID) bool {
-		if statuses[u] != unit.StatusPending {
-			return false
-		}
-		for _, e := range deps[u] {
-			if statuses[e.dependsOn] != e.requiredStatus {
-				return false
-			}
-		}
-		return true
-	}
-
-	// glyphRow renders one graph row: mark in the target unit's lane,
-	// "|" in other active lanes, and spaces elsewhere.
-	glyphRow := func(target unit.ID, mark string) string {
-		glyphs := make([]string, len(lanes))
-		for i, u := range lanes {
-			switch {
-			case u == target:
-				glyphs[i] = mark
-			case active[u]:
-				glyphs[i] = "|"
-			default:
-				glyphs[i] = " "
-			}
-		}
-		return strings.TrimRight(strings.Join(glyphs, " "), " ")
-	}
-
-	// connectorRow draws the dependency-satisfaction edge from lane
-	// "from" toward lane "to".
-	connectorRow := func(from, to unit.ID) string {
-		glyphs := make([]string, len(lanes))
-		for i, u := range lanes {
-			switch {
-			case u == from && laneOf[from] < laneOf[to]:
-				glyphs[i] = `\`
-			case u == from:
-				glyphs[i] = "/"
-			case active[u]:
-				glyphs[i] = "|"
-			default:
-				glyphs[i] = " "
-			}
-		}
-		return strings.TrimRight(strings.Join(glyphs, " "), " ")
-	}
-
-	base := events[0].Time
+// renderEvents consumes events with a sequence number greater than any
+// previously consumed and returns the newly produced graph rows,
+// newline-terminated. Events must be ordered by Seq.
+func (r *timelineRenderer) renderEvents(events []unit.Event) string {
 	var sb strings.Builder
-	writeRow := func(graph string, at time.Time, u unit.ID, description string) {
-		_, _ = sb.WriteString(fmt.Sprintf("%s  [%s]  %s  %s\n", graph, syncElapsed(base, at), u, description))
-	}
-
 	for _, ev := range events {
-		ensureLane(ev.Unit)
+		if ev.Seq <= r.lastSeq {
+			continue
+		}
+		r.lastSeq = ev.Seq
+		if !r.started {
+			r.base = ev.Time
+			r.started = true
+		}
+		r.ensureLane(ev.Unit)
 
 		switch ev.Kind {
 		case unit.EventStatusChange:
 			// Snapshot dependent readiness before applying the status
 			// change so blocked-to-ready flips can be detected.
-			wasReady := make(map[unit.ID]bool, len(dependents[ev.Unit]))
-			for _, dep := range dependents[ev.Unit] {
-				wasReady[dep] = isReady(dep)
+			wasReady := make(map[unit.ID]bool, len(r.dependents[ev.Unit]))
+			for _, dep := range r.dependents[ev.Unit] {
+				wasReady[dep] = r.isReady(dep)
 			}
 
-			statuses[ev.Unit] = ev.To
-			writeRow(glyphRow(ev.Unit, "*"), ev.Time, ev.Unit, syncEventDescription(ev))
+			r.statuses[ev.Unit] = ev.To
+			r.writeRow(&sb, r.glyphRow(ev.Unit, "*"), ev.Time, ev.Unit, syncEventDescription(ev))
 			if ev.To == unit.StatusComplete {
-				active[ev.Unit] = false
+				r.active[ev.Unit] = false
 			}
 
-			for _, dep := range dependents[ev.Unit] {
-				if !wasReady[dep] && isReady(dep) {
-					_, _ = sb.WriteString(connectorRow(ev.Unit, dep) + "\n")
-					writeRow(glyphRow(dep, "*"), ev.Time, dep, "ready (dependency satisfied)")
+			for _, dep := range r.dependents[ev.Unit] {
+				if !wasReady[dep] && r.isReady(dep) {
+					_, _ = sb.WriteString(r.connectorRow(ev.Unit, dep) + "\n")
+					r.writeRow(&sb, r.glyphRow(dep, "*"), ev.Time, dep, "ready (dependency satisfied)")
 				}
 			}
 		case unit.EventDependencyAdded:
-			deps[ev.Unit] = append(deps[ev.Unit], edge{
+			r.deps[ev.Unit] = append(r.deps[ev.Unit], timelineEdge{
 				dependsOn:      ev.DependsOn,
 				requiredStatus: ev.RequiredStatus,
 			})
-			dependents[ev.DependsOn] = append(dependents[ev.DependsOn], ev.Unit)
-			writeRow(glyphRow(ev.Unit, "*"), ev.Time, ev.Unit, syncEventDescription(ev))
+			r.dependents[ev.DependsOn] = append(r.dependents[ev.DependsOn], ev.Unit)
+			r.writeRow(&sb, r.glyphRow(ev.Unit, "*"), ev.Time, ev.Unit, syncEventDescription(ev))
 		}
 	}
+	return sb.String()
+}
 
-	return strings.TrimRight(sb.String(), "\n")
+func (r *timelineRenderer) ensureLane(u unit.ID) {
+	if _, ok := r.laneOf[u]; ok {
+		return
+	}
+	r.laneOf[u] = len(r.lanes)
+	r.lanes = append(r.lanes, u)
+	r.active[u] = true
+}
+
+// isReady mirrors the Manager's readiness semantics: a pending unit is
+// ready when every dependency's current status equals its required
+// status.
+func (r *timelineRenderer) isReady(u unit.ID) bool {
+	if r.statuses[u] != unit.StatusPending {
+		return false
+	}
+	for _, e := range r.deps[u] {
+		if r.statuses[e.dependsOn] != e.requiredStatus {
+			return false
+		}
+	}
+	return true
+}
+
+// glyphRow renders one graph row: mark in the target unit's lane, "|" in
+// other active lanes, and spaces elsewhere.
+func (r *timelineRenderer) glyphRow(target unit.ID, mark string) string {
+	glyphs := make([]string, len(r.lanes))
+	for i, u := range r.lanes {
+		switch {
+		case u == target:
+			glyphs[i] = mark
+		case r.active[u]:
+			glyphs[i] = "|"
+		default:
+			glyphs[i] = " "
+		}
+	}
+	return strings.TrimRight(strings.Join(glyphs, " "), " ")
+}
+
+// connectorRow draws the dependency-satisfaction edge from lane "from"
+// toward lane "to".
+func (r *timelineRenderer) connectorRow(from, to unit.ID) string {
+	glyphs := make([]string, len(r.lanes))
+	for i, u := range r.lanes {
+		switch {
+		case u == from && r.laneOf[from] < r.laneOf[to]:
+			glyphs[i] = `\`
+		case u == from:
+			glyphs[i] = "/"
+		case r.active[u]:
+			glyphs[i] = "|"
+		default:
+			glyphs[i] = " "
+		}
+	}
+	return strings.TrimRight(strings.Join(glyphs, " "), " ")
+}
+
+func (r *timelineRenderer) writeRow(sb *strings.Builder, graph string, at time.Time, u unit.ID, description string) {
+	_, _ = sb.WriteString(fmt.Sprintf("%s  [%s]  %s  %s\n", graph, syncElapsed(r.base, at), u, description))
 }

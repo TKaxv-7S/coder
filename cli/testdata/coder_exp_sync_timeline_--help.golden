@@ -8,11 +8,14 @@ USAGE:
   Show every recorded unit state transition and dependency declaration across
   all units, in the order they occurred. The default output is an ASCII graph of
   the dependency DAG in event-time order; use --output json for the raw event
-  list.
+  list. With --watch, new rows are streamed as events occur until interrupted.
 
 OPTIONS:
   -o, --output text|json (default: text)
           Output format.
+
+  -w, --watch bool
+          Stream new rows as events occur until interrupted.
 
 ———
 Run `coder --help` for a list of global options.

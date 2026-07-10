@@ -1,8 +1,11 @@
 package cli
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"golang.org/x/xerrors"
 
@@ -13,6 +16,8 @@ import (
 )
 
 func (*RootCmd) syncTimeline(socketPath *string) *serpent.Command {
+	var watch bool
+
 	formatter := cliui.NewOutputFormatter(
 		cliui.ChangeFormatterData(
 			cliui.TextFormat(),
@@ -29,9 +34,13 @@ func (*RootCmd) syncTimeline(socketPath *string) *serpent.Command {
 	cmd := &serpent.Command{
 		Use:   "timeline",
 		Short: "Show a timeline of unit state changes",
-		Long:  "Show every recorded unit state transition and dependency declaration across all units, in the order they occurred. The default output is an ASCII graph of the dependency DAG in event-time order; use --output json for the raw event list.",
+		Long:  "Show every recorded unit state transition and dependency declaration across all units, in the order they occurred. The default output is an ASCII graph of the dependency DAG in event-time order; use --output json for the raw event list. With --watch, new rows are streamed as events occur until interrupted.",
 		Handler: func(i *serpent.Invocation) error {
 			ctx := i.Context()
+
+			if watch && formatter.FormatID() != "text" {
+				return xerrors.New("--watch only supports text output")
+			}
 
 			opts := []agentsocket.Option{}
 			if *socketPath != "" {
@@ -53,6 +62,10 @@ func (*RootCmd) syncTimeline(socketPath *string) *serpent.Command {
 				return xerrors.Errorf("get timeline failed: %w", err)
 			}
 
+			if watch {
+				return watchTimeline(ctx, i, client, events)
+			}
+
 			out, err := formatter.Format(ctx, events)
 			if err != nil {
 				return xerrors.Errorf("format timeline: %w", err)
@@ -64,8 +77,50 @@ func (*RootCmd) syncTimeline(socketPath *string) *serpent.Command {
 		},
 	}
 
+	cmd.Options = serpent.OptionSet{
+		{
+			Flag:          "watch",
+			FlagShorthand: "w",
+			Description:   "Stream new rows as events occur until interrupted.",
+			Value:         serpent.BoolOf(&watch),
+		},
+	}
 	formatter.AttachOptions(&cmd.Options)
 	return cmd
+}
+
+// syncWatchPollInterval is how often --watch polls the agent for new
+// events.
+const syncWatchPollInterval = time.Second
+
+// watchTimeline renders the events seen so far, then polls the agent and
+// streams newly produced graph rows until the context is canceled.
+func watchTimeline(ctx context.Context, i *serpent.Invocation, client *agentsocket.Client, events []agentsocket.UnitEvent) error {
+	renderer := newTimelineRenderer()
+	_, _ = fmt.Fprint(i.Stdout, renderer.renderEvents(unitEventsFromSocket(events)))
+
+	ticker := time.NewTicker(syncWatchPollInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			// Interrupting a watch is the normal way to end it.
+			if errors.Is(ctx.Err(), context.Canceled) {
+				return nil
+			}
+			return ctx.Err()
+		case <-ticker.C:
+			events, err := client.SyncTimeline(ctx)
+			if err != nil {
+				if errors.Is(ctx.Err(), context.Canceled) {
+					return nil
+				}
+				return xerrors.Errorf("get timeline failed: %w", err)
+			}
+			_, _ = fmt.Fprint(i.Stdout, renderer.renderEvents(unitEventsFromSocket(events)))
+		}
+	}
 }
 
 // unitEventsFromSocket converts socket client event wrappers back to
