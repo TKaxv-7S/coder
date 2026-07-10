@@ -442,6 +442,8 @@ export type DeploymentConfig = Readonly<{
 const aiProviderConfigsPath = "/api/v2/ai/providers";
 const aiGatewayPath = "/api/v2/ai-gateway";
 const chatModelConfigsPath = "/api/experimental/chats/model-configs";
+const chatPersonasPath = "/api/experimental/chats/personas";
+const chatAgentsPath = "/api/experimental/chats/agents";
 const userSkillsPath = (user: string) =>
 	`/api/experimental/users/${encodeURIComponent(user)}/skills`;
 const userSkillPath = (user: string, name: string) =>
@@ -3950,6 +3952,78 @@ class ExperimentalApiMethods {
 		await this.axios.delete(
 			`${chatModelConfigsPath}/${encodeURIComponent(modelConfigId)}`,
 		);
+	};
+
+	getChatPersonas = async (
+		organizationId?: string,
+	): Promise<TypesGen.ChatPersona[]> => {
+		const response = await this.axios.get<TypesGen.ChatPersona[]>(
+			chatPersonasPath,
+			{ params: organizationId ? { organization: organizationId } : undefined },
+		);
+		return response.data;
+	};
+
+	createChatPersona = async (
+		req: TypesGen.CreateChatPersonaRequest,
+	): Promise<TypesGen.ChatPersona> => {
+		const response = await this.axios.post<TypesGen.ChatPersona>(
+			chatPersonasPath,
+			req,
+		);
+		return response.data;
+	};
+
+	updateChatPersona = async (
+		personaId: string,
+		req: TypesGen.UpdateChatPersonaRequest,
+	): Promise<TypesGen.ChatPersona> => {
+		const response = await this.axios.patch<TypesGen.ChatPersona>(
+			`${chatPersonasPath}/${encodeURIComponent(personaId)}`,
+			req,
+		);
+		return response.data;
+	};
+
+	deleteChatPersona = async (personaId: string): Promise<void> => {
+		await this.axios.delete(
+			`${chatPersonasPath}/${encodeURIComponent(personaId)}`,
+		);
+	};
+
+	getChatAgents = async (
+		organizationId?: string,
+	): Promise<TypesGen.ChatAgent[]> => {
+		const response = await this.axios.get<TypesGen.ChatAgent[]>(
+			chatAgentsPath,
+			{ params: organizationId ? { organization: organizationId } : undefined },
+		);
+		return response.data;
+	};
+
+	createChatAgent = async (
+		req: TypesGen.CreateChatAgentRequest,
+	): Promise<TypesGen.ChatAgent> => {
+		const response = await this.axios.post<TypesGen.ChatAgent>(
+			chatAgentsPath,
+			req,
+		);
+		return response.data;
+	};
+
+	updateChatAgent = async (
+		agentId: string,
+		req: TypesGen.UpdateChatAgentRequest,
+	): Promise<TypesGen.ChatAgent> => {
+		const response = await this.axios.patch<TypesGen.ChatAgent>(
+			`${chatAgentsPath}/${encodeURIComponent(agentId)}`,
+			req,
+		);
+		return response.data;
+	};
+
+	deleteChatAgent = async (agentId: string): Promise<void> => {
+		await this.axios.delete(`${chatAgentsPath}/${encodeURIComponent(agentId)}`);
 	};
 
 	getMCPServerConfigs = async (): Promise<TypesGen.MCPServerConfig[]> => {

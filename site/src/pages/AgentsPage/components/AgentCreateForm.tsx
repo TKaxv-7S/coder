@@ -3,6 +3,7 @@ import { useQuery } from "react-query";
 import { Link } from "react-router";
 import { toast } from "sonner";
 import { isApiError } from "#/api/errors";
+import { chatAgents } from "#/api/queries/chatAgents";
 import { permittedOrganizations } from "#/api/queries/organizations";
 import type * as TypesGen from "#/api/typesGenerated";
 import type { AgentChatSendShortcut } from "#/api/typesGenerated";
@@ -52,6 +53,9 @@ export type CreateChatOptions = {
 	mcpServerIds?: string[];
 	organizationId: string;
 	planMode?: TypesGen.ChatPlanMode;
+	// Chat agent to create the chat as. Omitted for the default
+	// builtin Coder agent, which preserves the no-agent behavior.
+	agentId?: string;
 };
 
 /**
@@ -289,6 +293,30 @@ export const AgentCreateForm: FC<AgentCreateFormProps> = ({
 	const [pendingOrgChange, setPendingOrgChange] =
 		useState<TypesGen.Organization | null>(null);
 	const organizationId = selectedOrg?.id ?? "";
+	const chatAgentsQuery = useQuery(
+		chatAgents(showOrganizations ? selectedOrg?.id : undefined),
+	);
+	const availableAgents = (chatAgentsQuery.data ?? []).filter(
+		(agent) => agent.enabled,
+	);
+	const builtinCoderAgentId = availableAgents.find(
+		(agent) => agent.builtin && agent.slug === "coder",
+	)?.id;
+	const defaultAgentId = builtinCoderAgentId ?? availableAgents[0]?.id ?? "";
+	const [userSelectedAgentId, setUserSelectedAgentId] = useState("");
+	// Fall back to the default when the user selection is no longer in
+	// the list, e.g. after switching organizations.
+	const selectedAgentId = availableAgents.some(
+		(agent) => agent.id === userSelectedAgentId,
+	)
+		? userSelectedAgentId
+		: defaultAgentId;
+	// The builtin Coder agent is the implicit default; omit agent_id so
+	// creation matches today's no-agent behavior.
+	const submittedAgentId =
+		selectedAgentId && selectedAgentId !== builtinCoderAgentId
+			? selectedAgentId
+			: undefined;
 	const [planModeEnabled, setPlanModeEnabled] = useState(false);
 	const hasModelOptions = modelOptions.length > 0;
 	const hasConfiguredModels = hasConfiguredModelsInCatalog(modelCatalog);
@@ -382,6 +410,7 @@ export const AgentCreateForm: FC<AgentCreateFormProps> = ({
 			model: submittedModel,
 			reasoningEffort: effectiveReasoningEffort,
 			organizationId,
+			agentId: submittedAgentId,
 			mcpServerIds:
 				effectiveMCPServerIds.length > 0
 					? [...effectiveMCPServerIds]
@@ -543,6 +572,9 @@ export const AgentCreateForm: FC<AgentCreateFormProps> = ({
 						onModelChange={handleModelChange}
 						modelOptions={modelOptions}
 						modelSelectorPlaceholder={modelSelectorPlaceholder}
+						agentOptions={availableAgents}
+						selectedAgentId={selectedAgentId}
+						onAgentChange={setUserSelectedAgentId}
 						reasoningEffort={effectiveReasoningEffort}
 						onReasoningEffortChange={setSelectedReasoningEffort}
 						isModelCatalogLoading={isModelCatalogLoading}

@@ -1,3 +1,4 @@
+export { AgentSelector } from "./AgentSelector";
 export { CompactOrgSelector } from "./CompactOrgSelector";
 export { ConversationItem } from "./Conversation";
 export { Message, MessageContent } from "./Message";

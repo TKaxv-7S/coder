@@ -8,6 +8,7 @@ import type {
 	UserSecret,
 } from "#/api/typesGenerated";
 import { permissionChecks } from "#/modules/permissions";
+import { MockChatAgents, MockChatPersonas } from "./chatAgents";
 import * as M from "./entities";
 import { MockGroup, MockWorkspaceQuota } from "./entities";
 
@@ -429,6 +430,13 @@ export const handlers = [
 
 	http.get("/api/v2/workspaceagents/:agent/listening-ports", () => {
 		return HttpResponse.json(M.MockListeningPortsResponse);
+	}),
+
+	http.get("/api/experimental/chats/personas", () => {
+		return HttpResponse.json(MockChatPersonas);
+	}),
+	http.get("/api/experimental/chats/agents", () => {
+		return HttpResponse.json(MockChatAgents);
 	}),
 ];
 

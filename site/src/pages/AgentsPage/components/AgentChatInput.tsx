@@ -72,7 +72,11 @@ import {
 	isUploadInProgress,
 	type UploadState,
 } from "./AttachmentPreview";
-import { ModelSelector, type ModelSelectorOption } from "./ChatElements";
+import {
+	AgentSelector,
+	ModelSelector,
+	type ModelSelectorOption,
+} from "./ChatElements";
 import {
 	ChatMessageInput,
 	type ChatMessageInputRef,
@@ -119,6 +123,11 @@ interface AgentChatInputProps {
 	modelOptions: readonly ModelSelectorOption[];
 	modelSelectorPlaceholder: string;
 	hasModelOptions: boolean;
+	// Agent selector, only shown on chat creation. Agents are fixed at
+	// creation, so existing chats never pass these.
+	agentOptions?: readonly TypesGen.ChatAgent[];
+	selectedAgentId?: string;
+	onAgentChange?: (value: string) => void;
 	reasoningEffort?: string;
 	onReasoningEffortChange?: (value: string) => void;
 	planModeEnabled?: boolean;
@@ -356,6 +365,9 @@ export const AgentChatInput: FC<AgentChatInputProps> = ({
 	modelOptions,
 	modelSelectorPlaceholder,
 	hasModelOptions,
+	agentOptions,
+	selectedAgentId,
+	onAgentChange,
 	reasoningEffort,
 	onReasoningEffortChange,
 	planModeEnabled = false,
@@ -1419,6 +1431,17 @@ export const AgentChatInput: FC<AgentChatInputProps> = ({
 								)}
 							</PopoverContent>
 						</Popover>
+						{agentOptions && onAgentChange && agentOptions.length > 0 && (
+							<AgentSelector
+								value={selectedAgentId ?? ""}
+								onValueChange={onAgentChange}
+								options={agentOptions}
+								disabled={isDisabled}
+								className="md:shrink"
+								dropdownSide="top"
+								dropdownAlign="start"
+							/>
+						)}
 						{isModelCatalogLoading ? (
 							<Skeleton className="h-6 w-24 rounded" />
 						) : (

@@ -59,6 +59,8 @@ const AISettingsSidebarView: FC<AISettingsSidebarViewProps> = ({
 						</SidebarNavItem>
 						<div className="flex flex-col gap-1 ml-3 border-0 border-solid border-l border-l-border">
 							<SubNavItem href="/ai/settings/models">Models</SubNavItem>
+							<SubNavItem href="/ai/settings/personas">Personas</SubNavItem>
+							<SubNavItem href="/ai/settings/agents">Agents</SubNavItem>
 							<SubNavItem href="/ai/settings/mcp-servers">
 								MCP servers
 							</SubNavItem>

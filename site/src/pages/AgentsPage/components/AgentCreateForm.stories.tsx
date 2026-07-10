@@ -11,6 +11,7 @@ import {
 import { API } from "#/api/api";
 import type * as TypesGen from "#/api/typesGenerated";
 import { ConfirmDialog } from "#/components/Dialogs/ConfirmDialog/ConfirmDialog";
+import { MockChatAgents } from "#/testHelpers/chatAgents";
 import { MockChatModelConfig } from "#/testHelpers/chatModels";
 import {
 	MockDefaultOrganization,
@@ -120,6 +121,9 @@ const meta: Meta<typeof AgentCreateForm> = {
 	},
 	beforeEach: () => {
 		localStorage.clear();
+		spyOn(API.experimental, "getChatAgents").mockResolvedValue([
+			...MockChatAgents,
+		]);
 	},
 };
 

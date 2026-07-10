@@ -92,6 +92,7 @@ const AgentCreatePage: FC = () => {
 		mcpServerIds,
 		organizationId,
 		planMode,
+		agentId,
 	}: CreateChatOptions) => {
 		const content: TypesGen.ChatInputPart[] = [];
 		if (message.trim()) {
@@ -112,6 +113,7 @@ const AgentCreatePage: FC = () => {
 			client_type: "ui",
 			...(model ? { model_config_id: model } : {}),
 			...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
+			...(agentId ? { agent_id: agentId } : {}),
 		};
 		const createdChat = await createMutation.mutateAsync(createRequest);
 

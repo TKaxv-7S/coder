@@ -3384,6 +3384,8 @@ export const MockOrganizationPermissions: OrganizationPermissions = {
 	viewProvisionerJobs: true,
 	viewIdpSyncSettings: true,
 	editIdpSyncSettings: true,
+	createChatPersonas: true,
+	createChatAgents: true,
 };
 
 export const MockNoOrganizationPermissions: OrganizationPermissions = {
@@ -3402,6 +3404,8 @@ export const MockNoOrganizationPermissions: OrganizationPermissions = {
 	viewProvisionerJobs: false,
 	viewIdpSyncSettings: false,
 	editIdpSyncSettings: false,
+	createChatPersonas: false,
+	createChatAgents: false,
 };
 
 export const MockDeploymentConfig: DeploymentConfig = {

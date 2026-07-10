@@ -52,6 +52,41 @@ export const SharedChat: Story = {
 	},
 };
 
+export const WithChatAgent: Story = {
+	args: {
+		chatAgent: {
+			id: "agent-1",
+			slug: "reviewer",
+			name: "Reviewer",
+			icon: "",
+		},
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		expect(canvas.getByTestId("chat-agent-attribution")).toHaveTextContent(
+			"Reviewer",
+		);
+	},
+};
+
+export const WithDefaultCoderAgent: Story = {
+	args: {
+		chatAgent: {
+			id: "agent-coder",
+			slug: "coder",
+			name: "Coder",
+			icon: "",
+		},
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		// The default builtin Coder agent gets no attribution badge.
+		expect(
+			canvas.queryByTestId("chat-agent-attribution"),
+		).not.toBeInTheDocument();
+	},
+};
+
 export const WithPanelOpen: Story = {
 	args: {
 		panel: {

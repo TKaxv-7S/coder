@@ -1659,6 +1659,7 @@ const AgentChatPage: FC = () => {
 			organizationId={chatQuery.data?.organization_id}
 			chatTitle={chatTitle}
 			parentChat={parentChat}
+			chatAgent={chatQuery.data?.agent}
 			persistedError={persistedError}
 			isArchived={isArchived}
 			isSharedChat={isSharedChat}

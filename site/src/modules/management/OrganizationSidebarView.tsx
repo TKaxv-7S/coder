@@ -182,6 +182,20 @@ const OrganizationSettingsNavigation: FC<
 					Roles
 				</SettingsSidebarNavItem>
 			)}
+			{orgPermissions.createChatPersonas && (
+				<SettingsSidebarNavItem
+					href={urlForSubpage(organization.name, "chat-personas")}
+				>
+					Chat Personas
+				</SettingsSidebarNavItem>
+			)}
+			{orgPermissions.createChatAgents && (
+				<SettingsSidebarNavItem
+					href={urlForSubpage(organization.name, "chat-agents")}
+				>
+					Chat Agents
+				</SettingsSidebarNavItem>
+			)}
 			{orgPermissions.viewProvisioners &&
 				orgPermissions.viewProvisionerJobs && (
 					<>

@@ -115,6 +115,20 @@ export const organizationPermissionChecks = (organizationId: string) =>
 			},
 			action: "update",
 		},
+		createChatPersonas: {
+			object: {
+				resource_type: "chat_persona",
+				organization_id: organizationId,
+			},
+			action: "create",
+		},
+		createChatAgents: {
+			object: {
+				resource_type: "chat_agent",
+				organization_id: organizationId,
+			},
+			action: "create",
+		},
 	}) as const satisfies Record<string, AuthorizationCheck>;
 
 /**

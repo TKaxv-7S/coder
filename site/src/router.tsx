@@ -456,6 +456,41 @@ const AISettingsUpdateModelPage = lazy(
 const AISettingsMCPServersPage = lazy(
 	() => import("./pages/AISettingsPage/MCPServersPage/MCPServersPage"),
 );
+const AISettingsChatPersonasPage = lazy(
+	() => import("./pages/AISettingsPage/ChatPersonasPage/ChatPersonasPage"),
+);
+const AISettingsCreateEditChatPersonaPage = lazy(
+	() =>
+		import("./pages/AISettingsPage/ChatPersonasPage/CreateEditChatPersonaPage"),
+);
+const AISettingsChatAgentsPage = lazy(
+	() => import("./pages/AISettingsPage/ChatAgentsPage/ChatAgentsPage"),
+);
+const AISettingsCreateEditChatAgentPage = lazy(
+	() => import("./pages/AISettingsPage/ChatAgentsPage/CreateEditChatAgentPage"),
+);
+const OrganizationChatPersonasPage = lazy(
+	() =>
+		import(
+			"./pages/OrganizationSettingsPage/ChatPersonasPage/ChatPersonasPage"
+		),
+);
+const OrganizationCreateEditChatPersonaPage = lazy(
+	() =>
+		import(
+			"./pages/OrganizationSettingsPage/ChatPersonasPage/CreateEditChatPersonaPage"
+		),
+);
+const OrganizationChatAgentsPage = lazy(
+	() =>
+		import("./pages/OrganizationSettingsPage/ChatAgentsPage/ChatAgentsPage"),
+);
+const OrganizationCreateEditChatAgentPage = lazy(
+	() =>
+		import(
+			"./pages/OrganizationSettingsPage/ChatAgentsPage/CreateEditChatAgentPage"
+		),
+);
 const AISettingsAddMCPServerPage = lazy(
 	() =>
 		import(
@@ -626,6 +661,28 @@ export const router = createBrowserRouter(
 								<Route path="create" element={<CreateEditRolePage />} />
 								<Route path=":roleName" element={<CreateEditRolePage />} />
 							</Route>
+							<Route path="chat-personas">
+								<Route index element={<OrganizationChatPersonasPage />} />
+								<Route
+									path="create"
+									element={<OrganizationCreateEditChatPersonaPage />}
+								/>
+								<Route
+									path=":personaId"
+									element={<OrganizationCreateEditChatPersonaPage />}
+								/>
+							</Route>
+							<Route path="chat-agents">
+								<Route index element={<OrganizationChatAgentsPage />} />
+								<Route
+									path="create"
+									element={<OrganizationCreateEditChatAgentPage />}
+								/>
+								<Route
+									path=":agentId"
+									element={<OrganizationCreateEditChatAgentPage />}
+								/>
+							</Route>
 							<Route path="provisioners" element={<ProvisionersPage />} />
 							<Route
 								path="provisioner-jobs"
@@ -780,6 +837,24 @@ export const router = createBrowserRouter(
 							element={<AISettingsUpdateModelPage />}
 						/>
 						<Route path="mcp-servers" element={<AISettingsMCPServersPage />} />
+						<Route path="personas" element={<AISettingsChatPersonasPage />} />
+						<Route
+							path="personas/create"
+							element={<AISettingsCreateEditChatPersonaPage />}
+						/>
+						<Route
+							path="personas/:personaId"
+							element={<AISettingsCreateEditChatPersonaPage />}
+						/>
+						<Route path="agents" element={<AISettingsChatAgentsPage />} />
+						<Route
+							path="agents/create"
+							element={<AISettingsCreateEditChatAgentPage />}
+						/>
+						<Route
+							path="agents/:agentId"
+							element={<AISettingsCreateEditChatAgentPage />}
+						/>
 						<Route
 							path="mcp-servers/add"
 							element={<AISettingsAddMCPServerPage />}

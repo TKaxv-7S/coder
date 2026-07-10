@@ -115,6 +115,7 @@ interface AgentChatPageViewProps {
 	organizationId: string | undefined;
 	chatTitle: string | undefined;
 	parentChat: TypesGen.Chat | undefined;
+	chatAgent?: TypesGen.ChatAgentSummary;
 	persistedError: ChatDetailError | undefined;
 	isArchived: boolean;
 	isSharedChat: boolean;
@@ -315,6 +316,7 @@ export const AgentChatPageView: FC<AgentChatPageViewProps> = ({
 	organizationId,
 	chatTitle,
 	parentChat,
+	chatAgent,
 	persistedError,
 	isArchived,
 	isSharedChat,
@@ -829,6 +831,7 @@ export const AgentChatPageView: FC<AgentChatPageViewProps> = ({
 							<ChatTopBar
 								chatTitle={chatTitle}
 								parentChat={parentChat}
+								chatAgent={chatAgent}
 								panel={{
 									showSidebarPanel,
 									onToggleSidebar: () => onSetShowSidebarPanel((prev) => !prev),

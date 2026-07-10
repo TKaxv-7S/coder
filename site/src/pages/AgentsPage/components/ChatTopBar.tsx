@@ -1,5 +1,6 @@
 import {
 	ArrowLeftIcon,
+	BotIcon,
 	ChevronRightIcon,
 	EllipsisVerticalIcon,
 	PanelLeftIcon,
@@ -20,6 +21,7 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "#/components/DropdownMenu/DropdownMenu";
+import { ExternalImage } from "#/components/ExternalImage/ExternalImage";
 import { Popover, PopoverTrigger } from "#/components/Popover/Popover";
 import { cn } from "#/utils/cn";
 import { parsePullRequestUrl } from "../utils/pullRequest";
@@ -42,6 +44,9 @@ type ChatSharingTopBarButtonProps = {
 type ChatTopBarProps = {
 	chatTitle?: string;
 	parentChat?: TypesGen.Chat;
+	// Chat agent attribution shown next to the title. Hidden for the
+	// default builtin Coder agent.
+	chatAgent?: TypesGen.ChatAgentSummary;
 	panel: SidebarPanelState;
 	onArchiveAgent: () => void;
 	onUnarchiveAgent: () => void;
@@ -97,6 +102,7 @@ const ChatSharingTopBarButton: FC<ChatSharingTopBarButtonProps> = ({
 export const ChatTopBar: FC<ChatTopBarProps> = ({
 	chatTitle,
 	parentChat,
+	chatAgent,
 	panel,
 	onArchiveAgent,
 	onUnarchiveAgent,
@@ -188,6 +194,23 @@ export const ChatTopBar: FC<ChatTopBarProps> = ({
 						<span className="truncate text-sm text-content-primary">
 							{chatTitle}
 						</span>
+						{chatAgent && chatAgent.slug !== "coder" && chatAgent.name && (
+							<span
+								data-testid="chat-agent-attribution"
+								className="inline-flex shrink-0 items-center gap-1 rounded-full bg-surface-secondary px-2 py-0.5 text-xs font-medium text-content-secondary"
+							>
+								{chatAgent.icon ? (
+									<ExternalImage
+										alt=""
+										src={chatAgent.icon}
+										className="size-3 object-contain"
+									/>
+								) : (
+									<BotIcon aria-hidden="true" className="size-3" />
+								)}
+								{chatAgent.name}
+							</span>
+						)}
 						{isSharedChat && (
 							<UsersIcon
 								className="size-3.5 shrink-0 text-content-secondary"
