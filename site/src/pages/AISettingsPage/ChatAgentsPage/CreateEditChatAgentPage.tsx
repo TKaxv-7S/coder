@@ -6,9 +6,11 @@ import {
 	chatAgents,
 	chatPersonas,
 	createChatAgent,
+	NIL_UUID,
 	updateChatAgent,
 } from "#/api/queries/chatAgents";
 import { chatModelConfigs } from "#/api/queries/chats";
+import { ErrorAlert } from "#/components/Alert/ErrorAlert";
 import { EmptyState } from "#/components/EmptyState/EmptyState";
 import { Loader } from "#/components/Loader/Loader";
 import {
@@ -22,13 +24,12 @@ import {
 } from "#/modules/chatAgents/ChatAgentForm";
 import { RequirePermission } from "#/modules/permissions/RequirePermission";
 import { pageTitle } from "#/utils/page";
-import { NIL_UUID } from "../ChatPersonasPage/CreateEditChatPersonaPage";
 
 const CreateEditChatAgentPage: FC = () => {
 	const { permissions } = useAuthenticated();
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
-	const { agentId } = useParams() as { agentId?: string };
+	const { agentId } = useParams<{ agentId: string }>();
 
 	const agentsQuery = useQuery(chatAgents());
 	const personasQuery = useQuery(chatPersonas());
@@ -92,6 +93,8 @@ const CreateEditChatAgentPage: FC = () => {
 			</SettingsHeader>
 			{isEditing && agentsQuery.isLoading ? (
 				<Loader />
+			) : isEditing && agentsQuery.isError ? (
+				<ErrorAlert error={agentsQuery.error} />
 			) : isEditing && !editingAgent ? (
 				<EmptyState message="Agent not found" />
 			) : (
@@ -101,7 +104,12 @@ const CreateEditChatAgentPage: FC = () => {
 					modelConfigs={modelConfigsQuery.data ?? []}
 					isSaving={createMutation.isPending || updateMutation.isPending}
 					readOnly={isBuiltin}
-					error={createMutation.error ?? updateMutation.error}
+					error={
+						personasQuery.error ??
+						modelConfigsQuery.error ??
+						createMutation.error ??
+						updateMutation.error
+					}
 					onSubmit={handleSubmit}
 					onCancel={() => void navigate(listPath)}
 				/>

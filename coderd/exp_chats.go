@@ -475,7 +475,11 @@ func (api *API) listChats(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	sdkChats := db2sdk.ChatRowsWithChildren(chatRows, childRows, diffStatusesByChatID)
-	api.populateChatAgentSummariesForList(ctx, sdkChats)
+	ptrs := make([]*codersdk.Chat, len(sdkChats))
+	for i := range sdkChats {
+		ptrs[i] = &sdkChats[i]
+	}
+	api.populateChatAgentSummaries(ctx, ptrs...)
 	httpapi.Write(ctx, rw, http.StatusOK, sdkChats)
 }
 
@@ -1207,14 +1211,13 @@ func (api *API) postChats(rw http.ResponseWriter, r *http.Request) {
 	// model resolution so agent and persona model preferences can
 	// participate in the precedence chain.
 	var (
-		chatAgentID          uuid.NullUUID
-		personaSystemPrompt  string
-		agentPromptAppend    string
-		agentModelConfigID   uuid.UUID
-		personaModelConfigID uuid.UUID
+		chatAgentID         uuid.NullUUID
+		personaSystemPrompt string
+		agentPromptAppend   string
+		modelPreferences    chatAgentModelPreferences
 	)
-	if req.AgentID != nil && *req.AgentID != uuid.Nil {
-		chatAgent, chatPersona, agentStatus, agentError := api.resolveCreateChatAgent(ctx, req.OrganizationID, *req.AgentID)
+	if req.ChatAgentID != nil && *req.ChatAgentID != uuid.Nil {
+		chatAgent, chatPersona, agentStatus, agentError := api.resolveCreateChatAgent(ctx, req.OrganizationID, *req.ChatAgentID)
 		if agentError != nil {
 			httpapi.Write(ctx, rw, agentStatus, *agentError)
 			return
@@ -1223,14 +1226,14 @@ func (api *API) postChats(rw http.ResponseWriter, r *http.Request) {
 		personaSystemPrompt = chatPersona.SystemPrompt
 		agentPromptAppend = chatAgent.PromptAppend
 		if chatAgent.ModelConfigID.Valid {
-			agentModelConfigID = chatAgent.ModelConfigID.UUID
+			modelPreferences.Agent = chatAgent.ModelConfigID.UUID
 		}
 		if chatPersona.ModelConfigID.Valid {
-			personaModelConfigID = chatPersona.ModelConfigID.UUID
+			modelPreferences.Persona = chatPersona.ModelConfigID.UUID
 		}
 	}
 
-	modelConfigID, personalOverrideEffort, modelConfigStatus, modelConfigError := api.resolveCreateChatModelConfigID(ctx, apiKey.UserID, req, agentModelConfigID, personaModelConfigID)
+	modelConfigID, personalOverrideEffort, modelConfigStatus, modelConfigError := api.resolveCreateChatModelConfigID(ctx, apiKey.UserID, req, modelPreferences)
 	if modelConfigError != nil {
 		httpapi.Write(ctx, rw, modelConfigStatus, *modelConfigError)
 		return
@@ -4750,12 +4753,30 @@ func (api *API) validateCreateChatWorkspaceSelection(
 	return selection, 0, nil
 }
 
+// chatAgentModelPreferences carries the model preferences a chat agent
+// contributes to chat creation. The agent's override takes precedence
+// over its persona's preference.
+type chatAgentModelPreferences struct {
+	Agent   uuid.UUID
+	Persona uuid.UUID
+}
+
+// ordered returns the non-nil preferences in precedence order.
+func (p chatAgentModelPreferences) ordered() []uuid.UUID {
+	ordered := make([]uuid.UUID, 0, 2)
+	for _, id := range []uuid.UUID{p.Agent, p.Persona} {
+		if id != uuid.Nil {
+			ordered = append(ordered, id)
+		}
+	}
+	return ordered
+}
+
 func (api *API) resolveCreateChatModelConfigID(
 	ctx context.Context,
 	userID uuid.UUID,
 	req codersdk.CreateChatRequest,
-	agentModelConfigID uuid.UUID,
-	personaModelConfigID uuid.UUID,
+	preferences chatAgentModelPreferences,
 ) (uuid.UUID, *string, int, *codersdk.Response) {
 	if req.ModelConfigID != nil {
 		if *req.ModelConfigID == uuid.Nil {
@@ -4769,10 +4790,7 @@ func (api *API) resolveCreateChatModelConfigID(
 	// Agent and persona model preferences apply after an explicit
 	// request override and before personal overrides. An unavailable
 	// preference falls through to the next tier rather than erroring.
-	for _, preferred := range []uuid.UUID{agentModelConfigID, personaModelConfigID} {
-		if preferred == uuid.Nil {
-			continue
-		}
+	for _, preferred := range preferences.ordered() {
 		_, reason, err := api.userCanUseChatModelConfig(ctx, userID, preferred)
 		if err != nil {
 			return uuid.Nil, nil, http.StatusInternalServerError, &codersdk.Response{

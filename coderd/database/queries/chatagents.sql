@@ -82,8 +82,10 @@ WHERE
 RETURNING *;
 
 -- name: UpdateChatAgentDeletedByID :exec
--- Soft delete keeps the row so chats referencing the agent retain FK
--- integrity.
+-- Soft delete keeps the row so attribution lookups on existing chats
+-- (GetChatAgentsByIDs) still resolve the agent's identity. There is no
+-- foreign key from chats because chats may reference in-memory builtin
+-- agents.
 UPDATE
     chat_agents
 SET
@@ -91,3 +93,15 @@ SET
     updated_at = now()
 WHERE
     id = @id::uuid;
+
+-- name: CountChatAgentsByPersonaID :one
+-- Counts non-deleted agents referencing a persona. Used to block
+-- persona deletion while agents still depend on it; there is no
+-- foreign key because agents may reference in-memory builtin personas.
+SELECT
+    COUNT(*)
+FROM
+    chat_agents
+WHERE
+    persona_id = @persona_id::uuid
+    AND deleted = FALSE;

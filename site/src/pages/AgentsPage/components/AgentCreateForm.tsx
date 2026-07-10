@@ -3,7 +3,7 @@ import { useQuery } from "react-query";
 import { Link } from "react-router";
 import { toast } from "sonner";
 import { isApiError } from "#/api/errors";
-import { chatAgents } from "#/api/queries/chatAgents";
+import { chatAgents, isDefaultCoderAgent } from "#/api/queries/chatAgents";
 import { permittedOrganizations } from "#/api/queries/organizations";
 import type * as TypesGen from "#/api/typesGenerated";
 import type { AgentChatSendShortcut } from "#/api/typesGenerated";
@@ -299,9 +299,7 @@ export const AgentCreateForm: FC<AgentCreateFormProps> = ({
 	const availableAgents = (chatAgentsQuery.data ?? []).filter(
 		(agent) => agent.enabled,
 	);
-	const builtinCoderAgentId = availableAgents.find(
-		(agent) => agent.builtin && agent.slug === "coder",
-	)?.id;
+	const builtinCoderAgentId = availableAgents.find(isDefaultCoderAgent)?.id;
 	const defaultAgentId = builtinCoderAgentId ?? availableAgents[0]?.id ?? "";
 	const [userSelectedAgentId, setUserSelectedAgentId] = useState("");
 	// Fall back to the default when the user selection is no longer in
@@ -311,7 +309,7 @@ export const AgentCreateForm: FC<AgentCreateFormProps> = ({
 	)
 		? userSelectedAgentId
 		: defaultAgentId;
-	// The builtin Coder agent is the implicit default; omit agent_id so
+	// The builtin Coder agent is the implicit default; omit chat_agent_id so
 	// creation matches today's no-agent behavior.
 	const submittedAgentId =
 		selectedAgentId && selectedAgentId !== builtinCoderAgentId
@@ -403,12 +401,22 @@ export const AgentCreateForm: FC<AgentCreateFormProps> = ({
 
 	const handleSend = async (message: string, fileIDs?: string[]) => {
 		submitDraft();
+		// When a custom agent is selected and the user never touched
+		// the model selector, omit the model so the server applies the
+		// documented precedence: agent override, then persona
+		// preference, then the normal model resolution. Sending the
+		// displayed fallback model here would silently override the
+		// agent's configured model preference.
+		const model =
+			submittedAgentId && !hasValidUserSelectedModel
+				? undefined
+				: submittedModel;
 		await onCreateChat({
 			message,
 			fileIDs,
 			workspaceId: effectiveWorkspaceId ?? undefined,
-			model: submittedModel,
-			reasoningEffort: effectiveReasoningEffort,
+			model,
+			reasoningEffort: model ? effectiveReasoningEffort : undefined,
 			organizationId,
 			agentId: submittedAgentId,
 			mcpServerIds:

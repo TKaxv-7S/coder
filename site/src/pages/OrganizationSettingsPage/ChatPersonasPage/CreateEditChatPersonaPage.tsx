@@ -5,9 +5,11 @@ import { toast } from "sonner";
 import {
 	chatPersonas,
 	createChatPersona,
+	NIL_UUID,
 	updateChatPersona,
 } from "#/api/queries/chatAgents";
 import { chatModelConfigs } from "#/api/queries/chats";
+import { ErrorAlert } from "#/components/Alert/ErrorAlert";
 import { EmptyState } from "#/components/EmptyState/EmptyState";
 import { Loader } from "#/components/Loader/Loader";
 import {
@@ -20,17 +22,16 @@ import {
 } from "#/modules/chatAgents/ChatPersonaForm";
 import { useOrganizationSettings } from "#/modules/management/OrganizationSettingsLayout";
 import { RequirePermission } from "#/modules/permissions/RequirePermission";
-import { NIL_UUID } from "#/pages/AISettingsPage/ChatPersonasPage/CreateEditChatPersonaPage";
 import { pageTitle } from "#/utils/page";
 
 const CreateEditChatPersonaPage: FC = () => {
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
 	const { organization, organizationPermissions } = useOrganizationSettings();
-	const { organization: organizationName, personaId } = useParams() as {
+	const { organization: organizationName, personaId } = useParams<{
 		organization: string;
-		personaId?: string;
-	};
+		personaId: string;
+	}>();
 
 	const personasQuery = useQuery(chatPersonas(organization?.id));
 	const modelConfigsQuery = useQuery(chatModelConfigs());
@@ -110,6 +111,8 @@ const CreateEditChatPersonaPage: FC = () => {
 			</SettingsHeader>
 			{isEditing && personasQuery.isLoading ? (
 				<Loader />
+			) : isEditing && personasQuery.isError ? (
+				<ErrorAlert error={personasQuery.error} />
 			) : isEditing && !editingPersona ? (
 				<EmptyState message="Persona not found" />
 			) : (
@@ -118,7 +121,11 @@ const CreateEditChatPersonaPage: FC = () => {
 					modelConfigs={modelConfigsQuery.data ?? []}
 					isSaving={createMutation.isPending || updateMutation.isPending}
 					readOnly={isReadOnly}
-					error={createMutation.error ?? updateMutation.error}
+					error={
+						modelConfigsQuery.error ??
+						createMutation.error ??
+						updateMutation.error
+					}
 					onSubmit={handleSubmit}
 					onCancel={() => void navigate(listPath)}
 				/>

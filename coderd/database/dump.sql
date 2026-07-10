@@ -5158,7 +5158,7 @@ ALTER TABLE ONLY boundary_sessions
     ADD CONSTRAINT boundary_sessions_workspace_agent_id_fkey FOREIGN KEY (workspace_agent_id) REFERENCES workspace_agents(id);
 
 ALTER TABLE ONLY chat_agents
-    ADD CONSTRAINT chat_agents_created_by_fkey FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE;
+    ADD CONSTRAINT chat_agents_created_by_fkey FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT;
 
 ALTER TABLE ONLY chat_agents
     ADD CONSTRAINT chat_agents_model_config_id_fkey FOREIGN KEY (model_config_id) REFERENCES chat_model_configs(id);
@@ -5212,7 +5212,7 @@ ALTER TABLE ONLY chat_model_configs
     ADD CONSTRAINT chat_model_configs_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES users(id);
 
 ALTER TABLE ONLY chat_personas
-    ADD CONSTRAINT chat_personas_created_by_fkey FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE;
+    ADD CONSTRAINT chat_personas_created_by_fkey FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT;
 
 ALTER TABLE ONLY chat_personas
     ADD CONSTRAINT chat_personas_model_config_id_fkey FOREIGN KEY (model_config_id) REFERENCES chat_model_configs(id);

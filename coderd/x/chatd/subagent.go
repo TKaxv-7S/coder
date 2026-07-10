@@ -1106,7 +1106,7 @@ func (p *Server) createChildSubagentChatWithOptions(
 	// child chat creation does not hold one DB connection while waiting
 	// for another pool checkout. An active persona replaces the
 	// built-in default as the base prompt.
-	deploymentPrompt := p.resolveDeploymentSystemPromptWithBase(ctx, chatBasePrompt(opts.personaSystemPrompt))
+	deploymentPrompt := p.resolveDeploymentSystemPrompt(ctx, opts.personaSystemPrompt)
 	// Delegated chats cannot call list_agents or message_agent, so
 	// strip the root-only orchestration guidance from their prompt.
 	deploymentPrompt = strings.Replace(deploymentPrompt, subagentOrchestrationPromptBlock, "", 1)

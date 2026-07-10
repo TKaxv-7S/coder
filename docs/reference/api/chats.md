@@ -32,6 +32,7 @@ Experimental: this endpoint is subject to change.
 [
   {
     "agent": {
+      "builtin": true,
       "icon": "string",
       "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
       "name": "string",
@@ -152,6 +153,7 @@ Status Code **200**
 |---------------------------|------------------------------------------------------------------------------------|----------|--------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `[array item]`            | array                                                                              | false    |              |                                                                                                                                                                                                                                                                            |
 | `» agent`                 | [codersdk.ChatAgentSummary](schemas.md#codersdkchatagentsummary)                   | false    |              | Agent identifies the chat agent this chat was created as, if any. Slug, name, and icon are populated on the main chat read endpoints; compact payloads such as watch events carry only the ID.                                                                             |
+| `»» builtin`              | boolean                                                                            | false    |              |                                                                                                                                                                                                                                                                            |
 | `»» icon`                 | string                                                                             | false    |              |                                                                                                                                                                                                                                                                            |
 | `»» id`                   | string(uuid)                                                                       | false    |              |                                                                                                                                                                                                                                                                            |
 | `»» name`                 | string                                                                             | false    |              |                                                                                                                                                                                                                                                                            |
@@ -265,7 +267,7 @@ Experimental: this endpoint is subject to change.
 
 ```json
 {
-  "agent_id": "2b1e3b65-2c04-4fa2-a2d7-467901e98978",
+  "chat_agent_id": "2172da74-33d6-40c9-906a-0f2db44ab49a",
   "client_type": "ui",
   "content": [
     {
@@ -316,6 +318,7 @@ Experimental: this endpoint is subject to change.
 ```json
 {
   "agent": {
+    "builtin": true,
     "icon": "string",
     "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
     "name": "string",
@@ -327,6 +330,7 @@ Experimental: this endpoint is subject to change.
   "children": [
     {
       "agent": {
+        "builtin": true,
         "icon": "string",
         "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
         "name": "string",
@@ -1142,6 +1146,7 @@ Experimental: this endpoint is subject to change.
 {
   "chat": {
     "agent": {
+      "builtin": true,
       "icon": "string",
       "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
       "name": "string",
@@ -1292,6 +1297,7 @@ Experimental: this endpoint is subject to change.
 ```json
 {
   "agent": {
+    "builtin": true,
     "icon": "string",
     "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
     "name": "string",
@@ -1303,6 +1309,7 @@ Experimental: this endpoint is subject to change.
   "children": [
     {
       "agent": {
+        "builtin": true,
         "icon": "string",
         "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
         "name": "string",
@@ -1581,6 +1588,7 @@ Experimental: this endpoint is subject to change.
 ```json
 {
   "agent": {
+    "builtin": true,
     "icon": "string",
     "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
     "name": "string",
@@ -1592,6 +1600,7 @@ Experimental: this endpoint is subject to change.
   "children": [
     {
       "agent": {
+        "builtin": true,
         "icon": "string",
         "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
         "name": "string",
@@ -1868,6 +1877,7 @@ Experimental: this endpoint is subject to change.
 ```json
 {
   "agent": {
+    "builtin": true,
     "icon": "string",
     "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
     "name": "string",
@@ -1879,6 +1889,7 @@ Experimental: this endpoint is subject to change.
   "children": [
     {
       "agent": {
+        "builtin": true,
         "icon": "string",
         "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
         "name": "string",
@@ -2724,6 +2735,7 @@ Experimental: this endpoint is subject to change.
 ```json
 {
   "agent": {
+    "builtin": true,
     "icon": "string",
     "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
     "name": "string",
@@ -2735,6 +2747,7 @@ Experimental: this endpoint is subject to change.
   "children": [
     {
       "agent": {
+        "builtin": true,
         "icon": "string",
         "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
         "name": "string",
@@ -3336,6 +3349,7 @@ Experimental: this endpoint is subject to change.
 ```json
 {
   "agent": {
+    "builtin": true,
     "icon": "string",
     "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
     "name": "string",
@@ -3347,6 +3361,7 @@ Experimental: this endpoint is subject to change.
   "children": [
     {
       "agent": {
+        "builtin": true,
         "icon": "string",
         "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
         "name": "string",

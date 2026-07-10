@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { type FC, Fragment, type ReactNode, useState } from "react";
 import { Link, useLocation } from "react-router";
+import { isDefaultCoderAgent } from "#/api/queries/chatAgents";
 import type * as TypesGen from "#/api/typesGenerated";
 import type { ChatDiffStatus } from "#/api/typesGenerated";
 import { Button } from "#/components/Button/Button";
@@ -194,7 +195,7 @@ export const ChatTopBar: FC<ChatTopBarProps> = ({
 						<span className="truncate text-sm text-content-primary">
 							{chatTitle}
 						</span>
-						{chatAgent && chatAgent.slug !== "coder" && chatAgent.name && (
+						{chatAgent && !isDefaultCoderAgent(chatAgent) && chatAgent.name && (
 							<span
 								data-testid="chat-agent-attribution"
 								className="inline-flex shrink-0 items-center gap-1 rounded-full bg-surface-secondary px-2 py-0.5 text-xs font-medium text-content-secondary"

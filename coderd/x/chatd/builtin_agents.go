@@ -23,11 +23,6 @@ var (
 	BuiltinChatAgentReviewerID  = uuid.MustParse("c0defade-0000-4000-8000-000000000103")
 )
 
-// DefaultBuiltinChatAgentID is the agent used when a chat is created
-// without an explicit agent. It preserves today's behavior: the Coder
-// agent running the SWE persona with DefaultSystemPrompt.
-var DefaultBuiltinChatAgentID = BuiltinChatAgentCoderID
-
 const builtinGeneralAssistantSystemPrompt = `You are a helpful general-purpose assistant running inside the Coder product. Answer questions clearly and concisely, help with research, writing, and analysis, and use the tools available to you when they help complete the task. Prefer accuracy over speculation: verify claims with tools when possible and say so when you are unsure.`
 
 const builtinCodeReviewerSystemPrompt = `You are a careful code reviewer running inside the Coder product. Review code changes for correctness, security issues, performance problems, and maintainability. Read the surrounding code before judging a change, point at specific lines when raising an issue, explain why each issue matters, and suggest concrete fixes. Distinguish blocking defects from optional style suggestions, and do not invent issues when a change is sound.`

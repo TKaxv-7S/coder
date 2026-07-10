@@ -1,6 +1,7 @@
 package chatd
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -274,4 +275,183 @@ func TestBuildSpawnAgentDescriptionListsChatAgents(t *testing.T) {
 	require.Contains(t, description, subagentTypeChatAgentPrefix+"coder")
 	require.Contains(t, description, subagentTypeChatAgentPrefix+"catalog-agent")
 	require.Contains(t, description, "Reviews catalog entries.")
+}
+
+// TestCreateChatWithPersonaIgnoresIncludeDefaultToggle verifies that
+// the deployment include-default-system-prompt toggle governs only the
+// built-in default: an explicitly selected persona prompt is always
+// included, while no-persona chats keep the toggle's existing behavior.
+func TestCreateChatWithPersonaIgnoresIncludeDefaultToggle(t *testing.T) {
+	t.Parallel()
+
+	const personaPrompt = "You are the toggle-test persona."
+
+	db, ps := dbtestutil.NewDB(t)
+	server := newInternalTestServer(t, db, ps, chatprovider.ProviderAPIKeys{})
+
+	ctx := chatdTestContext(t)
+	user, org, model := seedInternalChatDeps(t, db)
+	require.NoError(t, db.UpsertChatIncludeDefaultSystemPrompt(ctx, false))
+	require.NoError(t, db.UpsertChatSystemPrompt(ctx, "Admin custom prompt text."))
+
+	persona := dbgen.ChatPersona(t, db, database.ChatPersona{
+		Slug:         "toggle-persona",
+		SystemPrompt: personaPrompt,
+		CreatedBy:    user.ID,
+	})
+	agent := dbgen.ChatAgent(t, db, database.ChatAgent{
+		Slug:      "toggle-agent",
+		PersonaID: persona.ID,
+		CreatedBy: user.ID,
+	})
+
+	chat, err := server.CreateChat(ctx, CreateOptions{
+		OrganizationID:      org.ID,
+		OwnerID:             user.ID,
+		APIKeyID:            testAPIKeyID(t, db, user.ID),
+		Title:               "toggle persona chat",
+		ModelConfigID:       model.ID,
+		InitialUserContent:  []codersdk.ChatMessagePart{codersdk.ChatMessageText("hello")},
+		ChatAgentID:         uuid.NullUUID{UUID: agent.ID, Valid: true},
+		PersonaSystemPrompt: persona.SystemPrompt,
+	})
+	require.NoError(t, err)
+
+	msgs, err := db.GetChatMessagesForPromptByChatID(ctx, chat.ID)
+	require.NoError(t, err)
+	texts := messageTexts(t, msgs)
+	require.NotEmpty(t, texts)
+	// The persona prompt survives the disabled toggle, with the admin
+	// custom prompt appended after it.
+	require.Contains(t, texts[0], personaPrompt)
+	require.Contains(t, texts[0], "Admin custom prompt text.")
+	require.NotContains(t, texts[0], "You are the Coder agent")
+
+	// A no-persona chat keeps the toggle's behavior: the built-in
+	// default is suppressed and only the custom prompt remains.
+	plainChat, err := server.CreateChat(ctx, CreateOptions{
+		OrganizationID:     org.ID,
+		OwnerID:            user.ID,
+		APIKeyID:           testAPIKeyID(t, db, user.ID),
+		Title:              "toggle default chat",
+		ModelConfigID:      model.ID,
+		InitialUserContent: []codersdk.ChatMessagePart{codersdk.ChatMessageText("hello")},
+	})
+	require.NoError(t, err)
+	plainMsgs, err := db.GetChatMessagesForPromptByChatID(ctx, plainChat.ID)
+	require.NoError(t, err)
+	plainTexts := messageTexts(t, plainMsgs)
+	require.NotEmpty(t, plainTexts)
+	require.NotContains(t, plainTexts[0], "You are the Coder agent")
+	require.Contains(t, plainTexts[0], "Admin custom prompt text.")
+}
+
+// TestSpawnAgentCatalogCapAndResolution verifies that the enumerated
+// catalog is capped while slug resolution searches the full set, so an
+// agent past the cap remains spawnable by exact slug.
+func TestSpawnAgentCatalogCapAndResolution(t *testing.T) {
+	t.Parallel()
+
+	db, ps := dbtestutil.NewDB(t)
+	server := newInternalTestServer(t, db, ps, chatprovider.ProviderAPIKeys{})
+
+	ctx := chatdTestContext(t)
+	user, org, model := seedInternalChatDeps(t, db)
+
+	// More custom agents than the cap leaves room for after the
+	// builtins. The zzz-agent's name sorts last so it falls past the
+	// cap.
+	for i := 0; i < maxSpawnAgentCatalogEntries; i++ {
+		dbgen.ChatAgent(t, db, database.ChatAgent{
+			OrganizationID: uuid.NullUUID{UUID: org.ID, Valid: true},
+			Slug:           fmt.Sprintf("cap-agent-%02d", i),
+			Name:           fmt.Sprintf("Cap Agent %02d", i),
+			CreatedBy:      user.ID,
+		})
+	}
+	overshoot := dbgen.ChatAgent(t, db, database.ChatAgent{
+		OrganizationID: uuid.NullUUID{UUID: org.ID, Valid: true},
+		Slug:           "zzz-agent",
+		Name:           "Zzz Agent",
+		CreatedBy:      user.ID,
+	})
+	parentChat := createInternalParentChat(
+		ctx, t, server, db, org.ID, user.ID, model.ID, "parent-cap",
+	)
+
+	enumerated := enumeratedChatAgentsForChat(ctx, server, parentChat)
+	require.Len(t, enumerated, maxSpawnAgentCatalogEntries)
+	for _, agent := range enumerated {
+		require.NotEqual(t, overshoot.Slug, agent.Slug)
+	}
+
+	// Resolution ignores the cap: the overshoot agent still resolves.
+	resolved, _, err := resolveChatAgentBySlugForChat(ctx, server, parentChat, overshoot.Slug)
+	require.NoError(t, err)
+	require.Equal(t, overshoot.ID, resolved.ID)
+}
+
+// TestSpawnAgentSlugScopePrecedence verifies that when an organization
+// agent and a deployment agent share a slug, the organization agent
+// wins and the enumeration lists the slug once.
+func TestSpawnAgentSlugScopePrecedence(t *testing.T) {
+	t.Parallel()
+
+	db, ps := dbtestutil.NewDB(t)
+	server := newInternalTestServer(t, db, ps, chatprovider.ProviderAPIKeys{})
+
+	ctx := chatdTestContext(t)
+	user, org, model := seedInternalChatDeps(t, db)
+
+	dbgen.ChatAgent(t, db, database.ChatAgent{
+		Slug:      "shared-slug",
+		Name:      "Deployment Shared",
+		CreatedBy: user.ID,
+	})
+	orgAgent := dbgen.ChatAgent(t, db, database.ChatAgent{
+		OrganizationID: uuid.NullUUID{UUID: org.ID, Valid: true},
+		Slug:           "shared-slug",
+		Name:           "Org Shared",
+		CreatedBy:      user.ID,
+	})
+	parentChat := createInternalParentChat(
+		ctx, t, server, db, org.ID, user.ID, model.ID, "parent-precedence",
+	)
+
+	resolved, _, err := resolveChatAgentBySlugForChat(ctx, server, parentChat, "shared-slug")
+	require.NoError(t, err)
+	require.Equal(t, orgAgent.ID, resolved.ID)
+
+	enumerated := enumeratedChatAgentsForChat(ctx, server, parentChat)
+	count := 0
+	for _, agent := range enumerated {
+		if agent.Slug == "shared-slug" {
+			count++
+			require.Equal(t, orgAgent.ID, agent.ID)
+		}
+	}
+	require.Equal(t, 1, count)
+}
+
+// TestSpawnAgentPlanModeUnavailable verifies that agent:<slug> types
+// are neither enumerated nor resolvable during plan-mode turns.
+func TestSpawnAgentPlanModeUnavailable(t *testing.T) {
+	t.Parallel()
+
+	db, ps := dbtestutil.NewDB(t)
+	server := newInternalTestServer(t, db, ps, chatprovider.ProviderAPIKeys{})
+
+	ctx := chatdTestContext(t)
+	user, org, model := seedInternalChatDeps(t, db)
+	parentChat := createInternalParentChat(
+		ctx, t, server, db, org.ID, user.ID, model.ID, "parent-plan-mode",
+	)
+	parentChat.PlanMode = database.NullChatPlanMode{
+		ChatPlanMode: database.ChatPlanModePlan,
+		Valid:        true,
+	}
+
+	require.Empty(t, enumeratedChatAgentsForChat(ctx, server, parentChat))
+	_, _, err := resolveChatAgentBySlugForChat(ctx, server, parentChat, "coder")
+	require.ErrorContains(t, err, "unavailable in plan mode")
 }

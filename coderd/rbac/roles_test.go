@@ -1493,7 +1493,8 @@ func TestRolePermissions(t *testing.T) {
 		},
 		{
 			// The site-wide member read grant applies to org-scoped
-			// personas too, so every member can read them.
+			// personas too at the RBAC layer; the list API enforces
+			// org membership before returning org-scoped entries.
 			Name:     "ChatPersonaOrgRead",
 			Actions:  []policy.Action{policy.ActionRead},
 			Resource: rbac.ResourceChatPersona.WithID(uuid.New()).InOrg(orgID),
@@ -1535,7 +1536,8 @@ func TestRolePermissions(t *testing.T) {
 		},
 		{
 			// The site-wide member read grant applies to org-scoped
-			// agents too, so every member can read them.
+			// agents too at the RBAC layer; the list API enforces
+			// org membership before returning org-scoped entries.
 			Name:     "ChatAgentOrgRead",
 			Actions:  []policy.Action{policy.ActionRead},
 			Resource: rbac.ResourceChatAgent.WithID(uuid.New()).InOrg(orgID),

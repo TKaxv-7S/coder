@@ -17219,6 +17219,9 @@ const docTemplate = `{
         "codersdk.ChatAgentSummary": {
             "type": "object",
             "properties": {
+                "builtin": {
+                    "type": "boolean"
+                },
                 "icon": {
                     "type": "string"
                 },
@@ -18772,8 +18775,8 @@ const docTemplate = `{
         "codersdk.CreateChatRequest": {
             "type": "object",
             "properties": {
-                "agent_id": {
-                    "description": "AgentID selects the chat agent (builtin or database) whose\npersona supplies the base system prompt. Nil preserves the\ndefault behavior (the builtin Coder agent).",
+                "chat_agent_id": {
+                    "description": "ChatAgentID selects the chat agent (builtin or database) whose\npersona supplies the base system prompt. Nil preserves the\ndefault behavior (the builtin Coder agent). Distinct from the\nworkspace agent carried on Chat.AgentID.",
                     "type": "string",
                     "format": "uuid"
                 },

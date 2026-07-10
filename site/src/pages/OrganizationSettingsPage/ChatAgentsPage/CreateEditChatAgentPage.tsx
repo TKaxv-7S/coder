@@ -6,9 +6,11 @@ import {
 	chatAgents,
 	chatPersonas,
 	createChatAgent,
+	NIL_UUID,
 	updateChatAgent,
 } from "#/api/queries/chatAgents";
 import { chatModelConfigs } from "#/api/queries/chats";
+import { ErrorAlert } from "#/components/Alert/ErrorAlert";
 import { EmptyState } from "#/components/EmptyState/EmptyState";
 import { Loader } from "#/components/Loader/Loader";
 import {
@@ -21,17 +23,16 @@ import {
 } from "#/modules/chatAgents/ChatAgentForm";
 import { useOrganizationSettings } from "#/modules/management/OrganizationSettingsLayout";
 import { RequirePermission } from "#/modules/permissions/RequirePermission";
-import { NIL_UUID } from "#/pages/AISettingsPage/ChatPersonasPage/CreateEditChatPersonaPage";
 import { pageTitle } from "#/utils/page";
 
 const CreateEditChatAgentPage: FC = () => {
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
 	const { organization, organizationPermissions } = useOrganizationSettings();
-	const { organization: organizationName, agentId } = useParams() as {
+	const { organization: organizationName, agentId } = useParams<{
 		organization: string;
-		agentId?: string;
-	};
+		agentId: string;
+	}>();
 
 	const agentsQuery = useQuery(chatAgents(organization?.id));
 	const personasQuery = useQuery(chatPersonas(organization?.id));
@@ -114,6 +115,8 @@ const CreateEditChatAgentPage: FC = () => {
 			</SettingsHeader>
 			{isEditing && agentsQuery.isLoading ? (
 				<Loader />
+			) : isEditing && agentsQuery.isError ? (
+				<ErrorAlert error={agentsQuery.error} />
 			) : isEditing && !editingAgent ? (
 				<EmptyState message="Agent not found" />
 			) : (
@@ -123,7 +126,12 @@ const CreateEditChatAgentPage: FC = () => {
 					modelConfigs={modelConfigsQuery.data ?? []}
 					isSaving={createMutation.isPending || updateMutation.isPending}
 					readOnly={isReadOnly}
-					error={createMutation.error ?? updateMutation.error}
+					error={
+						personasQuery.error ??
+						modelConfigsQuery.error ??
+						createMutation.error ??
+						updateMutation.error
+					}
 					onSubmit={handleSubmit}
 					onCancel={() => void navigate(listPath)}
 				/>

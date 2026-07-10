@@ -2,6 +2,7 @@ package coderd_test
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -11,6 +12,7 @@ import (
 	"github.com/coder/coder/v2/coderd/rbac"
 	"github.com/coder/coder/v2/coderd/util/ptr"
 	"github.com/coder/coder/v2/coderd/x/chatd"
+	"github.com/coder/coder/v2/coderd/x/chatd/chattest"
 	"github.com/coder/coder/v2/codersdk"
 	"github.com/coder/coder/v2/enterprise/coderd/coderdenttest"
 	"github.com/coder/coder/v2/enterprise/coderd/license"
@@ -194,6 +196,28 @@ func TestChatPersonasCRUD(t *testing.T) {
 				req:    codersdk.CreateChatPersonaRequest{Slug: "swe", Name: "Fake SWE", SystemPrompt: "prompt"},
 				status: http.StatusConflict,
 			},
+			{
+				name: "SlugTooLong",
+				req: codersdk.CreateChatPersonaRequest{
+					Slug: strings.Repeat("a", 65), Name: "Long Slug", SystemPrompt: "prompt",
+				},
+				status: http.StatusBadRequest,
+			},
+			{
+				name: "NameTooLong",
+				req: codersdk.CreateChatPersonaRequest{
+					Slug: "long-name", Name: strings.Repeat("a", 65), SystemPrompt: "prompt",
+				},
+				status: http.StatusBadRequest,
+			},
+			{
+				name: "DescriptionTooLong",
+				req: codersdk.CreateChatPersonaRequest{
+					Slug: "long-description", Name: "Long Description",
+					SystemPrompt: "prompt", Description: strings.Repeat("a", 513),
+				},
+				status: http.StatusBadRequest,
+			},
 		}
 		for _, tc := range cases {
 			_, err := exp.CreateChatPersona(ctx, tc.req)
@@ -213,6 +237,89 @@ func TestChatPersonasCRUD(t *testing.T) {
 		var sdkErr *codersdk.Error
 		require.ErrorAs(t, err, &sdkErr)
 		require.Equal(t, http.StatusConflict, sdkErr.StatusCode())
+	})
+
+	t.Run("UpdateValidation", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := testutil.Context(t, testutil.WaitLong)
+		client, _ := chatAgentsTestClient(t)
+		exp := codersdk.NewExperimentalClient(client)
+
+		persona, err := exp.CreateChatPersona(ctx, codersdk.CreateChatPersonaRequest{
+			Slug: "update-validation", Name: "Update Validation", SystemPrompt: "prompt",
+		})
+		require.NoError(t, err)
+
+		cases := []struct {
+			name string
+			req  codersdk.UpdateChatPersonaRequest
+		}{
+			{name: "EmptyName", req: codersdk.UpdateChatPersonaRequest{Name: ptr.Ref("")}},
+			{name: "EmptySystemPrompt", req: codersdk.UpdateChatPersonaRequest{SystemPrompt: ptr.Ref(" ")}},
+			{name: "UnknownModelConfig", req: codersdk.UpdateChatPersonaRequest{ModelConfigID: ptr.Ref(uuid.New())}},
+			{name: "NameTooLong", req: codersdk.UpdateChatPersonaRequest{Name: ptr.Ref(strings.Repeat("a", 65))}},
+		}
+		for _, tc := range cases {
+			_, err := exp.UpdateChatPersona(ctx, persona.ID, tc.req)
+			var sdkErr *codersdk.Error
+			require.ErrorAs(t, err, &sdkErr, "case %s", tc.name)
+			require.Equal(t, http.StatusBadRequest, sdkErr.StatusCode(), "case %s", tc.name)
+		}
+
+		// A zero model config ID clears the preference.
+		provider, err := exp.CreateAIProvider(ctx, codersdk.CreateAIProviderRequest{
+			Type:    codersdk.AIProviderType(coderdtest.TestChatProviderOpenAICompat),
+			Name:    "persona-update-" + uuid.NewString(),
+			BaseURL: chattest.OpenAI(t),
+			Enabled: true,
+			APIKeys: []string{coderdtest.TestChatProviderAPIKey},
+		})
+		require.NoError(t, err)
+		contextLimit := int64(4096)
+		modelConfig, err := exp.CreateChatModelConfig(ctx, codersdk.CreateChatModelConfigRequest{
+			AIProviderID: &provider.ID,
+			Model:        coderdtest.TestChatModelOpenAICompat,
+			ContextLimit: &contextLimit,
+		})
+		require.NoError(t, err)
+		updated, err := exp.UpdateChatPersona(ctx, persona.ID, codersdk.UpdateChatPersonaRequest{
+			ModelConfigID: &modelConfig.ID,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, updated.ModelConfigID)
+		updated, err = exp.UpdateChatPersona(ctx, persona.ID, codersdk.UpdateChatPersonaRequest{
+			ModelConfigID: ptr.Ref(uuid.Nil),
+		})
+		require.NoError(t, err)
+		require.Nil(t, updated.ModelConfigID)
+	})
+
+	t.Run("DeleteReferencedPersona", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := testutil.Context(t, testutil.WaitLong)
+		client, _ := chatAgentsTestClient(t)
+		exp := codersdk.NewExperimentalClient(client)
+
+		persona, err := exp.CreateChatPersona(ctx, codersdk.CreateChatPersonaRequest{
+			Slug: "referenced-persona", Name: "Referenced", SystemPrompt: "prompt",
+		})
+		require.NoError(t, err)
+		agent, err := exp.CreateChatAgent(ctx, codersdk.CreateChatAgentRequest{
+			Slug: "referencing-agent", Name: "Referencing", PersonaID: persona.ID,
+		})
+		require.NoError(t, err)
+
+		// Deletion is blocked while an agent references the persona.
+		err = exp.DeleteChatPersona(ctx, persona.ID)
+		var sdkErr *codersdk.Error
+		require.ErrorAs(t, err, &sdkErr)
+		require.Equal(t, http.StatusConflict, sdkErr.StatusCode())
+
+		// Deleting the agent unblocks the persona.
+		require.NoError(t, exp.DeleteChatAgent(ctx, agent.ID))
+		require.NoError(t, exp.DeleteChatPersona(ctx, persona.ID))
 	})
 
 	t.Run("BuiltinImmutable", func(t *testing.T) {

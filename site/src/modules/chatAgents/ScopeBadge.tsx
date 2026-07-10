@@ -30,28 +30,24 @@ export const isEditableInScope = (
 		: !entry.organization_id;
 };
 
-const scopeLabels: Record<ChatCatalogScope, string> = {
-	builtin: "Builtin",
-	deployment: "Deployment",
-	organization: "Organization",
+const scopeBadgeProps: Record<
+	ChatCatalogScope,
+	{ label: string; variant: "purple" | "green" | "default" }
+> = {
+	builtin: { label: "Builtin", variant: "purple" },
+	deployment: { label: "Deployment", variant: "default" },
+	organization: { label: "Organization", variant: "green" },
 };
 
 export const ScopeBadge: FC<{ scope: ChatCatalogScope }> = ({ scope }) => (
-	<Badge
-		size="sm"
-		variant={
-			scope === "builtin"
-				? "purple"
-				: scope === "organization"
-					? "green"
-					: "default"
-		}
-	>
-		{scopeLabels[scope]}
+	<Badge size="sm" variant={scopeBadgeProps[scope].variant}>
+		{scopeBadgeProps[scope].label}
 	</Badge>
 );
 
-export const EnabledBadge: FC<{ enabled: boolean }> = ({ enabled }) => (
+// EnabledStatusBadge is named to avoid colliding with the shared
+// EnabledBadge in components/Badges, which has different styling.
+export const EnabledStatusBadge: FC<{ enabled: boolean }> = ({ enabled }) => (
 	<Badge size="sm" variant={enabled ? "green" : "default"}>
 		{enabled ? "Enabled" : "Disabled"}
 	</Badge>

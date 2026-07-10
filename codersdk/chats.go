@@ -560,10 +560,11 @@ type CreateChatRequest struct {
 	SystemPrompt   string          `json:"system_prompt,omitempty"`
 	WorkspaceID    *uuid.UUID      `json:"workspace_id,omitempty" format:"uuid"`
 	ModelConfigID  *uuid.UUID      `json:"model_config_id,omitempty" format:"uuid"`
-	// AgentID selects the chat agent (builtin or database) whose
+	// ChatAgentID selects the chat agent (builtin or database) whose
 	// persona supplies the base system prompt. Nil preserves the
-	// default behavior (the builtin Coder agent).
-	AgentID         *uuid.UUID        `json:"agent_id,omitempty" format:"uuid"`
+	// default behavior (the builtin Coder agent). Distinct from the
+	// workspace agent carried on Chat.AgentID.
+	ChatAgentID     *uuid.UUID        `json:"chat_agent_id,omitempty" format:"uuid"`
 	ReasoningEffort *string           `json:"reasoning_effort,omitempty"`
 	MCPServerIDs    []uuid.UUID       `json:"mcp_server_ids,omitempty" format:"uuid"`
 	Labels          map[string]string `json:"labels,omitempty"`

@@ -50,12 +50,14 @@ type ChatAgent struct {
 }
 
 // ChatAgentSummary identifies the chat agent a chat was created as,
-// for display attribution.
+// for display attribution. Builtin reports whether the agent is an
+// in-memory builtin catalog entry rather than a database row.
 type ChatAgentSummary struct {
-	ID   uuid.UUID `json:"id" format:"uuid"`
-	Slug string    `json:"slug,omitempty"`
-	Name string    `json:"name,omitempty"`
-	Icon string    `json:"icon,omitempty"`
+	ID      uuid.UUID `json:"id" format:"uuid"`
+	Slug    string    `json:"slug,omitempty"`
+	Name    string    `json:"name,omitempty"`
+	Icon    string    `json:"icon,omitempty"`
+	Builtin bool      `json:"builtin,omitempty"`
 }
 
 // CreateChatPersonaRequest creates a chat persona. A nil or zero

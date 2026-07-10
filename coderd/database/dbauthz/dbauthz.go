@@ -1908,6 +1908,17 @@ func (q *querier) CountAuditLogs(ctx context.Context, arg database.CountAuditLog
 	return q.db.CountAuthorizedAuditLogs(ctx, arg, prep)
 }
 
+func (q *querier) CountChatAgentsByPersonaID(ctx context.Context, personaID uuid.UUID) (int64, error) {
+	// Used by persona deletion to enforce referential integrity (no
+	// foreign key exists because agents may reference builtin
+	// personas). Requires read on chat agents, which every member
+	// role holds; the delete itself is separately authorized.
+	if err := q.authorizeContext(ctx, policy.ActionRead, rbac.ResourceChatAgent); err != nil {
+		return 0, err
+	}
+	return q.db.CountChatAgentsByPersonaID(ctx, personaID)
+}
+
 func (q *querier) CountChatQueuedMessages(ctx context.Context, chatID uuid.UUID) (int64, error) {
 	_, err := q.GetChatByID(ctx, chatID)
 	if err != nil {

@@ -1707,13 +1707,15 @@ export interface ChatAgent {
 // From codersdk/chatagents.go
 /**
  * ChatAgentSummary identifies the chat agent a chat was created as,
- * for display attribution.
+ * for display attribution. Builtin reports whether the agent is an
+ * in-memory builtin catalog entry rather than a database row.
  */
 export interface ChatAgentSummary {
 	readonly id: string;
 	readonly slug?: string;
 	readonly name?: string;
 	readonly icon?: string;
+	readonly builtin?: boolean;
 }
 
 // From codersdk/chats.go
@@ -3772,11 +3774,12 @@ export interface CreateChatRequest {
 	readonly workspace_id?: string;
 	readonly model_config_id?: string;
 	/**
-	 * AgentID selects the chat agent (builtin or database) whose
+	 * ChatAgentID selects the chat agent (builtin or database) whose
 	 * persona supplies the base system prompt. Nil preserves the
-	 * default behavior (the builtin Coder agent).
+	 * default behavior (the builtin Coder agent). Distinct from the
+	 * workspace agent carried on Chat.AgentID.
 	 */
-	readonly agent_id?: string;
+	readonly chat_agent_id?: string;
 	readonly reasoning_effort?: string;
 	readonly mcp_server_ids?: readonly string[];
 	readonly labels?: Record<string, string>;

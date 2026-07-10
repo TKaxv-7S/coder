@@ -1277,7 +1277,7 @@ func (p *Server) CreateChat(ctx context.Context, opts CreateOptions) (database.C
 	// chat creation does not hold one DB connection while waiting for
 	// another pool checkout. An active persona replaces the built-in
 	// default as the base prompt.
-	deploymentPrompt := p.resolveDeploymentSystemPromptWithBase(ctx, chatBasePrompt(opts.PersonaSystemPrompt))
+	deploymentPrompt := p.resolveDeploymentSystemPrompt(ctx, opts.PersonaSystemPrompt)
 
 	// Usage limits gate the create before we touch the state machine.
 	if limitErr := p.checkUsageLimit(ctx, p.db, opts.OwnerID, uuid.NullUUID{UUID: opts.OrganizationID, Valid: true}); limitErr != nil {
@@ -4427,22 +4427,24 @@ func (p *Server) resolveUserCompactionThreshold(ctx context.Context, userID uuid
 	return int32(val), true
 }
 
-// chatBasePrompt returns the base system prompt for a chat: the
-// persona prompt when a persona is active, otherwise the built-in
-// default.
-func chatBasePrompt(personaSystemPrompt string) string {
+// chatBasePrompt returns the base system prompt for a chat and reports
+// whether it comes from an explicitly selected persona. When no persona
+// is active the base is the built-in default.
+func chatBasePrompt(personaSystemPrompt string) (string, bool) {
 	if sanitized := SanitizePromptText(personaSystemPrompt); sanitized != "" {
-		return sanitized
+		return sanitized, true
 	}
-	return DefaultSystemPrompt
+	return DefaultSystemPrompt, false
 }
 
-// resolveDeploymentSystemPromptWithBase builds the deployment-level
-// system prompt from the given base prompt and the admin-configured
-// custom prompt stored in site_configs. The include-default toggle
-// applies to the base prompt, so a persona prompt takes the exact
-// position DefaultSystemPrompt occupies when no persona is active.
-func (p *Server) resolveDeploymentSystemPromptWithBase(ctx context.Context, basePrompt string) string {
+// resolveDeploymentSystemPrompt builds the deployment-level system
+// prompt from the chat's base prompt and the admin-configured custom
+// prompt stored in site_configs. The include-default toggle governs
+// only the built-in default prompt: a persona prompt takes the exact
+// position DefaultSystemPrompt occupies when no persona is active, and
+// is always included because selecting an agent is an explicit choice.
+func (p *Server) resolveDeploymentSystemPrompt(ctx context.Context, personaSystemPrompt string) string {
+	basePrompt, baseIsPersona := chatBasePrompt(personaSystemPrompt)
 	config, err := p.db.GetChatSystemPromptConfig(ctx)
 	if err != nil {
 		// Fail open: use the base prompt so chats always have
@@ -4457,7 +4459,7 @@ func (p *Server) resolveDeploymentSystemPromptWithBase(ctx context.Context, base
 	}
 
 	var parts []string
-	if config.IncludeDefaultSystemPrompt {
+	if baseIsPersona || config.IncludeDefaultSystemPrompt {
 		parts = append(parts, basePrompt)
 	}
 	if sanitizedCustom != "" {

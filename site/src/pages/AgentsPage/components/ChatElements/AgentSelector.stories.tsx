@@ -40,17 +40,17 @@ export const OpenList: Story = {
 		const list = within(listbox);
 		await expect(
 			list.getByRole("option", {
-				name: new RegExp(MockBuiltinChatAgent.name),
+				name: (name) => name.includes(MockBuiltinChatAgent.name),
 			}),
 		).toBeInTheDocument();
 		await expect(
 			list.getByRole("option", {
-				name: new RegExp(MockBuiltinAssistantChatAgent.name),
+				name: (name) => name.includes(MockBuiltinAssistantChatAgent.name),
 			}),
 		).toBeInTheDocument();
 		await expect(
 			list.getByRole("option", {
-				name: new RegExp(MockDeploymentChatAgent.name),
+				name: (name) => name.includes(MockDeploymentChatAgent.name),
 			}),
 		).toBeInTheDocument();
 	},

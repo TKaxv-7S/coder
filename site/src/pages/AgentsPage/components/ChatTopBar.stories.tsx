@@ -59,13 +59,14 @@ export const WithChatAgent: Story = {
 			slug: "reviewer",
 			name: "Reviewer",
 			icon: "",
+			builtin: true,
 		},
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		expect(canvas.getByTestId("chat-agent-attribution")).toHaveTextContent(
-			"Reviewer",
-		);
+		await expect(
+			canvas.getByTestId("chat-agent-attribution"),
+		).toHaveTextContent("Reviewer");
 	},
 };
 
@@ -76,12 +77,13 @@ export const WithDefaultCoderAgent: Story = {
 			slug: "coder",
 			name: "Coder",
 			icon: "",
+			builtin: true,
 		},
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		// The default builtin Coder agent gets no attribution badge.
-		expect(
+		await expect(
 			canvas.queryByTestId("chat-agent-attribution"),
 		).not.toBeInTheDocument();
 	},

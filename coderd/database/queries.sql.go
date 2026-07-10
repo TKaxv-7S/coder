@@ -4205,6 +4205,26 @@ func (q *sqlQuerier) UpsertBoundaryUsageStats(ctx context.Context, arg UpsertBou
 	return new_period, err
 }
 
+const countChatAgentsByPersonaID = `-- name: CountChatAgentsByPersonaID :one
+SELECT
+    COUNT(*)
+FROM
+    chat_agents
+WHERE
+    persona_id = $1::uuid
+    AND deleted = FALSE
+`
+
+// Counts non-deleted agents referencing a persona. Used to block
+// persona deletion while agents still depend on it; there is no
+// foreign key because agents may reference in-memory builtin personas.
+func (q *sqlQuerier) CountChatAgentsByPersonaID(ctx context.Context, personaID uuid.UUID) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countChatAgentsByPersonaID, personaID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const getChatAgentByID = `-- name: GetChatAgentByID :one
 SELECT
     id, organization_id, slug, name, description, icon, persona_id, prompt_append, model_config_id, enabled, deleted, created_by, created_at, updated_at
@@ -4489,8 +4509,10 @@ WHERE
     id = $1::uuid
 `
 
-// Soft delete keeps the row so chats referencing the agent retain FK
-// integrity.
+// Soft delete keeps the row so attribution lookups on existing chats
+// (GetChatAgentsByIDs) still resolve the agent's identity. There is no
+// foreign key from chats because chats may reference in-memory builtin
+// agents.
 func (q *sqlQuerier) UpdateChatAgentDeletedByID(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.ExecContext(ctx, updateChatAgentDeletedByID, id)
 	return err
@@ -6121,8 +6143,10 @@ WHERE
     id = $1::uuid
 `
 
-// Soft delete keeps the row so agents and chats referencing the
-// persona retain FK integrity.
+// Soft delete keeps the row so historical references stay resolvable.
+// There are no foreign keys from chat_agents or chats because those
+// columns may reference in-memory builtin personas and agents; the API
+// layer blocks deletion while non-deleted agents reference the persona.
 func (q *sqlQuerier) UpdateChatPersonaDeletedByID(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.ExecContext(ctx, updateChatPersonaDeletedByID, id)
 	return err

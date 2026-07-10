@@ -1,5 +1,5 @@
 import { useFormik } from "formik";
-import type { FC, ReactNode } from "react";
+import { type FC, type ReactNode, useId } from "react";
 import * as Yup from "yup";
 import type { ChatModelConfig } from "#/api/typesGenerated";
 import { ErrorAlert } from "#/components/Alert/ErrorAlert";
@@ -101,20 +101,23 @@ export const EnabledField: FC<EnabledFieldProps> = ({
 	checked,
 	disabled,
 	onCheckedChange,
-}) => (
-	<div className="flex items-center gap-2">
-		<Switch
-			id="enabled"
-			checked={checked}
-			onCheckedChange={onCheckedChange}
-			disabled={disabled}
-			aria-label="Enabled"
-		/>
-		<Label htmlFor="enabled" className="text-sm text-content-primary">
-			Enabled
-		</Label>
-	</div>
-);
+}) => {
+	const id = useId();
+	return (
+		<div className="flex items-center gap-2">
+			<Switch
+				id={id}
+				checked={checked}
+				onCheckedChange={onCheckedChange}
+				disabled={disabled}
+				aria-label="Enabled"
+			/>
+			<Label htmlFor={id} className="text-sm text-content-primary">
+				Enabled
+			</Label>
+		</div>
+	);
+};
 
 export interface ChatPersonaFormValues {
 	name: string;
@@ -163,6 +166,7 @@ export const ChatPersonaForm: FC<ChatPersonaFormProps> = ({
 	onCancel,
 }) => {
 	const isEditing = Boolean(editingPersona);
+	const fieldId = useId();
 	const form = useFormik<ChatPersonaFormValues>({
 		initialValues: {
 			name: editingPersona?.name ?? "",
@@ -180,9 +184,7 @@ export const ChatPersonaForm: FC<ChatPersonaFormProps> = ({
 	});
 
 	const fieldError = (field: keyof ChatPersonaFormValues) =>
-		form.touched[field] && form.errors[field]
-			? String(form.errors[field])
-			: undefined;
+		form.touched[field] && form.errors[field] ? form.errors[field] : undefined;
 
 	return (
 		<form
@@ -191,33 +193,41 @@ export const ChatPersonaForm: FC<ChatPersonaFormProps> = ({
 			className="flex max-w-2xl flex-col gap-5"
 		>
 			{Boolean(error) && <ErrorAlert error={error} />}
-			<FormField label="Name" htmlFor="name" error={fieldError("name")}>
+			<FormField
+				label="Name"
+				htmlFor={`${fieldId}-name`}
+				error={fieldError("name")}
+			>
 				<Input
-					id="name"
+					id={`${fieldId}-name`}
 					{...form.getFieldProps("name")}
 					disabled={readOnly}
 					placeholder="Code Reviewer"
 				/>
 			</FormField>
-			<FormField label="Slug" htmlFor="slug" error={fieldError("slug")}>
+			<FormField
+				label="Slug"
+				htmlFor={`${fieldId}-slug`}
+				error={fieldError("slug")}
+			>
 				<Input
-					id="slug"
+					id={`${fieldId}-slug`}
 					{...form.getFieldProps("slug")}
 					disabled={readOnly || isEditing}
 					placeholder="code-reviewer"
 				/>
 			</FormField>
-			<FormField label="Description" htmlFor="description">
+			<FormField label="Description" htmlFor={`${fieldId}-description`}>
 				<Input
-					id="description"
+					id={`${fieldId}-description`}
 					{...form.getFieldProps("description")}
 					disabled={readOnly}
 					placeholder="What this persona is for"
 				/>
 			</FormField>
-			<FormField label="Icon" htmlFor="icon">
+			<FormField label="Icon" htmlFor={`${fieldId}-icon`}>
 				<Input
-					id="icon"
+					id={`${fieldId}-icon`}
 					{...form.getFieldProps("icon")}
 					disabled={readOnly}
 					placeholder="/emojis/1f916.png"
@@ -225,11 +235,11 @@ export const ChatPersonaForm: FC<ChatPersonaFormProps> = ({
 			</FormField>
 			<FormField
 				label="System prompt"
-				htmlFor="system_prompt"
+				htmlFor={`${fieldId}-system-prompt`}
 				error={fieldError("system_prompt")}
 			>
 				<Textarea
-					id="system_prompt"
+					id={`${fieldId}-system-prompt`}
 					{...form.getFieldProps("system_prompt")}
 					disabled={readOnly}
 					rows={10}
@@ -237,7 +247,7 @@ export const ChatPersonaForm: FC<ChatPersonaFormProps> = ({
 				/>
 			</FormField>
 			<ModelSelectField
-				id="model_config_id"
+				id={`${fieldId}-model-config`}
 				label="Model preference"
 				value={form.values.model_config_id}
 				modelConfigs={modelConfigs}

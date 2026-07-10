@@ -1320,6 +1320,11 @@ func (s *MethodTestSuite) TestChats() {
 		dbm.EXPECT().GetChatAgentByID(gomock.Any(), agent.ID).Return(agent, nil).AnyTimes()
 		check.Args(agent.ID).Asserts(agent, policy.ActionRead).Returns(agent)
 	}))
+	s.Run("CountChatAgentsByPersonaID", s.Mocked(func(dbm *dbmock.MockStore, faker *gofakeit.Faker, check *expects) {
+		personaID := uuid.New()
+		dbm.EXPECT().CountChatAgentsByPersonaID(gomock.Any(), personaID).Return(int64(1), nil).AnyTimes()
+		check.Args(personaID).Asserts(rbac.ResourceChatAgent, policy.ActionRead).Returns(int64(1))
+	}))
 	s.Run("GetChatAgentsByIDs", s.Mocked(func(dbm *dbmock.MockStore, faker *gofakeit.Faker, check *expects) {
 		a1 := testutil.Fake(s.T(), faker, database.ChatAgent{})
 		a2 := testutil.Fake(s.T(), faker, database.ChatAgent{})

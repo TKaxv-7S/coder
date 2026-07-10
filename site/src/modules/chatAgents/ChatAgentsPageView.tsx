@@ -29,7 +29,7 @@ import { TableLoader } from "#/components/TableLoader/TableLoader";
 import { docs } from "#/utils/docs";
 import {
 	chatCatalogScope,
-	EnabledBadge,
+	EnabledStatusBadge,
 	isEditableInScope,
 	ScopeBadge,
 } from "./ScopeBadge";
@@ -57,7 +57,12 @@ export const ChatAgentsPageView: FC<ChatAgentsPageViewProps> = ({
 	const navigate = useNavigate();
 	const canWrite = canEdit && isEntitled;
 	const personaName = (personaId: string): string => {
-		const persona = personas?.find((p) => p.id === personaId);
+		// While personas are still loading, show a placeholder instead
+		// of "Unknown persona", which reads like a data problem.
+		if (personas === undefined) {
+			return "...";
+		}
+		const persona = personas.find((p) => p.id === personaId);
 		return persona ? persona.name || persona.slug : "Unknown persona";
 	};
 
@@ -131,7 +136,7 @@ export const ChatAgentsPageView: FC<ChatAgentsPageViewProps> = ({
 										<ScopeBadge scope={chatCatalogScope(agent)} />
 									</TableCell>
 									<TableCell>
-										<EnabledBadge enabled={agent.enabled} />
+										<EnabledStatusBadge enabled={agent.enabled} />
 									</TableCell>
 									<TableCell>
 										{editable && (

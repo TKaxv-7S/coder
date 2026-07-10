@@ -19,8 +19,10 @@ runs with that agent's persona prompt and model instead of the defaults.
 ## Scopes
 
 Personas and agents exist at three scopes. Slugs are unique within each
-scope, and entries from all scopes appear side by side; there is no
-shadowing or merging between scopes.
+scope, and the management UI and API address entries by ID, so entries
+from all scopes appear side by side. When scopes reuse a slug, the
+`spawn_agent` delegation described below resolves the slug with a fixed
+precedence: builtin, then organization, then deployment.
 
 | Scope        | Managed by  | Visible to           | Notes                                      |
 |--------------|-------------|----------------------|--------------------------------------------|
@@ -38,8 +40,10 @@ behavior.
 
 - The persona's system prompt replaces the built-in default prompt as the
   base of the chat's system prompt. The deployment-level
-  [custom system prompt](../getting-started.md) setting keeps its existing
-  behavior around that base.
+  [custom system prompt](../getting-started.md) setting still appends its
+  custom text, but its "include default prompt" toggle governs only the
+  built-in default: an explicitly selected persona prompt is always
+  included.
 - The agent's prompt append, when set, is added as an additional system
   message directly after the persona prompt.
 - The model is chosen in this order: a model explicitly selected for the
@@ -62,8 +66,14 @@ Each persona has a slug, name, description, icon, system prompt, and an
 optional preferred model. Each agent has the same identity fields plus the
 persona it runs, an optional prompt append, and an optional model override.
 An organization-scoped agent may reference a builtin or deployment-scoped
-persona, but not a persona from another organization. Disabled entries
+persona, but not a persona from another organization. A persona cannot be
+deleted while agents still reference it. Disabled entries
 stay listed for management but cannot be used in new chats.
+
+> [!NOTE]
+> Persona system prompts and agent prompt appends are returned verbatim
+> to every user who can list them. Do not embed secrets, credentials, or
+> confidential details in prompts.
 
 ## Use an agent in a chat
 
@@ -86,7 +96,7 @@ organization agents, each with its `id`, `slug`, `persona_id`, and
 `builtin` flag. Personas are listed the same way at
 `GET /api/experimental/chats/personas`.
 
-Create a chat as an agent by setting `agent_id`:
+Create a chat as an agent by setting `chat_agent_id`:
 
 ```sh
 curl -X POST https://coder.example.com/api/experimental/chats \
@@ -94,7 +104,7 @@ curl -X POST https://coder.example.com/api/experimental/chats \
   -H "Content-Type: application/json" \
   -d '{
     "organization_id": "<organization-uuid>",
-    "agent_id": "<agent-uuid>",
+    "chat_agent_id": "<agent-uuid>",
     "content": [
       {"type": "text", "text": "Review the open pull request"}
     ]
@@ -102,8 +112,8 @@ curl -X POST https://coder.example.com/api/experimental/chats \
 ```
 
 The response and later reads include an `agent` summary (ID, slug, name,
-and icon) for attribution. Omitting `agent_id` keeps today's default
-behavior.
+icon, and builtin flag) for attribution. Omitting `chat_agent_id` keeps
+today's default behavior.
 
 Inside a running chat, the model can delegate work to these agents: the
 `spawn_agent` tool accepts `agent:<slug>` type values (for example,

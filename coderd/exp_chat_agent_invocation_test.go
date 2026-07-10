@@ -1,6 +1,7 @@
 package coderd_test
 
 import (
+	"context"
 	"net/http"
 	"testing"
 
@@ -11,6 +12,8 @@ import (
 	"github.com/coder/coder/v2/coderd/database"
 	"github.com/coder/coder/v2/coderd/database/dbauthz"
 	"github.com/coder/coder/v2/coderd/database/dbgen"
+	"github.com/coder/coder/v2/coderd/rbac"
+	"github.com/coder/coder/v2/coderd/util/ptr"
 	"github.com/coder/coder/v2/coderd/x/chatd"
 	"github.com/coder/coder/v2/coderd/x/chatd/chattest"
 	"github.com/coder/coder/v2/codersdk"
@@ -39,7 +42,7 @@ func TestCreateChatWithAgent(t *testing.T) {
 		chat, err := client.CreateChat(ctx, codersdk.CreateChatRequest{
 			OrganizationID: firstUser.OrganizationID,
 			Content:        newChatInput("review something"),
-			AgentID:        &agentID,
+			ChatAgentID:    &agentID,
 		})
 		require.NoError(t, err)
 		require.NotNil(t, chat.Agent)
@@ -80,7 +83,7 @@ func TestCreateChatWithAgent(t *testing.T) {
 		chat, err := client.CreateChat(ctx, codersdk.CreateChatRequest{
 			OrganizationID: firstUser.OrganizationID,
 			Content:        newChatInput("hello agent"),
-			AgentID:        &agent.ID,
+			ChatAgentID:    &agent.ID,
 		})
 		require.NoError(t, err)
 		require.NotNil(t, chat.Agent)
@@ -122,25 +125,100 @@ func TestCreateChatWithAgent(t *testing.T) {
 			params.Enabled = false
 		})
 
+		// Agents whose persona was disabled or deleted after the agent
+		// was created must be rejected at invocation time.
+		disabledPersona := dbgen.ChatPersona(t, db, database.ChatPersona{
+			Slug:      "disabled-invoke-persona",
+			CreatedBy: firstUser.UserID,
+		}, func(params *database.InsertChatPersonaParams) {
+			params.Enabled = false
+		})
+		agentWithDisabledPersona := dbgen.ChatAgent(t, db, database.ChatAgent{
+			Slug:      "disabled-persona-invoke-agent",
+			PersonaID: disabledPersona.ID,
+			CreatedBy: firstUser.UserID,
+		})
+		deletedPersona := dbgen.ChatPersona(t, db, database.ChatPersona{
+			Slug:      "deleted-invoke-persona",
+			CreatedBy: firstUser.UserID,
+		})
+		agentWithDeletedPersona := dbgen.ChatAgent(t, db, database.ChatAgent{
+			Slug:      "deleted-persona-invoke-agent",
+			PersonaID: deletedPersona.ID,
+			CreatedBy: firstUser.UserID,
+		})
+		require.NoError(t, db.UpdateChatPersonaDeletedByID(ownerCtx(ctx), deletedPersona.ID))
+
 		cases := []struct {
 			name    string
 			agentID uuid.UUID
+			message string
 		}{
-			{name: "Unknown", agentID: uuid.New()},
-			{name: "Disabled", agentID: disabledAgent.ID},
-			{name: "ForeignOrg", agentID: foreignAgent.ID},
+			{name: "Unknown", agentID: uuid.New(), message: "Chat agent does not exist"},
+			{name: "Disabled", agentID: disabledAgent.ID, message: "Chat agent is disabled"},
+			{name: "ForeignOrg", agentID: foreignAgent.ID, message: "Chat agent belongs to a different organization"},
+			{name: "PersonaDisabled", agentID: agentWithDisabledPersona.ID, message: "persona is disabled"},
+			{name: "PersonaDeleted", agentID: agentWithDeletedPersona.ID, message: "persona does not exist"},
 		}
 		for _, tc := range cases {
 			agentID := tc.agentID
 			_, err := client.CreateChat(ctx, codersdk.CreateChatRequest{
 				OrganizationID: firstUser.OrganizationID,
 				Content:        newChatInput("should fail"),
-				AgentID:        &agentID,
+				ChatAgentID:    &agentID,
 			})
 			var sdkErr *codersdk.Error
 			require.ErrorAs(t, err, &sdkErr, "case %s", tc.name)
 			require.Equal(t, http.StatusBadRequest, sdkErr.StatusCode(), "case %s", tc.name)
+			require.Contains(t, sdkErr.Message, tc.message, "case %s", tc.name)
 		}
+	})
+
+	t.Run("AttributionSurvivesAgentDeletion", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := testutil.Context(t, testutil.WaitLong)
+		client, db := newChatClientWithDatabase(t)
+		firstUser := coderdtest.CreateFirstUser(t, client.Client)
+		_ = createChatModelConfig(t, client)
+
+		agent := dbgen.ChatAgent(t, db, database.ChatAgent{
+			Slug:      "deleted-attribution-agent",
+			Name:      "Deleted Attribution Agent",
+			Icon:      "/emojis/1f916.png",
+			CreatedBy: firstUser.UserID,
+		})
+		chat, err := client.CreateChat(ctx, codersdk.CreateChatRequest{
+			OrganizationID: firstUser.OrganizationID,
+			Content:        newChatInput("hello"),
+			ChatAgentID:    &agent.ID,
+		})
+		require.NoError(t, err)
+
+		// Soft-delete the agent; existing chats must keep their
+		// attribution because GetChatAgentsByIDs includes deleted rows.
+		require.NoError(t, db.UpdateChatAgentDeletedByID(ownerCtx(ctx), agent.ID))
+
+		fetched, err := client.GetChat(ctx, chat.ID)
+		require.NoError(t, err)
+		require.NotNil(t, fetched.Agent)
+		require.Equal(t, agent.Slug, fetched.Agent.Slug)
+		require.Equal(t, agent.Name, fetched.Agent.Name)
+		require.False(t, fetched.Agent.Builtin)
+
+		chats, err := client.ListChats(ctx, nil)
+		require.NoError(t, err)
+		require.NotEmpty(t, chats)
+		var found bool
+		for _, listed := range chats {
+			if listed.ID != chat.ID {
+				continue
+			}
+			found = true
+			require.NotNil(t, listed.Agent)
+			require.Equal(t, agent.Slug, listed.Agent.Slug)
+		}
+		require.True(t, found)
 	})
 
 	t.Run("ModelPrecedence", func(t *testing.T) {
@@ -168,10 +246,17 @@ func TestCreateChatWithAgent(t *testing.T) {
 			ContextLimit: &contextLimit,
 		})
 		require.NoError(t, err)
+		personaModel, err := client.CreateChatModelConfig(ctx, codersdk.CreateChatModelConfigRequest{
+			AIProviderID: &overrideProvider.ID,
+			Model:        coderdtest.TestChatModelOpenAICompat,
+			ContextLimit: &contextLimit,
+		})
+		require.NoError(t, err)
 
 		persona := dbgen.ChatPersona(t, db, database.ChatPersona{
-			Slug:      "precedence-persona",
-			CreatedBy: firstUser.UserID,
+			Slug:          "precedence-persona",
+			ModelConfigID: uuid.NullUUID{UUID: personaModel.ID, Valid: true},
+			CreatedBy:     firstUser.UserID,
 		})
 		agent := dbgen.ChatAgent(t, db, database.ChatAgent{
 			Slug:          "precedence-agent",
@@ -180,12 +265,12 @@ func TestCreateChatWithAgent(t *testing.T) {
 			CreatedBy:     firstUser.UserID,
 		})
 
-		// The agent's model preference wins over the deployment
-		// default.
+		// The agent's model preference wins over the persona's and the
+		// deployment default.
 		chat, err := client.CreateChat(ctx, codersdk.CreateChatRequest{
 			OrganizationID: firstUser.OrganizationID,
 			Content:        newChatInput("agent model"),
-			AgentID:        &agent.ID,
+			ChatAgentID:    &agent.ID,
 		})
 		require.NoError(t, err)
 		require.Equal(t, overrideModel.ID, chat.LastModelConfigID)
@@ -194,27 +279,48 @@ func TestCreateChatWithAgent(t *testing.T) {
 		chat, err = client.CreateChat(ctx, codersdk.CreateChatRequest{
 			OrganizationID: firstUser.OrganizationID,
 			Content:        newChatInput("explicit model"),
-			AgentID:        &agent.ID,
+			ChatAgentID:    &agent.ID,
 			ModelConfigID:  &defaultModel.ID,
 		})
 		require.NoError(t, err)
 		require.Equal(t, defaultModel.ID, chat.LastModelConfigID)
 
-		// A disabled agent preference falls through to the default.
+		// A disabled agent preference falls through to the persona's
+		// preference, not straight to the default.
 		_, err = client.UpdateChatModelConfig(ctx, overrideModel.ID, codersdk.UpdateChatModelConfigRequest{
-			Enabled: boolPtr(false),
+			Enabled: ptr.Ref(false),
+		})
+		require.NoError(t, err)
+		chat, err = client.CreateChat(ctx, codersdk.CreateChatRequest{
+			OrganizationID: firstUser.OrganizationID,
+			Content:        newChatInput("persona model"),
+			ChatAgentID:    &agent.ID,
+		})
+		require.NoError(t, err)
+		require.Equal(t, personaModel.ID, chat.LastModelConfigID)
+
+		// With both preferences disabled the default applies.
+		_, err = client.UpdateChatModelConfig(ctx, personaModel.ID, codersdk.UpdateChatModelConfigRequest{
+			Enabled: ptr.Ref(false),
 		})
 		require.NoError(t, err)
 		chat, err = client.CreateChat(ctx, codersdk.CreateChatRequest{
 			OrganizationID: firstUser.OrganizationID,
 			Content:        newChatInput("fallback model"),
-			AgentID:        &agent.ID,
+			ChatAgentID:    &agent.ID,
 		})
 		require.NoError(t, err)
 		require.Equal(t, defaultModel.ID, chat.LastModelConfigID)
 	})
 }
 
-func boolPtr(v bool) *bool {
-	return &v
+// ownerCtx returns a context authorized as a deployment owner for
+// direct store mutations in tests.
+func ownerCtx(ctx context.Context) context.Context {
+	return dbauthz.As(ctx, rbac.Subject{
+		ID:     "owner",
+		Roles:  rbac.RoleIdentifiers{rbac.RoleOwner()},
+		Groups: []string{},
+		Scope:  rbac.ScopeAll,
+	})
 }

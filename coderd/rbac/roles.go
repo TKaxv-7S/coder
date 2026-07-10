@@ -442,7 +442,10 @@ func ReloadBuiltinRoles(opts *RoleOptions) {
 				ResourceOauth2App.Type:      {policy.ActionRead},
 				ResourceWorkspaceProxy.Type: {policy.ActionRead},
 				// All members can read deployment-scoped chat personas
-				// and agents so they can use them in chats.
+				// and agents so they can use them in chats. Site-level
+				// permissions apply to org-scoped rows of the same type
+				// too, so the persona/agent list API separately enforces
+				// org membership before returning org-scoped entries.
 				ResourceChatPersona.Type: {policy.ActionRead},
 				ResourceChatAgent.Type:   {policy.ActionRead},
 			}),

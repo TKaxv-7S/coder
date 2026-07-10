@@ -11,7 +11,7 @@ CREATE TABLE chat_personas (
     model_config_id UUID        REFERENCES chat_model_configs(id),
     enabled         BOOLEAN     NOT NULL DEFAULT TRUE,
     deleted         BOOLEAN     NOT NULL DEFAULT FALSE,
-    created_by      UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_by      UUID        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -33,8 +33,8 @@ CREATE UNIQUE INDEX idx_chat_personas_deployment_slug
 -- optionally append to its prompt or override its model. persona_id has
 -- no foreign key because agents may reference in-memory builtin
 -- personas that are not database rows; referential validation for
--- database personas happens at the API layer, and personas are
--- soft-deleted so dangling references cannot occur either way.
+-- database personas happens at the API layer, which also blocks persona
+-- deletion while non-deleted agents reference it.
 CREATE TABLE chat_agents (
     id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID        REFERENCES organizations(id) ON DELETE CASCADE,
@@ -47,7 +47,7 @@ CREATE TABLE chat_agents (
     model_config_id UUID        REFERENCES chat_model_configs(id),
     enabled         BOOLEAN     NOT NULL DEFAULT TRUE,
     deleted         BOOLEAN     NOT NULL DEFAULT FALSE,
-    created_by      UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_by      UUID        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );

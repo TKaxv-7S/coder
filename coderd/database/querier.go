@@ -90,6 +90,10 @@ type sqlcQuerier interface {
 	CleanupDeletedMCPServerIDsFromChats(ctx context.Context) error
 	CountAIBridgeSessions(ctx context.Context, arg CountAIBridgeSessionsParams) (int64, error)
 	CountAuditLogs(ctx context.Context, arg CountAuditLogsParams) (int64, error)
+	// Counts non-deleted agents referencing a persona. Used to block
+	// persona deletion while agents still depend on it; there is no
+	// foreign key because agents may reference in-memory builtin personas.
+	CountChatAgentsByPersonaID(ctx context.Context, personaID uuid.UUID) (int64, error)
 	// Cheap queue-length check used by ChatMachine.Update when deciding
 	// whether the chat is in a "1" sub-state.
 	CountChatQueuedMessages(ctx context.Context, chatID uuid.UUID) (int64, error)
@@ -1340,8 +1344,10 @@ type sqlcQuerier interface {
 	UpdateAPIKeyByID(ctx context.Context, arg UpdateAPIKeyByIDParams) error
 	UpdateChatACLByID(ctx context.Context, arg UpdateChatACLByIDParams) error
 	UpdateChatAgent(ctx context.Context, arg UpdateChatAgentParams) (ChatAgent, error)
-	// Soft delete keeps the row so chats referencing the agent retain FK
-	// integrity.
+	// Soft delete keeps the row so attribution lookups on existing chats
+	// (GetChatAgentsByIDs) still resolve the agent's identity. There is no
+	// foreign key from chats because chats may reference in-memory builtin
+	// agents.
 	UpdateChatAgentDeletedByID(ctx context.Context, id uuid.UUID) error
 	UpdateChatBuildAgentBinding(ctx context.Context, arg UpdateChatBuildAgentBindingParams) (Chat, error)
 	UpdateChatByID(ctx context.Context, arg UpdateChatByIDParams) (Chat, error)
@@ -1393,8 +1399,10 @@ type sqlcQuerier interface {
 	UpdateChatMCPServerIDs(ctx context.Context, arg UpdateChatMCPServerIDsParams) (Chat, error)
 	UpdateChatModelConfig(ctx context.Context, arg UpdateChatModelConfigParams) (ChatModelConfig, error)
 	UpdateChatPersona(ctx context.Context, arg UpdateChatPersonaParams) (ChatPersona, error)
-	// Soft delete keeps the row so agents and chats referencing the
-	// persona retain FK integrity.
+	// Soft delete keeps the row so historical references stay resolvable.
+	// There are no foreign keys from chat_agents or chats because those
+	// columns may reference in-memory builtin personas and agents; the API
+	// layer blocks deletion while non-deleted agents reference the persona.
 	UpdateChatPersonaDeletedByID(ctx context.Context, id uuid.UUID) error
 	UpdateChatPinOrder(ctx context.Context, arg UpdateChatPinOrderParams) error
 	UpdateChatPlanModeByID(ctx context.Context, arg UpdateChatPlanModeByIDParams) (Chat, error)

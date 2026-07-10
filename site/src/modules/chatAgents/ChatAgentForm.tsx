@@ -1,5 +1,5 @@
 import { useFormik } from "formik";
-import type { FC } from "react";
+import { type FC, useId } from "react";
 import * as Yup from "yup";
 import type { ChatModelConfig, ChatPersona } from "#/api/typesGenerated";
 import { ErrorAlert } from "#/components/Alert/ErrorAlert";
@@ -72,6 +72,7 @@ export const ChatAgentForm: FC<ChatAgentFormProps> = ({
 	onCancel,
 }) => {
 	const isEditing = Boolean(editingAgent);
+	const fieldId = useId();
 	const form = useFormik<ChatAgentFormValues>({
 		initialValues: {
 			name: editingAgent?.name ?? "",
@@ -90,9 +91,7 @@ export const ChatAgentForm: FC<ChatAgentFormProps> = ({
 	});
 
 	const fieldError = (field: keyof ChatAgentFormValues) =>
-		form.touched[field] && form.errors[field]
-			? String(form.errors[field])
-			: undefined;
+		form.touched[field] && form.errors[field] ? form.errors[field] : undefined;
 
 	return (
 		<form
@@ -101,33 +100,41 @@ export const ChatAgentForm: FC<ChatAgentFormProps> = ({
 			className="flex max-w-2xl flex-col gap-5"
 		>
 			{Boolean(error) && <ErrorAlert error={error} />}
-			<FormField label="Name" htmlFor="name" error={fieldError("name")}>
+			<FormField
+				label="Name"
+				htmlFor={`${fieldId}-name`}
+				error={fieldError("name")}
+			>
 				<Input
-					id="name"
+					id={`${fieldId}-name`}
 					{...form.getFieldProps("name")}
 					disabled={readOnly}
 					placeholder="Reviewer"
 				/>
 			</FormField>
-			<FormField label="Slug" htmlFor="slug" error={fieldError("slug")}>
+			<FormField
+				label="Slug"
+				htmlFor={`${fieldId}-slug`}
+				error={fieldError("slug")}
+			>
 				<Input
-					id="slug"
+					id={`${fieldId}-slug`}
 					{...form.getFieldProps("slug")}
 					disabled={readOnly || isEditing}
 					placeholder="reviewer"
 				/>
 			</FormField>
-			<FormField label="Description" htmlFor="description">
+			<FormField label="Description" htmlFor={`${fieldId}-description`}>
 				<Input
-					id="description"
+					id={`${fieldId}-description`}
 					{...form.getFieldProps("description")}
 					disabled={readOnly}
 					placeholder="What this agent is for"
 				/>
 			</FormField>
-			<FormField label="Icon" htmlFor="icon">
+			<FormField label="Icon" htmlFor={`${fieldId}-icon`}>
 				<Input
-					id="icon"
+					id={`${fieldId}-icon`}
 					{...form.getFieldProps("icon")}
 					disabled={readOnly}
 					placeholder="/emojis/1f916.png"
@@ -135,7 +142,7 @@ export const ChatAgentForm: FC<ChatAgentFormProps> = ({
 			</FormField>
 			<FormField
 				label="Persona"
-				htmlFor="persona_id"
+				htmlFor={`${fieldId}-persona`}
 				error={fieldError("persona_id")}
 			>
 				<Select
@@ -143,7 +150,7 @@ export const ChatAgentForm: FC<ChatAgentFormProps> = ({
 					onValueChange={(value) => form.setFieldValue("persona_id", value)}
 					disabled={readOnly}
 				>
-					<SelectTrigger id="persona_id" aria-label="Persona">
+					<SelectTrigger id={`${fieldId}-persona`} aria-label="Persona">
 						<SelectValue placeholder="Select a persona" />
 					</SelectTrigger>
 					<SelectContent>
@@ -155,9 +162,9 @@ export const ChatAgentForm: FC<ChatAgentFormProps> = ({
 					</SelectContent>
 				</Select>
 			</FormField>
-			<FormField label="Prompt append" htmlFor="prompt_append">
+			<FormField label="Prompt append" htmlFor={`${fieldId}-prompt-append`}>
 				<Textarea
-					id="prompt_append"
+					id={`${fieldId}-prompt-append`}
 					{...form.getFieldProps("prompt_append")}
 					disabled={readOnly}
 					rows={6}
@@ -165,7 +172,7 @@ export const ChatAgentForm: FC<ChatAgentFormProps> = ({
 				/>
 			</FormField>
 			<ModelSelectField
-				id="model_config_id"
+				id={`${fieldId}-model-config`}
 				label="Model override"
 				value={form.values.model_config_id}
 				modelConfigs={modelConfigs}

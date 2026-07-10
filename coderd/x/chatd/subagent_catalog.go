@@ -2,7 +2,8 @@ package chatd
 
 import (
 	"context"
-	"sort"
+	"database/sql"
+	"slices"
 	"strings"
 
 	"charm.land/fantasy"
@@ -213,10 +214,16 @@ func availableSubagentTypeIDs(
 	for _, def := range defs {
 		ids = append(ids, def.id)
 	}
-	for _, agent := range availableChatAgentsForChat(ctx, p, currentChat) {
+	for _, agent := range enumeratedChatAgentsForChat(ctx, p, currentChat) {
 		ids = append(ids, subagentTypeChatAgentPrefix+agent.Slug)
 	}
 	return ids
+}
+
+// chatInPlanMode reports whether the chat is currently in a plan-mode
+// turn, during which chat agent spawn types are unavailable.
+func chatInPlanMode(chat database.Chat) bool {
+	return chat.PlanMode.Valid && chat.PlanMode.ChatPlanMode == database.ChatPlanModePlan
 }
 
 func (d subagentDefinition) unavailableReasonText(
@@ -237,8 +244,7 @@ func resolveSubagentDefinition(
 	rawSubagentType string,
 ) (subagentDefinition, error) {
 	subagentType := strings.TrimSpace(rawSubagentType)
-	if strings.HasPrefix(subagentType, subagentTypeChatAgentPrefix) {
-		slug := strings.TrimPrefix(subagentType, subagentTypeChatAgentPrefix)
+	if slug, ok := strings.CutPrefix(subagentType, subagentTypeChatAgentPrefix); ok {
 		return chatAgentSubagentDefinition(ctx, p, currentChat, slug)
 	}
 	def, ok := lookupSubagentDefinition(subagentType)
@@ -254,41 +260,77 @@ func resolveSubagentDefinition(
 	return def, nil
 }
 
-// availableChatAgentsForChat lists the chat agents a chat can delegate
-// to: builtins plus enabled database agents in the deployment scope or
-// the chat's organization. Builtins sort first, then database agents
-// by name, capped at maxSpawnAgentCatalogEntries.
-func availableChatAgentsForChat(
+// chatAgentsForChat lists every chat agent a chat can delegate to:
+// builtins plus enabled database agents in the deployment scope or the
+// chat's organization. Entries are deduplicated by slug with precedence
+// builtin > organization > deployment, so agent:<slug> always resolves
+// to the same agent even when scopes reuse a slug. Builtins sort
+// first, then database agents by name.
+func chatAgentsForChat(
 	ctx context.Context,
 	p *Server,
 	currentChat database.Chat,
-) []database.ChatAgent {
-	agents := BuiltinChatAgents()
+) ([]database.ChatAgent, error) {
 	// The chat owner can read every agent the query returns:
 	// deployment and org-scoped chat agents are member-readable, and
 	// the SQL filter restricts rows to the chat's own organization.
 	//nolint:gocritic // See above.
 	dbAgents, err := p.db.GetChatAgents(dbauthz.AsChatd(ctx), currentChat.OrganizationID)
 	if err != nil {
+		return nil, xerrors.Errorf("list chat agents: %w", err)
+	}
+	agents := BuiltinChatAgents()
+	seen := make(map[string]struct{}, len(agents)+len(dbAgents))
+	for _, agent := range agents {
+		seen[agent.Slug] = struct{}{}
+	}
+	custom := make([]database.ChatAgent, 0, len(dbAgents))
+	// Organization agents shadow deployment agents with the same slug.
+	for _, wantOrgScoped := range []bool{true, false} {
+		for _, agent := range dbAgents {
+			if !agent.Enabled || agent.OrganizationID.Valid != wantOrgScoped {
+				continue
+			}
+			if _, ok := seen[agent.Slug]; ok {
+				continue
+			}
+			seen[agent.Slug] = struct{}{}
+			custom = append(custom, agent)
+		}
+	}
+	slices.SortFunc(custom, func(a, b database.ChatAgent) int {
+		if c := strings.Compare(a.Name, b.Name); c != 0 {
+			return c
+		}
+		return strings.Compare(a.Slug, b.Slug)
+	})
+	return append(agents, custom...), nil
+}
+
+// enumeratedChatAgentsForChat returns the chat agents advertised in the
+// spawn_agent tool description and type list, capped at
+// maxSpawnAgentCatalogEntries. Chat agent types are not enumerated
+// during plan-mode turns, matching the planning overlay's guidance that
+// only general and explore may be used. A database failure degrades the
+// enumeration to builtins only; slug resolution does not share the cap
+// or the degradation (see resolveChatAgentBySlugForChat), so an agent
+// omitted from the enumeration is still spawnable by exact slug.
+func enumeratedChatAgentsForChat(
+	ctx context.Context,
+	p *Server,
+	currentChat database.Chat,
+) []database.ChatAgent {
+	if chatInPlanMode(currentChat) {
+		return nil
+	}
+	agents, err := chatAgentsForChat(ctx, p, currentChat)
+	if err != nil {
 		p.logger.Warn(ctx, "failed to list chat agents for spawn catalog",
 			slog.F("chat_id", currentChat.ID),
 			slog.Error(err),
 		)
-		dbAgents = nil
+		agents = BuiltinChatAgents()
 	}
-	custom := make([]database.ChatAgent, 0, len(dbAgents))
-	for _, agent := range dbAgents {
-		if agent.Enabled {
-			custom = append(custom, agent)
-		}
-	}
-	sort.Slice(custom, func(i, j int) bool {
-		if custom[i].Name != custom[j].Name {
-			return custom[i].Name < custom[j].Name
-		}
-		return custom[i].Slug < custom[j].Slug
-	})
-	agents = append(agents, custom...)
 	if len(agents) > maxSpawnAgentCatalogEntries {
 		agents = agents[:maxSpawnAgentCatalogEntries]
 	}
@@ -296,38 +338,48 @@ func availableChatAgentsForChat(
 }
 
 // resolveChatAgentBySlugForChat resolves a chat agent by slug for the
-// given chat, along with its persona. Builtins are checked first, then
-// enabled database agents in the deployment scope or the chat's
-// organization. The persona must be enabled and be builtin,
-// deployment-scoped, or in the chat's organization.
+// given chat, along with its persona. Resolution searches the full
+// available set (builtin > organization > deployment precedence), not
+// the capped enumeration, so every visible enabled agent is spawnable.
+// The persona must be enabled and be builtin, deployment-scoped, or in
+// the chat's organization.
 func resolveChatAgentBySlugForChat(
 	ctx context.Context,
 	p *Server,
 	currentChat database.Chat,
 	slug string,
 ) (database.ChatAgent, database.ChatPersona, error) {
-	var agent database.ChatAgent
-	found := false
-	for _, candidate := range availableChatAgentsForChat(ctx, p, currentChat) {
-		if candidate.Slug == slug {
-			agent = candidate
-			found = true
-			break
-		}
+	if chatInPlanMode(currentChat) {
+		return database.ChatAgent{}, database.ChatPersona{}, xerrors.New(
+			"chat agent types are unavailable in plan mode; use general or explore",
+		)
 	}
-	if !found {
+	agents, err := chatAgentsForChat(ctx, p, currentChat)
+	if err != nil {
+		return database.ChatAgent{}, database.ChatPersona{}, err
+	}
+	i := slices.IndexFunc(agents, func(agent database.ChatAgent) bool {
+		return agent.Slug == slug
+	})
+	if i < 0 {
 		return database.ChatAgent{}, database.ChatPersona{}, xerrors.Errorf(
 			"agent %q is unknown, disabled, or not available in this chat's organization", slug,
 		)
 	}
+	agent := agents[i]
 
 	// The catalog query above already authorized visibility; the
 	// persona read uses the same chatd scope.
 	//nolint:gocritic // See above.
 	persona, _, err := ResolveChatPersona(dbauthz.AsChatd(ctx), p.db, agent.PersonaID)
 	if err != nil {
+		if xerrors.Is(err, sql.ErrNoRows) {
+			return database.ChatAgent{}, database.ChatPersona{}, xerrors.Errorf(
+				"agent %q references a persona that does not exist", slug,
+			)
+		}
 		return database.ChatAgent{}, database.ChatPersona{}, xerrors.Errorf(
-			"agent %q references a persona that does not exist", slug,
+			"resolve persona for agent %q: %w", slug, err,
 		)
 	}
 	if !persona.Enabled {
@@ -368,18 +420,32 @@ func chatAgentSubagentDefinition(
 				agentPromptAppend:   agent.PromptAppend,
 			}
 			// Agent override > persona preference. An unusable
-			// preference (disabled config or provider) falls through
-			// to the next tier.
+			// preference (disabled config or provider, or provider
+			// credentials the chat owner cannot use) falls through to
+			// the next tier, matching the root chat creation path.
 			modelConfigID := uuid.Nil
 			for _, preferred := range []uuid.NullUUID{agent.ModelConfigID, persona.ModelConfigID} {
 				if !preferred.Valid {
 					continue
 				}
-				if _, _, err := p.resolveModelConfigAndNormalizedProvider(ctx, preferred.UUID); err != nil {
+				modelConfig, providerName, err := p.resolveModelConfigAndNormalizedProvider(ctx, preferred.UUID)
+				if err != nil {
 					p.logger.Debug(ctx, "chat agent model preference is unavailable, falling through",
 						slog.F("chat_agent_id", agent.ID),
 						slog.F("model_config_id", preferred.UUID),
 						slog.Error(err),
+					)
+					continue
+				}
+				providerKeys, err := p.resolveUserProviderAPIKeys(ctx, turnParent.OwnerID, modelConfigAIProviderID(modelConfig))
+				if err != nil {
+					return childSubagentChatOptions{}, xerrors.Errorf("resolve provider API keys: %w", err)
+				}
+				if !userCanUseProviderKeys(providerKeys, providerName) {
+					p.logger.Debug(ctx, "chat agent model preference credentials are unavailable, falling through",
+						slog.F("chat_agent_id", agent.ID),
+						slog.F("model_config_id", preferred.UUID),
+						slog.F("provider", providerName),
 					)
 					continue
 				}
@@ -493,7 +559,7 @@ func buildSpawnAgentDescription(
 			"\" should be used for cloning repositories or non-local investigation. " +
 			"They must not implement changes or intentionally modify workspace files."
 	}
-	if catalog := formatChatAgentCatalog(availableChatAgentsForChat(ctx, p, currentChat)); catalog != "" {
+	if catalog := formatChatAgentCatalog(enumeratedChatAgentsForChat(ctx, p, currentChat)); catalog != "" {
 		description += " Named agent types are also available; each runs the " +
 			"child with that agent's persona and instructions: " + catalog + "."
 	}
@@ -501,15 +567,18 @@ func buildSpawnAgentDescription(
 }
 
 // formatChatAgentCatalog renders the agent:<slug> catalog entries for
-// the spawn_agent tool description.
+// the spawn_agent tool description. Names and descriptions are
+// admin-authored free text embedded in every generation's tool schema,
+// so they get the same sanitization as prompt fields.
 func formatChatAgentCatalog(agents []database.ChatAgent) string {
 	parts := make([]string, 0, len(agents))
 	for _, agent := range agents {
 		entry := subagentTypeChatAgentPrefix + agent.Slug
-		if agent.Description != "" {
-			entry += " (" + agent.Name + ": " + agent.Description + ")"
-		} else {
-			entry += " (" + agent.Name + ")"
+		name := SanitizePromptText(agent.Name)
+		if description := SanitizePromptText(agent.Description); description != "" {
+			entry += " (" + name + ": " + description + ")"
+		} else if name != "" {
+			entry += " (" + name + ")"
 		}
 		parts = append(parts, entry)
 	}

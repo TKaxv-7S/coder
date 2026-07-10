@@ -29,7 +29,7 @@ import { TableLoader } from "#/components/TableLoader/TableLoader";
 import { docs } from "#/utils/docs";
 import {
 	chatCatalogScope,
-	EnabledBadge,
+	EnabledStatusBadge,
 	isEditableInScope,
 	ScopeBadge,
 } from "./ScopeBadge";
@@ -129,7 +129,7 @@ export const ChatPersonasPageView: FC<ChatPersonasPageViewProps> = ({
 										<ScopeBadge scope={chatCatalogScope(persona)} />
 									</TableCell>
 									<TableCell>
-										<EnabledBadge enabled={persona.enabled} />
+										<EnabledStatusBadge enabled={persona.enabled} />
 									</TableCell>
 									<TableCell>
 										{editable && (

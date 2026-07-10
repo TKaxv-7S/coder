@@ -2,6 +2,7 @@ package coderd
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -17,13 +18,27 @@ import (
 	"github.com/coder/coder/v2/coderd/httpmw"
 	"github.com/coder/coder/v2/coderd/rbac"
 	"github.com/coder/coder/v2/coderd/rbac/policy"
+	"github.com/coder/coder/v2/coderd/util/ptr"
 	"github.com/coder/coder/v2/coderd/x/chatd"
 	"github.com/coder/coder/v2/codersdk"
 )
 
-// chatAgentSlugRegex validates persona and agent slugs: lowercase
+// chatCatalogSlugRegex validates persona and agent slugs: lowercase
 // alphanumeric segments separated by single hyphens.
-var chatAgentSlugRegex = regexp.MustCompile(`^[a-z0-9](-?[a-z0-9])*$`)
+var chatCatalogSlugRegex = regexp.MustCompile(`^[a-z0-9](-?[a-z0-9])*$`)
+
+// Length limits for persona and agent text fields. Names and
+// descriptions are embedded in the spawn_agent tool schema sent on
+// every generation, and prompts are copied into every chat created
+// with the persona or agent, so unbounded values would inflate every
+// request to the model.
+const (
+	chatCatalogSlugMaxLen        = 64
+	chatCatalogNameMaxLen        = 64
+	chatCatalogDescriptionMaxLen = 512
+	chatCatalogIconMaxLen        = 256
+	chatCatalogPromptMaxLen      = 32768
+)
 
 func convertChatPersona(persona database.ChatPersona, builtin bool) codersdk.ChatPersona {
 	out := codersdk.ChatPersona{
@@ -39,12 +54,10 @@ func convertChatPersona(persona database.ChatPersona, builtin bool) codersdk.Cha
 		UpdatedAt:    persona.UpdatedAt,
 	}
 	if persona.OrganizationID.Valid {
-		orgID := persona.OrganizationID.UUID
-		out.OrganizationID = &orgID
+		out.OrganizationID = ptr.Ref(persona.OrganizationID.UUID)
 	}
 	if persona.ModelConfigID.Valid {
-		modelConfigID := persona.ModelConfigID.UUID
-		out.ModelConfigID = &modelConfigID
+		out.ModelConfigID = ptr.Ref(persona.ModelConfigID.UUID)
 	}
 	return out
 }
@@ -64,19 +77,21 @@ func convertChatAgent(agent database.ChatAgent, builtin bool) codersdk.ChatAgent
 		UpdatedAt:    agent.UpdatedAt,
 	}
 	if agent.OrganizationID.Valid {
-		orgID := agent.OrganizationID.UUID
-		out.OrganizationID = &orgID
+		out.OrganizationID = ptr.Ref(agent.OrganizationID.UUID)
 	}
 	if agent.ModelConfigID.Valid {
-		modelConfigID := agent.ModelConfigID.UUID
-		out.ModelConfigID = &modelConfigID
+		out.ModelConfigID = ptr.Ref(agent.ModelConfigID.UUID)
 	}
 	return out
 }
 
-// parseChatAgentListOrganization parses the optional `organization`
-// query parameter for the persona and agent list endpoints.
-func parseChatAgentListOrganization(rw http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
+// parseChatCatalogListOrganization parses the optional `organization`
+// query parameter for the persona and agent list endpoints and, when
+// present, verifies the caller can read that organization. Org-scoped
+// personas and agents are member-readable through a site-wide RBAC
+// grant that exists for deployment-scoped rows, so org membership is
+// enforced here to keep one org's entries invisible to other orgs.
+func (api *API) parseChatCatalogListOrganization(rw http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
 	raw := r.URL.Query().Get("organization")
 	if raw == "" {
 		return uuid.Nil, true
@@ -89,19 +104,29 @@ func parseChatAgentListOrganization(rw http.ResponseWriter, r *http.Request) (uu
 		})
 		return uuid.Nil, false
 	}
+	if !api.Authorize(r, policy.ActionRead, rbac.ResourceOrganization.InOrg(orgID)) {
+		httpapi.ResourceNotFound(rw)
+		return uuid.Nil, false
+	}
 	return orgID, true
 }
 
-// validateChatAgentSlug validates a new persona or agent slug and
+// validateChatCatalogSlug validates a new persona or agent slug and
 // writes an error response when invalid.
-func validateChatAgentSlug(rw http.ResponseWriter, r *http.Request, slug string) bool {
+func validateChatCatalogSlug(rw http.ResponseWriter, r *http.Request, slug string) bool {
 	if slug == "" {
 		httpapi.Write(r.Context(), rw, http.StatusBadRequest, codersdk.Response{
 			Message: "Slug is required.",
 		})
 		return false
 	}
-	if !chatAgentSlugRegex.MatchString(slug) {
+	if len(slug) > chatCatalogSlugMaxLen {
+		httpapi.Write(r.Context(), rw, http.StatusBadRequest, codersdk.Response{
+			Message: fmt.Sprintf("Slug must be at most %d characters.", chatCatalogSlugMaxLen),
+		})
+		return false
+	}
+	if !chatCatalogSlugRegex.MatchString(slug) {
 		httpapi.Write(r.Context(), rw, http.StatusBadRequest, codersdk.Response{
 			Message: "Invalid slug.",
 			Detail:  "Slugs must be lowercase alphanumeric segments separated by single hyphens.",
@@ -111,10 +136,22 @@ func validateChatAgentSlug(rw http.ResponseWriter, r *http.Request, slug string)
 	return true
 }
 
-// validateChatAgentModelConfigID checks that a referenced chat model
+// validateChatCatalogFieldLen enforces a maximum length on a persona
+// or agent text field, writing an error response when exceeded.
+func validateChatCatalogFieldLen(rw http.ResponseWriter, r *http.Request, field, value string, maxLen int) bool {
+	if len(value) > maxLen {
+		httpapi.Write(r.Context(), rw, http.StatusBadRequest, codersdk.Response{
+			Message: fmt.Sprintf("%s must be at most %d characters.", field, maxLen),
+		})
+		return false
+	}
+	return true
+}
+
+// validateChatCatalogModelConfigID checks that a referenced chat model
 // config exists and is not deleted. It writes an error response and
 // returns false when the reference is invalid.
-func (api *API) validateChatAgentModelConfigID(rw http.ResponseWriter, r *http.Request, modelConfigID uuid.UUID) bool {
+func (api *API) validateChatCatalogModelConfigID(rw http.ResponseWriter, r *http.Request, modelConfigID uuid.UUID) bool {
 	ctx := r.Context()
 	//nolint:gocritic // The caller already authorized the persona/agent write; model configs are deployment-wide.
 	_, err := api.Database.GetChatModelConfigByID(dbauthz.AsChatd(ctx), modelConfigID)
@@ -182,7 +219,7 @@ func (api *API) validateChatAgentPersona(rw http.ResponseWriter, r *http.Request
 // @Description Experimental: this endpoint is subject to change.
 func (api *API) listChatPersonas(rw http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	orgID, ok := parseChatAgentListOrganization(rw, r)
+	orgID, ok := api.parseChatCatalogListOrganization(rw, r)
 	if !ok {
 		return
 	}
@@ -218,7 +255,7 @@ func (api *API) listChatPersonas(rw http.ResponseWriter, r *http.Request) {
 // @Description Experimental: this endpoint is subject to change.
 func (api *API) listChatAgents(rw http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	orgID, ok := parseChatAgentListOrganization(rw, r)
+	orgID, ok := api.parseChatCatalogListOrganization(rw, r)
 	if !ok {
 		return
 	}
@@ -289,7 +326,7 @@ func (api *API) CreateChatPersona(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	slug := strings.TrimSpace(req.Slug)
-	if !validateChatAgentSlug(rw, r, slug) {
+	if !validateChatCatalogSlug(rw, r, slug) {
 		return
 	}
 	if chatd.IsBuiltinChatPersonaSlug(slug) {
@@ -311,9 +348,15 @@ func (api *API) CreateChatPersona(rw http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+	if !validateChatCatalogFieldLen(rw, r, "Name", name, chatCatalogNameMaxLen) ||
+		!validateChatCatalogFieldLen(rw, r, "Description", req.Description, chatCatalogDescriptionMaxLen) ||
+		!validateChatCatalogFieldLen(rw, r, "Icon", req.Icon, chatCatalogIconMaxLen) ||
+		!validateChatCatalogFieldLen(rw, r, "System prompt", req.SystemPrompt, chatCatalogPromptMaxLen) {
+		return
+	}
 	modelConfigID := uuid.NullUUID{}
 	if req.ModelConfigID != nil && *req.ModelConfigID != uuid.Nil {
-		if !api.validateChatAgentModelConfigID(rw, r, *req.ModelConfigID) {
+		if !api.validateChatCatalogModelConfigID(rw, r, *req.ModelConfigID) {
 			return
 		}
 		modelConfigID = uuid.NullUUID{UUID: *req.ModelConfigID, Valid: true}
@@ -433,12 +476,21 @@ func (api *API) UpdateChatPersona(rw http.ResponseWriter, r *http.Request) {
 			})
 			return
 		}
+		if !validateChatCatalogFieldLen(rw, r, "Name", name, chatCatalogNameMaxLen) {
+			return
+		}
 		params.Name = name
 	}
 	if req.Description != nil {
+		if !validateChatCatalogFieldLen(rw, r, "Description", *req.Description, chatCatalogDescriptionMaxLen) {
+			return
+		}
 		params.Description = strings.TrimSpace(*req.Description)
 	}
 	if req.Icon != nil {
+		if !validateChatCatalogFieldLen(rw, r, "Icon", *req.Icon, chatCatalogIconMaxLen) {
+			return
+		}
 		params.Icon = strings.TrimSpace(*req.Icon)
 	}
 	if req.SystemPrompt != nil {
@@ -448,13 +500,16 @@ func (api *API) UpdateChatPersona(rw http.ResponseWriter, r *http.Request) {
 			})
 			return
 		}
+		if !validateChatCatalogFieldLen(rw, r, "System prompt", *req.SystemPrompt, chatCatalogPromptMaxLen) {
+			return
+		}
 		params.SystemPrompt = *req.SystemPrompt
 	}
 	if req.ModelConfigID != nil {
 		if *req.ModelConfigID == uuid.Nil {
 			params.ModelConfigID = uuid.NullUUID{}
 		} else {
-			if !api.validateChatAgentModelConfigID(rw, r, *req.ModelConfigID) {
+			if !api.validateChatCatalogModelConfigID(rw, r, *req.ModelConfigID) {
 				return
 			}
 			params.ModelConfigID = uuid.NullUUID{UUID: *req.ModelConfigID, Valid: true}
@@ -529,6 +584,26 @@ func (api *API) DeleteChatPersona(rw http.ResponseWriter, r *http.Request) {
 	defer commitAudit()
 	aReq.Old = existing
 
+	// Personas have no foreign key from chat_agents (agents may
+	// reference in-memory builtin personas), so referential integrity
+	// is enforced here: deletion is blocked while non-deleted agents
+	// still reference the persona.
+	referencing, err := api.Database.CountChatAgentsByPersonaID(ctx, personaID)
+	if err != nil {
+		httpapi.Write(ctx, rw, http.StatusInternalServerError, codersdk.Response{
+			Message: "Failed to check chat agents referencing the persona.",
+			Detail:  err.Error(),
+		})
+		return
+	}
+	if referencing > 0 {
+		httpapi.Write(ctx, rw, http.StatusConflict, codersdk.Response{
+			Message: fmt.Sprintf("Chat persona is referenced by %d chat agent(s).", referencing),
+			Detail:  "Delete or repoint the referencing chat agents first.",
+		})
+		return
+	}
+
 	err = api.Database.UpdateChatPersonaDeletedByID(ctx, personaID)
 	if err != nil {
 		if httpapi.Is404Error(err) {
@@ -591,7 +666,7 @@ func (api *API) CreateChatAgent(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	slug := strings.TrimSpace(req.Slug)
-	if !validateChatAgentSlug(rw, r, slug) {
+	if !validateChatCatalogSlug(rw, r, slug) {
 		return
 	}
 	if chatd.IsBuiltinChatAgentSlug(slug) {
@@ -607,6 +682,12 @@ func (api *API) CreateChatAgent(rw http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+	if !validateChatCatalogFieldLen(rw, r, "Name", name, chatCatalogNameMaxLen) ||
+		!validateChatCatalogFieldLen(rw, r, "Description", req.Description, chatCatalogDescriptionMaxLen) ||
+		!validateChatCatalogFieldLen(rw, r, "Icon", req.Icon, chatCatalogIconMaxLen) ||
+		!validateChatCatalogFieldLen(rw, r, "Prompt append", req.PromptAppend, chatCatalogPromptMaxLen) {
+		return
+	}
 	if req.PersonaID == uuid.Nil {
 		httpapi.Write(ctx, rw, http.StatusBadRequest, codersdk.Response{
 			Message: "Persona ID is required.",
@@ -618,7 +699,7 @@ func (api *API) CreateChatAgent(rw http.ResponseWriter, r *http.Request) {
 	}
 	modelConfigID := uuid.NullUUID{}
 	if req.ModelConfigID != nil && *req.ModelConfigID != uuid.Nil {
-		if !api.validateChatAgentModelConfigID(rw, r, *req.ModelConfigID) {
+		if !api.validateChatCatalogModelConfigID(rw, r, *req.ModelConfigID) {
 			return
 		}
 		modelConfigID = uuid.NullUUID{UUID: *req.ModelConfigID, Valid: true}
@@ -740,12 +821,21 @@ func (api *API) UpdateChatAgent(rw http.ResponseWriter, r *http.Request) {
 			})
 			return
 		}
+		if !validateChatCatalogFieldLen(rw, r, "Name", name, chatCatalogNameMaxLen) {
+			return
+		}
 		params.Name = name
 	}
 	if req.Description != nil {
+		if !validateChatCatalogFieldLen(rw, r, "Description", *req.Description, chatCatalogDescriptionMaxLen) {
+			return
+		}
 		params.Description = strings.TrimSpace(*req.Description)
 	}
 	if req.Icon != nil {
+		if !validateChatCatalogFieldLen(rw, r, "Icon", *req.Icon, chatCatalogIconMaxLen) {
+			return
+		}
 		params.Icon = strings.TrimSpace(*req.Icon)
 	}
 	if req.PersonaID != nil {
@@ -761,13 +851,16 @@ func (api *API) UpdateChatAgent(rw http.ResponseWriter, r *http.Request) {
 		params.PersonaID = *req.PersonaID
 	}
 	if req.PromptAppend != nil {
+		if !validateChatCatalogFieldLen(rw, r, "Prompt append", *req.PromptAppend, chatCatalogPromptMaxLen) {
+			return
+		}
 		params.PromptAppend = *req.PromptAppend
 	}
 	if req.ModelConfigID != nil {
 		if *req.ModelConfigID == uuid.Nil {
 			params.ModelConfigID = uuid.NullUUID{}
 		} else {
-			if !api.validateChatAgentModelConfigID(rw, r, *req.ModelConfigID) {
+			if !api.validateChatCatalogModelConfigID(rw, r, *req.ModelConfigID) {
 				return
 			}
 			params.ModelConfigID = uuid.NullUUID{UUID: *req.ModelConfigID, Valid: true}
@@ -941,12 +1034,12 @@ func (api *API) resolveCreateChatAgent(
 	return agent, persona, 0, nil
 }
 
-// populateChatAgentSummaries fills slug, name, and icon on the ID-only
-// agent summaries that db2sdk.Chat attaches to chats created as an
-// agent. Builtins resolve in memory; database rows are collected and
-// fetched in a single batch. Soft-deleted agents still resolve so
-// attribution survives deletion. Failures are non-fatal: the summary
-// keeps its ID.
+// populateChatAgentSummaries fills slug, name, icon, and the builtin
+// flag on the ID-only agent summaries that db2sdk.Chat attaches to
+// chats created as an agent, including their children. Builtins
+// resolve in memory; database rows are collected and fetched in a
+// single batch. Soft-deleted agents still resolve so attribution
+// survives deletion. Failures are non-fatal: the summary keeps its ID.
 func (api *API) populateChatAgentSummaries(ctx context.Context, chats ...*codersdk.Chat) {
 	var pending []*codersdk.ChatAgentSummary
 	var collect func(chat *codersdk.Chat)
@@ -956,6 +1049,7 @@ func (api *API) populateChatAgentSummaries(ctx context.Context, chats ...*coders
 				chat.Agent.Slug = builtin.Slug
 				chat.Agent.Name = builtin.Name
 				chat.Agent.Icon = builtin.Icon
+				chat.Agent.Builtin = true
 			} else {
 				pending = append(pending, chat.Agent)
 			}
@@ -1003,14 +1097,4 @@ func (api *API) populateChatAgentSummaries(ctx context.Context, chats ...*coders
 		summary.Name = agent.Name
 		summary.Icon = agent.Icon
 	}
-}
-
-// populateChatAgentSummariesForList applies populateChatAgentSummaries
-// to a slice of chats.
-func (api *API) populateChatAgentSummariesForList(ctx context.Context, chats []codersdk.Chat) {
-	ptrs := make([]*codersdk.Chat, len(chats))
-	for i := range chats {
-		ptrs[i] = &chats[i]
-	}
-	api.populateChatAgentSummaries(ctx, ptrs...)
 }

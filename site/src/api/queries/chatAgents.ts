@@ -2,6 +2,24 @@ import type { QueryClient } from "react-query";
 import { API } from "#/api/api";
 import type * as TypesGen from "#/api/typesGenerated";
 
+// NIL_UUID clears a persona or agent model preference on update; the
+// API treats the zero UUID as "remove the preference".
+export const NIL_UUID = "00000000-0000-0000-0000-000000000000";
+
+// BUILTIN_CODER_AGENT_SLUG is the slug of the builtin default Coder
+// agent (defined in coderd/x/chatd/builtin_agents.go). Chats created
+// as this agent match the no-agent default behavior, so the UI treats
+// it as the implicit default and hides attribution for it.
+const BUILTIN_CODER_AGENT_SLUG = "coder";
+
+// isDefaultCoderAgent reports whether an agent summary refers to the
+// builtin default Coder agent.
+export const isDefaultCoderAgent = (agent: {
+	slug?: string;
+	builtin?: boolean;
+}): boolean =>
+	Boolean(agent.builtin) && agent.slug === BUILTIN_CODER_AGENT_SLUG;
+
 const chatPersonasKey = (organizationId?: string) =>
 	["chat-personas", organizationId ?? "deployment"] as const;
 
@@ -20,8 +38,9 @@ export const chatAgents = (organizationId?: string) => ({
 		API.experimental.getChatAgents(organizationId),
 });
 
-// Agent list responses embed the effective persona/model, so persona
-// changes can affect agent rows. Invalidate both key families.
+// Agent rows join persona names in the UI and persona deletion is
+// blocked by referencing agents, so changes to either list can affect
+// how the other renders. Invalidate both key families.
 const invalidateChatAgentQueries = async (queryClient: QueryClient) => {
 	await Promise.all([
 		queryClient.invalidateQueries({ queryKey: ["chat-personas"] }),

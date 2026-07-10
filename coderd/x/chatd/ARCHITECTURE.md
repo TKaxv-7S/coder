@@ -1254,10 +1254,11 @@ Personas and agents hook into the pipeline in three places:
 
 - **Prompt assembly.** `CreateChat` and the child-subagent creation path
   build the deployment system prompt through
-  `resolveDeploymentSystemPromptWithBase`. When a persona is active its
-  prompt replaces `DefaultSystemPrompt` as the base; the admin-configured
-  custom prompt and its include-default toggle keep their existing
-  semantics around that base. A non-empty agent `prompt_append` is
+  `resolveDeploymentSystemPrompt`. When a persona is active its
+  prompt replaces `DefaultSystemPrompt` as the base and is always
+  included; the admin-configured custom prompt still appends, and its
+  include-default toggle governs only the built-in default. A non-empty
+  agent `prompt_append` is
   inserted as an additional system message directly after the
   deployment/persona prompt at creation time. Prompts are persisted as
   initial chat messages, so existing chats keep the prompt they were
@@ -1272,7 +1273,11 @@ Personas and agents hook into the pipeline in three places:
   `agent:<slug>` type values in addition to the builtin
   general/explore/computer_use types. The tool description enumerates the
   chat agents available to the chat (builtins plus enabled agents in the
-  chat's deployment or organization scope), capped at
-  `maxSpawnAgentCatalogEntries` to bound tool-schema size. Resolution
+  chat's deployment or organization scope, deduplicated by slug with
+  builtin > organization > deployment precedence), capped at
+  `maxSpawnAgentCatalogEntries` to bound tool-schema size and skipped
+  during plan-mode turns. Slug resolution searches the full uncapped set,
+  so agents omitted from the enumeration remain spawnable by exact slug.
+  Resolution
   happens per spawn in `chatAgentSubagentDefinition`; root-only spawning
   and the other subagent guardrails are unchanged.

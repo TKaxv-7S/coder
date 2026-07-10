@@ -5,9 +5,11 @@ import { toast } from "sonner";
 import {
 	chatPersonas,
 	createChatPersona,
+	NIL_UUID,
 	updateChatPersona,
 } from "#/api/queries/chatAgents";
 import { chatModelConfigs } from "#/api/queries/chats";
+import { ErrorAlert } from "#/components/Alert/ErrorAlert";
 import { EmptyState } from "#/components/EmptyState/EmptyState";
 import { Loader } from "#/components/Loader/Loader";
 import {
@@ -22,15 +24,11 @@ import {
 import { RequirePermission } from "#/modules/permissions/RequirePermission";
 import { pageTitle } from "#/utils/page";
 
-// UpdateChatPersonaRequest treats the zero UUID as "clear the model
-// preference"; omitting the field leaves it unchanged.
-export const NIL_UUID = "00000000-0000-0000-0000-000000000000";
-
 const CreateEditChatPersonaPage: FC = () => {
 	const { permissions } = useAuthenticated();
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
-	const { personaId } = useParams() as { personaId?: string };
+	const { personaId } = useParams<{ personaId: string }>();
 
 	const personasQuery = useQuery(chatPersonas());
 	const modelConfigsQuery = useQuery(chatModelConfigs());
@@ -98,6 +96,8 @@ const CreateEditChatPersonaPage: FC = () => {
 			</SettingsHeader>
 			{isEditing && personasQuery.isLoading ? (
 				<Loader />
+			) : isEditing && personasQuery.isError ? (
+				<ErrorAlert error={personasQuery.error} />
 			) : isEditing && !editingPersona ? (
 				<EmptyState message="Persona not found" />
 			) : (
@@ -106,7 +106,11 @@ const CreateEditChatPersonaPage: FC = () => {
 					modelConfigs={modelConfigsQuery.data ?? []}
 					isSaving={createMutation.isPending || updateMutation.isPending}
 					readOnly={isBuiltin}
-					error={createMutation.error ?? updateMutation.error}
+					error={
+						modelConfigsQuery.error ??
+						createMutation.error ??
+						updateMutation.error
+					}
 					onSubmit={handleSubmit}
 					onCancel={() => void navigate(listPath)}
 				/>

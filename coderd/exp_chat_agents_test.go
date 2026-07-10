@@ -1,6 +1,7 @@
 package coderd_test
 
 import (
+	"net/http"
 	"testing"
 
 	"github.com/google/uuid"
@@ -95,6 +96,24 @@ func TestListChatPersonas(t *testing.T) {
 		require.Contains(t, ids, orgPersona.ID)
 		require.NotContains(t, ids, otherOrgPersona.ID)
 		require.Contains(t, ids, chatd.BuiltinChatPersonaSWEID)
+
+		// A member cannot list another organization's personas even
+		// though the RBAC read grant is site-wide; the list endpoint
+		// enforces org membership.
+		_, err = exp.ChatPersonas(ctx, otherOrg.ID)
+		var sdkErr *codersdk.Error
+		require.ErrorAs(t, err, &sdkErr)
+		require.Equal(t, http.StatusNotFound, sdkErr.StatusCode())
+
+		// The owner can list any organization's personas.
+		ownerExp := codersdk.NewExperimentalClient(client)
+		personas, err = ownerExp.ChatPersonas(ctx, otherOrg.ID)
+		require.NoError(t, err)
+		ids = make(map[uuid.UUID]struct{})
+		for _, persona := range personas {
+			ids[persona.ID] = struct{}{}
+		}
+		require.Contains(t, ids, otherOrgPersona.ID)
 	})
 }
 

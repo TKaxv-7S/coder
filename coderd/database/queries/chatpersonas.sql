@@ -69,8 +69,10 @@ WHERE
 RETURNING *;
 
 -- name: UpdateChatPersonaDeletedByID :exec
--- Soft delete keeps the row so agents and chats referencing the
--- persona retain FK integrity.
+-- Soft delete keeps the row so historical references stay resolvable.
+-- There are no foreign keys from chat_agents or chats because those
+-- columns may reference in-memory builtin personas and agents; the API
+-- layer blocks deletion while non-deleted agents reference the persona.
 UPDATE
     chat_personas
 SET
