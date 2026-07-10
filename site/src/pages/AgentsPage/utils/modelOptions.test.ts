@@ -16,6 +16,7 @@ import {
 	getUnsupportedProviderNames,
 	hasConfiguredProviderConfigs,
 	hasUserFixableProviders,
+	modelSelectorOptionFromConfig,
 	providerInfoByIDFromConfigs,
 	providerInfoByIDFromUserConfigs,
 	providerTypeByIDFromConfigs,
@@ -277,6 +278,39 @@ describe("resolveModelOptionId", () => {
 
 	it("returns an empty string when no option matches", () => {
 		expect(resolveModelOptionId("openai:gpt-5", modelOptions)).toBe("");
+	});
+});
+
+describe("modelSelectorOptionFromConfig", () => {
+	it("projects model config and provider metadata", () => {
+		const config = createConfig({
+			id: "config-id",
+			ai_provider_id: "provider-id",
+			model: "model-id",
+			display_name: "  Display name  ",
+			context_limit: 128_000,
+			model_config: { reasoning_effort: { default: "medium" } },
+			reasoning_efforts: ["low", "medium", "high"],
+		});
+
+		expect(
+			modelSelectorOptionFromConfig(config, {
+				provider: "provider",
+				displayName: "Provider",
+				icon: "icon",
+			}),
+		).toEqual({
+			id: "config-id",
+			provider: "provider",
+			providerId: "provider-id",
+			providerLabel: "Provider",
+			providerIcon: "icon",
+			model: "model-id",
+			displayName: "Display name",
+			contextLimit: 128_000,
+			reasoningEffortDefault: "medium",
+			reasoningEfforts: ["low", "medium", "high"],
+		});
 	});
 });
 

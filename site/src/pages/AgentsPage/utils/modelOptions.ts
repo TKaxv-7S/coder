@@ -164,6 +164,28 @@ export type ProviderInfo = {
 	readonly icon: string;
 };
 
+export const modelSelectorOptionFromConfig = (
+	config: TypesGen.ChatModelConfig,
+	providerInfo: ProviderInfo | undefined,
+): ModelSelectorOption => {
+	const reasoningEffort = config.model_config?.reasoning_effort;
+	const reasoningEfforts = config.reasoning_efforts ?? [];
+	return {
+		id: config.id,
+		provider: providerInfo?.provider ?? "",
+		providerId: config.ai_provider_id,
+		providerLabel: providerInfo?.displayName,
+		providerIcon: providerInfo?.icon,
+		model: config.model,
+		displayName: config.display_name.trim() || config.model,
+		contextLimit: config.context_limit,
+		...(reasoningEffort?.default
+			? { reasoningEffortDefault: reasoningEffort.default }
+			: {}),
+		...(reasoningEfforts.length > 0 ? { reasoningEfforts } : {}),
+	};
+};
+
 // providerInfoByIDFromConfigs and providerInfoByIDFromUserConfigs build
 // the ai_provider_id -> provider metadata lookup that
 // getModelOptionsFromConfigs needs. The admin and user provider endpoints

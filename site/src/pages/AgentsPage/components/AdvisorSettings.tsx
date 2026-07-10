@@ -10,13 +10,12 @@ import { Button } from "#/components/Button/Button";
 import { useTemporarySavedState } from "#/components/TemporarySavedState/TemporarySavedState";
 import { AgentSettingLayout } from "#/pages/AISettingsPage/CoderAgentsPage/components/AgentSettingLayout";
 import { cn } from "#/utils/cn";
-import type { ProviderInfo } from "../utils/modelOptions";
-import { pickReasoningEffort } from "../utils/reasoningEffort";
 import {
-	ModelSelector,
-	type ModelSelectorOption,
-	type ModelSelectorSpecialOption,
-} from "./ChatElements";
+	modelSelectorOptionFromConfig,
+	type ProviderInfo,
+} from "../utils/modelOptions";
+import { pickReasoningEffort } from "../utils/reasoningEffort";
+import { ModelSelector, type ModelSelectorSpecialOption } from "./ChatElements";
 
 const nilUUID = "00000000-0000-0000-0000-000000000000";
 const chatModelFallbackValue = "__use-chat-model__";
@@ -121,9 +120,6 @@ const validateAdvisorConfig = (values: AdvisorSettingsFormValues) => {
 	return errors;
 };
 
-const getModelDisplayName = (config: ChatModelConfig): string =>
-	config.display_name.trim() || config.model;
-
 export const AdvisorSettings: FC<AdvisorSettingsProps> = ({
 	advisorConfigData,
 	isAdvisorConfigLoading,
@@ -144,26 +140,11 @@ export const AdvisorSettings: FC<AdvisorSettingsProps> = ({
 	const { isSavedVisible, showSavedState } = useTemporarySavedState();
 	const hasLoadedAdvisorConfig = advisorConfigData !== undefined;
 	const enabledModelConfigs = modelConfigs.filter((config) => config.enabled);
-	const modelOptions: ModelSelectorOption[] = enabledModelConfigs.map(
-		(modelConfig) => {
-			const providerInfo = providerInfoByID.get(modelConfig.ai_provider_id);
-			const reasoningEffort = modelConfig.model_config?.reasoning_effort;
-			const reasoningEfforts = modelConfig.reasoning_efforts ?? [];
-			return {
-				id: modelConfig.id,
-				provider: providerInfo?.provider ?? "",
-				providerId: modelConfig.ai_provider_id,
-				providerLabel: providerInfo?.displayName,
-				providerIcon: providerInfo?.icon,
-				model: modelConfig.model,
-				displayName: getModelDisplayName(modelConfig),
-				contextLimit: modelConfig.context_limit,
-				...(reasoningEffort?.default
-					? { reasoningEffortDefault: reasoningEffort.default }
-					: {}),
-				...(reasoningEfforts.length > 0 ? { reasoningEfforts } : {}),
-			};
-		},
+	const modelOptions = enabledModelConfigs.map((modelConfig) =>
+		modelSelectorOptionFromConfig(
+			modelConfig,
+			providerInfoByID.get(modelConfig.ai_provider_id),
+		),
 	);
 
 	const form = useFormik<AdvisorSettingsFormValues>({
@@ -255,7 +236,7 @@ export const AdvisorSettings: FC<AdvisorSettingsProps> = ({
 		});
 	} else if (hasUnavailableSelectedModel) {
 		const unavailableLabel = selectedModelConfig
-			? `Unavailable: ${getModelDisplayName(selectedModelConfig)}`
+			? `Unavailable: ${selectedModelConfig.display_name.trim() || selectedModelConfig.model}`
 			: `Unavailable model (${form.values.model_config_id})`;
 		specialOptions.push({
 			value: form.values.model_config_id,
