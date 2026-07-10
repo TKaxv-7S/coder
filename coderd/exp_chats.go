@@ -474,7 +474,9 @@ func (api *API) listChats(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	httpapi.Write(ctx, rw, http.StatusOK, db2sdk.ChatRowsWithChildren(chatRows, childRows, diffStatusesByChatID))
+	sdkChats := db2sdk.ChatRowsWithChildren(chatRows, childRows, diffStatusesByChatID)
+	api.populateChatAgentSummariesForList(ctx, sdkChats)
+	httpapi.Write(ctx, rw, http.StatusOK, sdkChats)
 }
 
 func (api *API) getChatDiffStatusesByChatID(
@@ -1201,7 +1203,34 @@ func (api *API) postChats(rw http.ResponseWriter, r *http.Request) {
 
 	title := chatprompt.FallbackTitle(titleSource)
 
-	modelConfigID, personalOverrideEffort, modelConfigStatus, modelConfigError := api.resolveCreateChatModelConfigID(ctx, apiKey.UserID, req)
+	// Resolve the requested chat agent (builtin or database) before
+	// model resolution so agent and persona model preferences can
+	// participate in the precedence chain.
+	var (
+		chatAgentID          uuid.NullUUID
+		personaSystemPrompt  string
+		agentPromptAppend    string
+		agentModelConfigID   uuid.UUID
+		personaModelConfigID uuid.UUID
+	)
+	if req.AgentID != nil && *req.AgentID != uuid.Nil {
+		chatAgent, chatPersona, agentStatus, agentError := api.resolveCreateChatAgent(ctx, req.OrganizationID, *req.AgentID)
+		if agentError != nil {
+			httpapi.Write(ctx, rw, agentStatus, *agentError)
+			return
+		}
+		chatAgentID = uuid.NullUUID{UUID: chatAgent.ID, Valid: true}
+		personaSystemPrompt = chatPersona.SystemPrompt
+		agentPromptAppend = chatAgent.PromptAppend
+		if chatAgent.ModelConfigID.Valid {
+			agentModelConfigID = chatAgent.ModelConfigID.UUID
+		}
+		if chatPersona.ModelConfigID.Valid {
+			personaModelConfigID = chatPersona.ModelConfigID.UUID
+		}
+	}
+
+	modelConfigID, personalOverrideEffort, modelConfigStatus, modelConfigError := api.resolveCreateChatModelConfigID(ctx, apiKey.UserID, req, agentModelConfigID, personaModelConfigID)
 	if modelConfigError != nil {
 		httpapi.Write(ctx, rw, modelConfigStatus, *modelConfigError)
 		return
@@ -1327,20 +1356,23 @@ func (api *API) postChats(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	chat, err := api.chatDaemon.CreateChat(ctx, chatd.CreateOptions{
-		OrganizationID:     req.OrganizationID,
-		OwnerID:            apiKey.UserID,
-		WorkspaceID:        workspaceSelection.WorkspaceID,
-		Title:              title,
-		ModelConfigID:      modelConfigID,
-		ReasoningEffort:    reasoningEffort,
-		PlanMode:           planModeToNullChatPlanMode(req.PlanMode),
-		ClientType:         clientType,
-		SystemPrompt:       req.SystemPrompt,
-		InitialUserContent: contentBlocks,
-		APIKeyID:           apiKey.ID,
-		MCPServerIDs:       mcpServerIDs,
-		Labels:             labels,
-		DynamicTools:       dynamicToolsJSON,
+		OrganizationID:      req.OrganizationID,
+		OwnerID:             apiKey.UserID,
+		WorkspaceID:         workspaceSelection.WorkspaceID,
+		Title:               title,
+		ModelConfigID:       modelConfigID,
+		ReasoningEffort:     reasoningEffort,
+		PlanMode:            planModeToNullChatPlanMode(req.PlanMode),
+		ClientType:          clientType,
+		SystemPrompt:        req.SystemPrompt,
+		InitialUserContent:  contentBlocks,
+		APIKeyID:            apiKey.ID,
+		MCPServerIDs:        mcpServerIDs,
+		Labels:              labels,
+		DynamicTools:        dynamicToolsJSON,
+		ChatAgentID:         chatAgentID,
+		PersonaSystemPrompt: personaSystemPrompt,
+		AgentPromptAppend:   agentPromptAppend,
 		// IMPORTANT: users can only create root chats at the time of writing.
 		ParentChatID: uuid.NullUUID{},
 	})
@@ -1405,6 +1437,7 @@ func (api *API) postChats(rw http.ResponseWriter, r *http.Request) {
 
 	chatFiles := api.fetchChatFileMetadata(ctx, chat.ID)
 	response := db2sdk.Chat(chat, nil, chatFiles)
+	api.populateChatAgentSummaries(ctx, &response)
 	if len(unlinked) > 0 {
 		if capExceeded {
 			response.Warnings = append(response.Warnings, fileLinkCapWarning(len(unlinked)))
@@ -2146,6 +2179,7 @@ func (api *API) getChat(rw http.ResponseWriter, r *http.Request) {
 	chatFiles := api.fetchChatFileMetadata(ctx, chat.ID)
 
 	sdkChat := db2sdk.Chat(chat, diffStatus, chatFiles)
+	api.populateChatAgentSummaries(ctx, &sdkChat)
 
 	// Enrich the lightweight context summary with the chat's pinned
 	// resources (metadata only). This detail is computed on read and only
@@ -4720,6 +4754,8 @@ func (api *API) resolveCreateChatModelConfigID(
 	ctx context.Context,
 	userID uuid.UUID,
 	req codersdk.CreateChatRequest,
+	agentModelConfigID uuid.UUID,
+	personaModelConfigID uuid.UUID,
 ) (uuid.UUID, *string, int, *codersdk.Response) {
 	if req.ModelConfigID != nil {
 		if *req.ModelConfigID == uuid.Nil {
@@ -4728,6 +4764,32 @@ func (api *API) resolveCreateChatModelConfigID(
 			}
 		}
 		return *req.ModelConfigID, nil, 0, nil
+	}
+
+	// Agent and persona model preferences apply after an explicit
+	// request override and before personal overrides. An unavailable
+	// preference falls through to the next tier rather than erroring.
+	for _, preferred := range []uuid.UUID{agentModelConfigID, personaModelConfigID} {
+		if preferred == uuid.Nil {
+			continue
+		}
+		_, reason, err := api.userCanUseChatModelConfig(ctx, userID, preferred)
+		if err != nil {
+			return uuid.Nil, nil, http.StatusInternalServerError, &codersdk.Response{
+				Message: "Failed to resolve chat model config.",
+				Detail:  err.Error(),
+			}
+		}
+		if reason == chatModelConfigAvailable {
+			return preferred, nil, 0, nil
+		}
+		api.Logger.Debug(
+			ctx,
+			"chat agent or persona model preference is unavailable, falling through",
+			slog.F("user_id", userID),
+			slog.F("model_config_id", preferred),
+			slog.F("reason", reason),
+		)
 	}
 
 	personalOverridesEnabled, err := api.Database.GetChatPersonalModelOverridesEnabled(ctx)

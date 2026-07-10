@@ -19,11 +19,14 @@ import (
 
 // CreateChatInput configures [CreateChat].
 type CreateChatInput struct {
-	OrganizationID    uuid.UUID
-	OwnerID           uuid.UUID
-	WorkspaceID       uuid.NullUUID
-	BuildID           uuid.NullUUID
-	AgentID           uuid.NullUUID
+	OrganizationID uuid.UUID
+	OwnerID        uuid.UUID
+	WorkspaceID    uuid.NullUUID
+	BuildID        uuid.NullUUID
+	AgentID        uuid.NullUUID
+	// ChatAgentID is the chat agent (builtin or database) the chat
+	// was created as. Distinct from AgentID, the workspace agent.
+	ChatAgentID       uuid.NullUUID
 	ParentChatID      uuid.NullUUID
 	RootChatID        uuid.NullUUID
 	LastModelConfigID uuid.UUID
@@ -83,6 +86,7 @@ func CreateChat(
 			WorkspaceID:       input.WorkspaceID,
 			BuildID:           input.BuildID,
 			AgentID:           input.AgentID,
+			ChatAgentID:       input.ChatAgentID,
 			ParentChatID:      input.ParentChatID,
 			RootChatID:        input.RootChatID,
 			LastModelConfigID: input.LastModelConfigID,

@@ -151,6 +151,11 @@ type Chat struct {
 	// subagents, so nesting depth is capped at 1 and this slice is
 	// always empty for child chats.
 	Children []Chat `json:"children"`
+	// Agent identifies the chat agent this chat was created as, if
+	// any. Slug, name, and icon are populated on the main chat read
+	// endpoints; compact payloads such as watch events carry only
+	// the ID.
+	Agent *ChatAgentSummary `json:"agent,omitempty"`
 }
 
 // ChatContext reports a chat's pinned workspace context and whether it has
@@ -550,11 +555,15 @@ type ToolResult struct {
 
 // CreateChatRequest is the request to create a new chat.
 type CreateChatRequest struct {
-	OrganizationID  uuid.UUID         `json:"organization_id" format:"uuid"`
-	Content         []ChatInputPart   `json:"content"`
-	SystemPrompt    string            `json:"system_prompt,omitempty"`
-	WorkspaceID     *uuid.UUID        `json:"workspace_id,omitempty" format:"uuid"`
-	ModelConfigID   *uuid.UUID        `json:"model_config_id,omitempty" format:"uuid"`
+	OrganizationID uuid.UUID       `json:"organization_id" format:"uuid"`
+	Content        []ChatInputPart `json:"content"`
+	SystemPrompt   string          `json:"system_prompt,omitempty"`
+	WorkspaceID    *uuid.UUID      `json:"workspace_id,omitempty" format:"uuid"`
+	ModelConfigID  *uuid.UUID      `json:"model_config_id,omitempty" format:"uuid"`
+	// AgentID selects the chat agent (builtin or database) whose
+	// persona supplies the base system prompt. Nil preserves the
+	// default behavior (the builtin Coder agent).
+	AgentID         *uuid.UUID        `json:"agent_id,omitempty" format:"uuid"`
 	ReasoningEffort *string           `json:"reasoning_effort,omitempty"`
 	MCPServerIDs    []uuid.UUID       `json:"mcp_server_ids,omitempty" format:"uuid"`
 	Labels          map[string]string `json:"labels,omitempty"`

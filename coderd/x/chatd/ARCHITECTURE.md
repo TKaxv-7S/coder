@@ -1239,3 +1239,40 @@ The loop should not terminate just because:
 - pubsub drops a notification;
 - the relay has no parts yet for the requested episode;
 - the relay connection reconnects.
+
+# Chat personas and agents
+
+Personas bundle a system prompt with an optional preferred model. Agents
+point at a persona and optionally append prompt text or override the
+model. Both come in three tiers: builtin (in-memory catalog entries with
+fixed UUIDs in `builtin_agents.go`, always enabled, never mutable),
+deployment-scoped database rows, and organization-scoped database rows.
+Chats record the agent they were created as in `chats.chat_agent_id`,
+which has no foreign key because builtin agents are not database rows.
+
+Personas and agents hook into the pipeline in three places:
+
+- **Prompt assembly.** `CreateChat` and the child-subagent creation path
+  build the deployment system prompt through
+  `resolveDeploymentSystemPromptWithBase`. When a persona is active its
+  prompt replaces `DefaultSystemPrompt` as the base; the admin-configured
+  custom prompt and its include-default toggle keep their existing
+  semantics around that base. A non-empty agent `prompt_append` is
+  inserted as an additional system message directly after the
+  deployment/persona prompt at creation time. Prompts are persisted as
+  initial chat messages, so existing chats keep the prompt they were
+  created with regardless of later persona edits.
+- **Model resolution.** At chat creation the precedence is: explicit
+  request model > agent override > persona preference > the existing
+  fallthrough (personal overrides, then the deployment default). An
+  unavailable agent or persona preference falls through to the next tier
+  instead of erroring. Subagent children resolve agent override > persona
+  preference > the general per-context subagent resolution.
+- **spawn_agent delegation.** The `spawn_agent` tool accepts
+  `agent:<slug>` type values in addition to the builtin
+  general/explore/computer_use types. The tool description enumerates the
+  chat agents available to the chat (builtins plus enabled agents in the
+  chat's deployment or organization scope), capped at
+  `maxSpawnAgentCatalogEntries` to bound tool-schema size. Resolution
+  happens per spawn in `chatAgentSubagentDefinition`; root-only spawning
+  and the other subagent guardrails are unchanged.

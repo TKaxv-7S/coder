@@ -31,6 +31,12 @@ Experimental: this endpoint is subject to change.
 ```json
 [
   {
+    "agent": {
+      "icon": "string",
+      "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
+      "name": "string",
+      "slug": "string"
+    },
     "agent_id": "2b1e3b65-2c04-4fa2-a2d7-467901e98978",
     "archived": true,
     "build_id": "bfb1f3fa-bf7b-43a5-9e0b-26cc050e44cb",
@@ -145,6 +151,11 @@ Status Code **200**
 | Name                      | Type                                                                               | Required | Restrictions | Description                                                                                                                                                                                                                                                                |
 |---------------------------|------------------------------------------------------------------------------------|----------|--------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `[array item]`            | array                                                                              | false    |              |                                                                                                                                                                                                                                                                            |
+| `» agent`                 | [codersdk.ChatAgentSummary](schemas.md#codersdkchatagentsummary)                   | false    |              | Agent identifies the chat agent this chat was created as, if any. Slug, name, and icon are populated on the main chat read endpoints; compact payloads such as watch events carry only the ID.                                                                             |
+| `»» icon`                 | string                                                                             | false    |              |                                                                                                                                                                                                                                                                            |
+| `»» id`                   | string(uuid)                                                                       | false    |              |                                                                                                                                                                                                                                                                            |
+| `»» name`                 | string                                                                             | false    |              |                                                                                                                                                                                                                                                                            |
+| `»» slug`                 | string                                                                             | false    |              |                                                                                                                                                                                                                                                                            |
 | `» agent_id`              | string(uuid)                                                                       | false    |              |                                                                                                                                                                                                                                                                            |
 | `» archived`              | boolean                                                                            | false    |              |                                                                                                                                                                                                                                                                            |
 | `» build_id`              | string(uuid)                                                                       | false    |              |                                                                                                                                                                                                                                                                            |
@@ -254,6 +265,7 @@ Experimental: this endpoint is subject to change.
 
 ```json
 {
+  "agent_id": "2b1e3b65-2c04-4fa2-a2d7-467901e98978",
   "client_type": "ui",
   "content": [
     {
@@ -303,11 +315,23 @@ Experimental: this endpoint is subject to change.
 
 ```json
 {
+  "agent": {
+    "icon": "string",
+    "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
+    "name": "string",
+    "slug": "string"
+  },
   "agent_id": "2b1e3b65-2c04-4fa2-a2d7-467901e98978",
   "archived": true,
   "build_id": "bfb1f3fa-bf7b-43a5-9e0b-26cc050e44cb",
   "children": [
     {
+      "agent": {
+        "icon": "string",
+        "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
+        "name": "string",
+        "slug": "string"
+      },
       "agent_id": "2b1e3b65-2c04-4fa2-a2d7-467901e98978",
       "archived": true,
       "build_id": "bfb1f3fa-bf7b-43a5-9e0b-26cc050e44cb",
@@ -1117,6 +1141,12 @@ Experimental: this endpoint is subject to change.
 ```json
 {
   "chat": {
+    "agent": {
+      "icon": "string",
+      "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
+      "name": "string",
+      "slug": "string"
+    },
     "agent_id": "2b1e3b65-2c04-4fa2-a2d7-467901e98978",
     "archived": true,
     "build_id": "bfb1f3fa-bf7b-43a5-9e0b-26cc050e44cb",
@@ -1261,11 +1291,23 @@ Experimental: this endpoint is subject to change.
 
 ```json
 {
+  "agent": {
+    "icon": "string",
+    "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
+    "name": "string",
+    "slug": "string"
+  },
   "agent_id": "2b1e3b65-2c04-4fa2-a2d7-467901e98978",
   "archived": true,
   "build_id": "bfb1f3fa-bf7b-43a5-9e0b-26cc050e44cb",
   "children": [
     {
+      "agent": {
+        "icon": "string",
+        "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
+        "name": "string",
+        "slug": "string"
+      },
       "agent_id": "2b1e3b65-2c04-4fa2-a2d7-467901e98978",
       "archived": true,
       "build_id": "bfb1f3fa-bf7b-43a5-9e0b-26cc050e44cb",
@@ -1538,11 +1580,23 @@ Experimental: this endpoint is subject to change.
 
 ```json
 {
+  "agent": {
+    "icon": "string",
+    "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
+    "name": "string",
+    "slug": "string"
+  },
   "agent_id": "2b1e3b65-2c04-4fa2-a2d7-467901e98978",
   "archived": true,
   "build_id": "bfb1f3fa-bf7b-43a5-9e0b-26cc050e44cb",
   "children": [
     {
+      "agent": {
+        "icon": "string",
+        "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
+        "name": "string",
+        "slug": "string"
+      },
       "agent_id": "2b1e3b65-2c04-4fa2-a2d7-467901e98978",
       "archived": true,
       "build_id": "bfb1f3fa-bf7b-43a5-9e0b-26cc050e44cb",
@@ -1813,11 +1867,23 @@ Experimental: this endpoint is subject to change.
 
 ```json
 {
+  "agent": {
+    "icon": "string",
+    "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
+    "name": "string",
+    "slug": "string"
+  },
   "agent_id": "2b1e3b65-2c04-4fa2-a2d7-467901e98978",
   "archived": true,
   "build_id": "bfb1f3fa-bf7b-43a5-9e0b-26cc050e44cb",
   "children": [
     {
+      "agent": {
+        "icon": "string",
+        "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
+        "name": "string",
+        "slug": "string"
+      },
       "agent_id": "2b1e3b65-2c04-4fa2-a2d7-467901e98978",
       "archived": true,
       "build_id": "bfb1f3fa-bf7b-43a5-9e0b-26cc050e44cb",
@@ -2657,11 +2723,23 @@ Experimental: this endpoint is subject to change.
 
 ```json
 {
+  "agent": {
+    "icon": "string",
+    "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
+    "name": "string",
+    "slug": "string"
+  },
   "agent_id": "2b1e3b65-2c04-4fa2-a2d7-467901e98978",
   "archived": true,
   "build_id": "bfb1f3fa-bf7b-43a5-9e0b-26cc050e44cb",
   "children": [
     {
+      "agent": {
+        "icon": "string",
+        "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
+        "name": "string",
+        "slug": "string"
+      },
       "agent_id": "2b1e3b65-2c04-4fa2-a2d7-467901e98978",
       "archived": true,
       "build_id": "bfb1f3fa-bf7b-43a5-9e0b-26cc050e44cb",
@@ -3257,11 +3335,23 @@ Experimental: this endpoint is subject to change.
 
 ```json
 {
+  "agent": {
+    "icon": "string",
+    "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
+    "name": "string",
+    "slug": "string"
+  },
   "agent_id": "2b1e3b65-2c04-4fa2-a2d7-467901e98978",
   "archived": true,
   "build_id": "bfb1f3fa-bf7b-43a5-9e0b-26cc050e44cb",
   "children": [
     {
+      "agent": {
+        "icon": "string",
+        "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
+        "name": "string",
+        "slug": "string"
+      },
       "agent_id": "2b1e3b65-2c04-4fa2-a2d7-467901e98978",
       "archived": true,
       "build_id": "bfb1f3fa-bf7b-43a5-9e0b-26cc050e44cb",

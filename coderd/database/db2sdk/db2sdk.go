@@ -1749,6 +1749,11 @@ func Chat(c database.Chat, diffStatus *database.ChatDiffStatus, files []database
 	if c.AgentID.Valid {
 		chat.AgentID = &c.AgentID.UUID
 	}
+	if c.ChatAgentID.Valid {
+		// Slug, name, and icon are enriched by the coderd read
+		// handlers; compact consumers (watch events) get the ID only.
+		chat.Agent = &codersdk.ChatAgentSummary{ID: c.ChatAgentID.UUID}
+	}
 	if diffStatus != nil {
 		convertedDiffStatus := ChatDiffStatus(c.ID, diffStatus)
 		chat.DiffStatus = &convertedDiffStatus

@@ -1152,6 +1152,17 @@ type CreateOptions struct {
 	MCPServerIDs       []uuid.UUID
 	Labels             database.StringMap
 	DynamicTools       json.RawMessage
+	// ChatAgentID records the chat agent (builtin or database) the
+	// chat was created as. Attribution only; prompt and model inputs
+	// are passed explicitly below.
+	ChatAgentID uuid.NullUUID
+	// PersonaSystemPrompt, when non-empty, replaces DefaultSystemPrompt
+	// as the base of the deployment system prompt. The admin-configured
+	// custom prompt still applies around it.
+	PersonaSystemPrompt string
+	// AgentPromptAppend, when non-empty, is inserted as an additional
+	// system message directly after the deployment/persona prompt.
+	AgentPromptAppend string
 }
 
 // SendMessageBusyBehavior controls what happens when a chat is already active.
@@ -1264,8 +1275,9 @@ func (p *Server) CreateChat(ctx context.Context, opts CreateOptions) (database.C
 	}
 	// Resolve the deployment prompt before opening the transaction so
 	// chat creation does not hold one DB connection while waiting for
-	// another pool checkout.
-	deploymentPrompt := p.resolveDeploymentSystemPrompt(ctx)
+	// another pool checkout. An active persona replaces the built-in
+	// default as the base prompt.
+	deploymentPrompt := p.resolveDeploymentSystemPromptWithBase(ctx, chatBasePrompt(opts.PersonaSystemPrompt))
 
 	// Usage limits gate the create before we touch the state machine.
 	if limitErr := p.checkUsageLimit(ctx, p.db, opts.OwnerID, uuid.NullUUID{UUID: opts.OrganizationID, Valid: true}); limitErr != nil {
@@ -1303,6 +1315,15 @@ func (p *Server) CreateChat(ctx context.Context, opts CreateOptions) (database.C
 		}
 		initialMessages = append(initialMessages, systemMessage(deploymentContent, opts.ModelConfigID))
 	}
+	if agentAppend := SanitizePromptText(opts.AgentPromptAppend); agentAppend != "" {
+		agentAppendContent, marshalErr := chatprompt.MarshalParts([]codersdk.ChatMessagePart{
+			codersdk.ChatMessageText(agentAppend),
+		})
+		if marshalErr != nil {
+			return database.Chat{}, xerrors.Errorf("marshal agent prompt append: %w", marshalErr)
+		}
+		initialMessages = append(initialMessages, systemMessage(agentAppendContent, opts.ModelConfigID))
+	}
 	if userPrompt != "" {
 		userPromptContent, marshalErr := chatprompt.MarshalParts([]codersdk.ChatMessagePart{
 			codersdk.ChatMessageText(userPrompt),
@@ -1321,6 +1342,7 @@ func (p *Server) CreateChat(ctx context.Context, opts CreateOptions) (database.C
 		WorkspaceID:       opts.WorkspaceID,
 		BuildID:           opts.BuildID,
 		AgentID:           opts.AgentID,
+		ChatAgentID:       opts.ChatAgentID,
 		ParentChatID:      opts.ParentChatID,
 		RootChatID:        opts.RootChatID,
 		LastModelConfigID: opts.ModelConfigID,
@@ -4405,16 +4427,28 @@ func (p *Server) resolveUserCompactionThreshold(ctx context.Context, userID uuid
 	return int32(val), true
 }
 
-// resolveDeploymentSystemPrompt builds the deployment-level system
-// prompt from the built-in default and the admin-configured custom
-// prompt stored in site_configs.
-func (p *Server) resolveDeploymentSystemPrompt(ctx context.Context) string {
+// chatBasePrompt returns the base system prompt for a chat: the
+// persona prompt when a persona is active, otherwise the built-in
+// default.
+func chatBasePrompt(personaSystemPrompt string) string {
+	if sanitized := SanitizePromptText(personaSystemPrompt); sanitized != "" {
+		return sanitized
+	}
+	return DefaultSystemPrompt
+}
+
+// resolveDeploymentSystemPromptWithBase builds the deployment-level
+// system prompt from the given base prompt and the admin-configured
+// custom prompt stored in site_configs. The include-default toggle
+// applies to the base prompt, so a persona prompt takes the exact
+// position DefaultSystemPrompt occupies when no persona is active.
+func (p *Server) resolveDeploymentSystemPromptWithBase(ctx context.Context, basePrompt string) string {
 	config, err := p.db.GetChatSystemPromptConfig(ctx)
 	if err != nil {
-		// Fail open: use the built-in default so chats always have
+		// Fail open: use the base prompt so chats always have
 		// some system guidance.
 		p.logger.Error(ctx, "failed to fetch chat system prompt configuration, using default", slog.Error(err))
-		return DefaultSystemPrompt
+		return basePrompt
 	}
 
 	sanitizedCustom := SanitizePromptText(config.ChatSystemPrompt)
@@ -4424,7 +4458,7 @@ func (p *Server) resolveDeploymentSystemPrompt(ctx context.Context) string {
 
 	var parts []string
 	if config.IncludeDefaultSystemPrompt {
-		parts = append(parts, DefaultSystemPrompt)
+		parts = append(parts, basePrompt)
 	}
 	if sanitizedCustom != "" {
 		parts = append(parts, sanitizedCustom)

@@ -17011,6 +17011,14 @@ const docTemplate = `{
         "codersdk.Chat": {
             "type": "object",
             "properties": {
+                "agent": {
+                    "description": "Agent identifies the chat agent this chat was created as, if\nany. Slug, name, and icon are populated on the main chat read\nendpoints; compact payloads such as watch events carry only\nthe ID.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/codersdk.ChatAgentSummary"
+                        }
+                    ]
+                },
                 "agent_id": {
                     "type": "string",
                     "format": "uuid"
@@ -17205,6 +17213,24 @@ const docTemplate = `{
                 "updated_at": {
                     "type": "string",
                     "format": "date-time"
+                }
+            }
+        },
+        "codersdk.ChatAgentSummary": {
+            "type": "object",
+            "properties": {
+                "icon": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "slug": {
+                    "type": "string"
                 }
             }
         },
@@ -18746,6 +18772,11 @@ const docTemplate = `{
         "codersdk.CreateChatRequest": {
             "type": "object",
             "properties": {
+                "agent_id": {
+                    "description": "AgentID selects the chat agent (builtin or database) whose\npersona supplies the base system prompt. Nil preserves the\ndefault behavior (the builtin Coder agent).",
+                    "type": "string",
+                    "format": "uuid"
+                },
                 "client_type": {
                     "$ref": "#/definitions/codersdk.ChatClientType"
                 },

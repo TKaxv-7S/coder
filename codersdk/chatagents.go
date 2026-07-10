@@ -49,6 +49,15 @@ type ChatAgent struct {
 	UpdatedAt      time.Time  `json:"updated_at" format:"date-time"`
 }
 
+// ChatAgentSummary identifies the chat agent a chat was created as,
+// for display attribution.
+type ChatAgentSummary struct {
+	ID   uuid.UUID `json:"id" format:"uuid"`
+	Slug string    `json:"slug,omitempty"`
+	Name string    `json:"name,omitempty"`
+	Icon string    `json:"icon,omitempty"`
+}
+
 // CreateChatPersonaRequest creates a chat persona. A nil or zero
 // OrganizationID creates a deployment-scoped persona.
 type CreateChatPersonaRequest struct {

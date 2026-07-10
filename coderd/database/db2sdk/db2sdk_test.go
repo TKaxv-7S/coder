@@ -704,6 +704,7 @@ func TestChat_AllFieldsPopulated(t *testing.T) {
 		WorkspaceID:         uuid.NullUUID{UUID: uuid.New(), Valid: true},
 		BuildID:             uuid.NullUUID{UUID: uuid.New(), Valid: true},
 		AgentID:             uuid.NullUUID{UUID: uuid.New(), Valid: true},
+		ChatAgentID:         uuid.NullUUID{UUID: uuid.New(), Valid: true},
 		ParentChatID:        uuid.NullUUID{UUID: uuid.New(), Valid: true},
 		RootChatID:          uuid.NullUUID{UUID: uuid.New(), Valid: true},
 		LastModelConfigID:   uuid.New(),

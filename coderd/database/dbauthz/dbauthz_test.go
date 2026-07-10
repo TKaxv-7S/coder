@@ -1320,6 +1320,13 @@ func (s *MethodTestSuite) TestChats() {
 		dbm.EXPECT().GetChatAgentByID(gomock.Any(), agent.ID).Return(agent, nil).AnyTimes()
 		check.Args(agent.ID).Asserts(agent, policy.ActionRead).Returns(agent)
 	}))
+	s.Run("GetChatAgentsByIDs", s.Mocked(func(dbm *dbmock.MockStore, faker *gofakeit.Faker, check *expects) {
+		a1 := testutil.Fake(s.T(), faker, database.ChatAgent{})
+		a2 := testutil.Fake(s.T(), faker, database.ChatAgent{})
+		ids := []uuid.UUID{a1.ID, a2.ID}
+		dbm.EXPECT().GetChatAgentsByIDs(gomock.Any(), ids).Return([]database.ChatAgent{a1, a2}, nil).AnyTimes()
+		check.Args(ids).Asserts(a1, policy.ActionRead, a2, policy.ActionRead).Returns(slice.New(a1, a2))
+	}))
 	s.Run("GetChatAgents", s.Mocked(func(dbm *dbmock.MockStore, faker *gofakeit.Faker, check *expects) {
 		orgID := uuid.New()
 		deployment := testutil.Fake(s.T(), faker, database.ChatAgent{})

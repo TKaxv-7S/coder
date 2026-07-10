@@ -4296,6 +4296,55 @@ func (q *sqlQuerier) GetChatAgents(ctx context.Context, organizationID uuid.UUID
 	return items, nil
 }
 
+const getChatAgentsByIDs = `-- name: GetChatAgentsByIDs :many
+SELECT
+    id, organization_id, slug, name, description, icon, persona_id, prompt_append, model_config_id, enabled, deleted, created_by, created_at, updated_at
+FROM
+    chat_agents
+WHERE
+    id = ANY($1::uuid[])
+`
+
+// Includes soft-deleted rows so chats keep their agent attribution
+// after the agent is deleted.
+func (q *sqlQuerier) GetChatAgentsByIDs(ctx context.Context, ids []uuid.UUID) ([]ChatAgent, error) {
+	rows, err := q.db.QueryContext(ctx, getChatAgentsByIDs, pq.Array(ids))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ChatAgent
+	for rows.Next() {
+		var i ChatAgent
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrganizationID,
+			&i.Slug,
+			&i.Name,
+			&i.Description,
+			&i.Icon,
+			&i.PersonaID,
+			&i.PromptAppend,
+			&i.ModelConfigID,
+			&i.Enabled,
+			&i.Deleted,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const insertChatAgent = `-- name: InsertChatAgent :one
 INSERT INTO chat_agents (
     organization_id,
@@ -10109,6 +10158,7 @@ INSERT INTO chats (
     workspace_id,
     build_id,
     agent_id,
+    chat_agent_id,
     parent_chat_id,
     root_chat_id,
     last_model_config_id,
@@ -10129,14 +10179,15 @@ INSERT INTO chats (
     $6::uuid,
     $7::uuid,
     $8::uuid,
-    $9::text,
-    $10::chat_mode,
-    $11::chat_plan_mode,
-    $12::chat_status,
-    COALESCE($13::uuid[], '{}'::uuid[]),
-    COALESCE($14::jsonb, '{}'::jsonb),
-    $15::jsonb,
-    $16::chat_client_type
+    $9::uuid,
+    $10::text,
+    $11::chat_mode,
+    $12::chat_plan_mode,
+    $13::chat_status,
+    COALESCE($14::uuid[], '{}'::uuid[]),
+    COALESCE($15::jsonb, '{}'::jsonb),
+    $16::jsonb,
+    $17::chat_client_type
 )
 RETURNING id, owner_id, workspace_id, title, status, worker_id, started_at, heartbeat_at, created_at, updated_at, parent_chat_id, root_chat_id, last_model_config_id, archived, last_error, mode, mcp_server_ids, labels, build_id, agent_id, pin_order, last_read_message_id, dynamic_tools, organization_id, plan_mode, client_type, last_turn_summary, user_acl, group_acl, snapshot_version, history_version, queue_version, generation_attempt, retry_state, retry_state_version, runner_id, requires_action_deadline_at, context_aggregate_hash, context_dirty_since, context_dirty_resources, context_error, last_reasoning_effort, chat_agent_id
 ),
@@ -10202,6 +10253,7 @@ type InsertChatParams struct {
 	WorkspaceID       uuid.NullUUID         `db:"workspace_id" json:"workspace_id"`
 	BuildID           uuid.NullUUID         `db:"build_id" json:"build_id"`
 	AgentID           uuid.NullUUID         `db:"agent_id" json:"agent_id"`
+	ChatAgentID       uuid.NullUUID         `db:"chat_agent_id" json:"chat_agent_id"`
 	ParentChatID      uuid.NullUUID         `db:"parent_chat_id" json:"parent_chat_id"`
 	RootChatID        uuid.NullUUID         `db:"root_chat_id" json:"root_chat_id"`
 	LastModelConfigID uuid.UUID             `db:"last_model_config_id" json:"last_model_config_id"`
@@ -10222,6 +10274,7 @@ func (q *sqlQuerier) InsertChat(ctx context.Context, arg InsertChatParams) (Chat
 		arg.WorkspaceID,
 		arg.BuildID,
 		arg.AgentID,
+		arg.ChatAgentID,
 		arg.ParentChatID,
 		arg.RootChatID,
 		arg.LastModelConfigID,

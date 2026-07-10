@@ -7,6 +7,16 @@ WHERE
     id = @id::uuid
     AND deleted = FALSE;
 
+-- name: GetChatAgentsByIDs :many
+-- Includes soft-deleted rows so chats keep their agent attribution
+-- after the agent is deleted.
+SELECT
+    *
+FROM
+    chat_agents
+WHERE
+    id = ANY(@ids::uuid[]);
+
 -- name: GetChatAgents :many
 -- Returns deployment-scoped agents and, when an organization ID is
 -- given, that organization's agents as well.

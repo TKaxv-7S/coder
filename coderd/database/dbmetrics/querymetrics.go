@@ -1409,6 +1409,14 @@ func (m queryMetricsStore) GetChatAgents(ctx context.Context, organizationID uui
 	return r0, r1
 }
 
+func (m queryMetricsStore) GetChatAgentsByIDs(ctx context.Context, ids []uuid.UUID) ([]database.ChatAgent, error) {
+	start := time.Now()
+	r0, r1 := m.s.GetChatAgentsByIDs(ctx, ids)
+	m.queryLatencies.WithLabelValues("GetChatAgentsByIDs").Observe(time.Since(start).Seconds())
+	m.queryCounts.WithLabelValues(httpmw.ExtractHTTPRoute(ctx), httpmw.ExtractHTTPMethod(ctx), "GetChatAgentsByIDs").Inc()
+	return r0, r1
+}
+
 func (m queryMetricsStore) GetChatAutoArchiveDays(ctx context.Context, defaultAutoArchiveDays int32) (int32, error) {
 	start := time.Now()
 	r0, r1 := m.s.GetChatAutoArchiveDays(ctx, defaultAutoArchiveDays)

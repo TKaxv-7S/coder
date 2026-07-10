@@ -375,6 +375,9 @@ type sqlcQuerier interface {
 	// Returns deployment-scoped agents and, when an organization ID is
 	// given, that organization's agents as well.
 	GetChatAgents(ctx context.Context, organizationID uuid.UUID) ([]ChatAgent, error)
+	// Includes soft-deleted rows so chats keep their agent attribution
+	// after the agent is deleted.
+	GetChatAgentsByIDs(ctx context.Context, ids []uuid.UUID) ([]ChatAgent, error)
 	// Auto-archive window in days. 0 disables.
 	GetChatAutoArchiveDays(ctx context.Context, defaultAutoArchiveDays int32) (int32, error)
 	GetChatByID(ctx context.Context, id uuid.UUID) (Chat, error)

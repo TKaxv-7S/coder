@@ -2593,6 +2593,21 @@ func (mr *MockStoreMockRecorder) GetChatAgents(ctx, organizationID any) *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetChatAgents", reflect.TypeOf((*MockStore)(nil).GetChatAgents), ctx, organizationID)
 }
 
+// GetChatAgentsByIDs mocks base method.
+func (m *MockStore) GetChatAgentsByIDs(ctx context.Context, ids []uuid.UUID) ([]database.ChatAgent, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetChatAgentsByIDs", ctx, ids)
+	ret0, _ := ret[0].([]database.ChatAgent)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetChatAgentsByIDs indicates an expected call of GetChatAgentsByIDs.
+func (mr *MockStoreMockRecorder) GetChatAgentsByIDs(ctx, ids any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetChatAgentsByIDs", reflect.TypeOf((*MockStore)(nil).GetChatAgentsByIDs), ctx, ids)
+}
+
 // GetChatAutoArchiveDays mocks base method.
 func (m *MockStore) GetChatAutoArchiveDays(ctx context.Context, defaultAutoArchiveDays int32) (int32, error) {
 	m.ctrl.T.Helper()

@@ -2026,11 +2026,23 @@ AuthorizationObject can represent a "set" of objects, such as: all workspaces in
 
 ```json
 {
+  "agent": {
+    "icon": "string",
+    "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
+    "name": "string",
+    "slug": "string"
+  },
   "agent_id": "2b1e3b65-2c04-4fa2-a2d7-467901e98978",
   "archived": true,
   "build_id": "bfb1f3fa-bf7b-43a5-9e0b-26cc050e44cb",
   "children": [
     {
+      "agent": {
+        "icon": "string",
+        "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
+        "name": "string",
+        "slug": "string"
+      },
       "agent_id": "2b1e3b65-2c04-4fa2-a2d7-467901e98978",
       "archived": true,
       "build_id": "bfb1f3fa-bf7b-43a5-9e0b-26cc050e44cb",
@@ -2226,6 +2238,7 @@ AuthorizationObject can represent a "set" of objects, such as: all workspaces in
 
 | Name                    | Type                                                            | Required | Restrictions | Description                                                                                                                                                                                                                                                                |
 |-------------------------|-----------------------------------------------------------------|----------|--------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `agent`                 | [codersdk.ChatAgentSummary](#codersdkchatagentsummary)          | false    |              | Agent identifies the chat agent this chat was created as, if any. Slug, name, and icon are populated on the main chat read endpoints; compact payloads such as watch events carry only the ID.                                                                             |
 | `agent_id`              | string                                                          | false    |              |                                                                                                                                                                                                                                                                            |
 | `archived`              | boolean                                                         | false    |              |                                                                                                                                                                                                                                                                            |
 | `build_id`              | string                                                          | false    |              |                                                                                                                                                                                                                                                                            |
@@ -2350,6 +2363,26 @@ AuthorizationObject can represent a "set" of objects, such as: all workspaces in
 | `prompt_append`   | string  | false    |              |             |
 | `slug`            | string  | false    |              |             |
 | `updated_at`      | string  | false    |              |             |
+
+## codersdk.ChatAgentSummary
+
+```json
+{
+  "icon": "string",
+  "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
+  "name": "string",
+  "slug": "string"
+}
+```
+
+### Properties
+
+| Name   | Type   | Required | Restrictions | Description |
+|--------|--------|----------|--------------|-------------|
+| `icon` | string | false    |              |             |
+| `id`   | string | false    |              |             |
+| `name` | string | false    |              |             |
+| `slug` | string | false    |              |             |
 
 ## codersdk.ChatBusyBehavior
 
@@ -3981,6 +4014,12 @@ AuthorizationObject can represent a "set" of objects, such as: all workspaces in
 ```json
 {
   "chat": {
+    "agent": {
+      "icon": "string",
+      "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
+      "name": "string",
+      "slug": "string"
+    },
     "agent_id": "2b1e3b65-2c04-4fa2-a2d7-467901e98978",
     "archived": true,
     "build_id": "bfb1f3fa-bf7b-43a5-9e0b-26cc050e44cb",
@@ -4724,6 +4763,7 @@ AuthorizationObject can represent a "set" of objects, such as: all workspaces in
 
 ```json
 {
+  "agent_id": "2b1e3b65-2c04-4fa2-a2d7-467901e98978",
   "client_type": "ui",
   "content": [
     {
@@ -4763,20 +4803,21 @@ AuthorizationObject can represent a "set" of objects, such as: all workspaces in
 
 ### Properties
 
-| Name                   | Type                                                      | Required | Restrictions | Description                                                                                                                                |
-|------------------------|-----------------------------------------------------------|----------|--------------|--------------------------------------------------------------------------------------------------------------------------------------------|
-| `client_type`          | [codersdk.ChatClientType](#codersdkchatclienttype)        | false    |              |                                                                                                                                            |
-| `content`              | array of [codersdk.ChatInputPart](#codersdkchatinputpart) | false    |              |                                                                                                                                            |
-| `labels`               | object                                                    | false    |              |                                                                                                                                            |
-| » `[any property]`     | string                                                    | false    |              |                                                                                                                                            |
-| `mcp_server_ids`       | array of string                                           | false    |              |                                                                                                                                            |
-| `model_config_id`      | string                                                    | false    |              |                                                                                                                                            |
-| `organization_id`      | string                                                    | false    |              |                                                                                                                                            |
-| `plan_mode`            | [codersdk.ChatPlanMode](#codersdkchatplanmode)            | false    |              |                                                                                                                                            |
-| `reasoning_effort`     | string                                                    | false    |              |                                                                                                                                            |
-| `system_prompt`        | string                                                    | false    |              |                                                                                                                                            |
-| `unsafe_dynamic_tools` | array of [codersdk.DynamicTool](#codersdkdynamictool)     | false    |              | Unsafe dynamic tools declares client-executed tools that the LLM can invoke. This API is highly experimental and highly subject to change. |
-| `workspace_id`         | string                                                    | false    |              |                                                                                                                                            |
+| Name                   | Type                                                      | Required | Restrictions | Description                                                                                                                                                        |
+|------------------------|-----------------------------------------------------------|----------|--------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `agent_id`             | string                                                    | false    |              | Agent ID selects the chat agent (builtin or database) whose persona supplies the base system prompt. Nil preserves the default behavior (the builtin Coder agent). |
+| `client_type`          | [codersdk.ChatClientType](#codersdkchatclienttype)        | false    |              |                                                                                                                                                                    |
+| `content`              | array of [codersdk.ChatInputPart](#codersdkchatinputpart) | false    |              |                                                                                                                                                                    |
+| `labels`               | object                                                    | false    |              |                                                                                                                                                                    |
+| » `[any property]`     | string                                                    | false    |              |                                                                                                                                                                    |
+| `mcp_server_ids`       | array of string                                           | false    |              |                                                                                                                                                                    |
+| `model_config_id`      | string                                                    | false    |              |                                                                                                                                                                    |
+| `organization_id`      | string                                                    | false    |              |                                                                                                                                                                    |
+| `plan_mode`            | [codersdk.ChatPlanMode](#codersdkchatplanmode)            | false    |              |                                                                                                                                                                    |
+| `reasoning_effort`     | string                                                    | false    |              |                                                                                                                                                                    |
+| `system_prompt`        | string                                                    | false    |              |                                                                                                                                                                    |
+| `unsafe_dynamic_tools` | array of [codersdk.DynamicTool](#codersdkdynamictool)     | false    |              | Unsafe dynamic tools declares client-executed tools that the LLM can invoke. This API is highly experimental and highly subject to change.                         |
+| `workspace_id`         | string                                                    | false    |              |                                                                                                                                                                    |
 
 ## codersdk.CreateFirstUserOnboardingInfo
 

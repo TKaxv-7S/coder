@@ -767,6 +767,10 @@ var (
 					rbac.ResourceWorkspace.Type:        {policy.ActionRead, policy.ActionUpdate},
 					rbac.ResourceDeploymentConfig.Type: {policy.ActionRead},
 					rbac.ResourceUser.Type:             {policy.ActionReadPersonal},
+					// Chatd resolves chat agents and personas for prompt
+					// assembly and the spawn_agent catalog.
+					rbac.ResourceChatPersona.Type: {policy.ActionRead},
+					rbac.ResourceChatAgent.Type:   {policy.ActionRead},
 				}),
 				User:    []rbac.Permission{},
 				ByOrgID: map[string]rbac.OrgPermissions{},
@@ -3019,6 +3023,10 @@ func (q *querier) GetChatAgentByID(ctx context.Context, id uuid.UUID) (database.
 
 func (q *querier) GetChatAgents(ctx context.Context, organizationID uuid.UUID) ([]database.ChatAgent, error) {
 	return fetchWithPostFilter(q.auth, policy.ActionRead, q.db.GetChatAgents)(ctx, organizationID)
+}
+
+func (q *querier) GetChatAgentsByIDs(ctx context.Context, ids []uuid.UUID) ([]database.ChatAgent, error) {
+	return fetchWithPostFilter(q.auth, policy.ActionRead, q.db.GetChatAgentsByIDs)(ctx, ids)
 }
 
 func (q *querier) GetChatAutoArchiveDays(ctx context.Context, defaultAutoArchiveDays int32) (int32, error) {

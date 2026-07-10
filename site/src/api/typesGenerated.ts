@@ -1667,6 +1667,13 @@ export interface Chat {
 	 * always empty for child chats.
 	 */
 	readonly children: readonly Chat[];
+	/**
+	 * Agent identifies the chat agent this chat was created as, if
+	 * any. Slug, name, and icon are populated on the main chat read
+	 * endpoints; compact payloads such as watch events carry only
+	 * the ID.
+	 */
+	readonly agent?: ChatAgentSummary;
 }
 
 // From codersdk/chats.go
@@ -1695,6 +1702,18 @@ export interface ChatAgent {
 	readonly enabled: boolean;
 	readonly created_at: string;
 	readonly updated_at: string;
+}
+
+// From codersdk/chatagents.go
+/**
+ * ChatAgentSummary identifies the chat agent a chat was created as,
+ * for display attribution.
+ */
+export interface ChatAgentSummary {
+	readonly id: string;
+	readonly slug?: string;
+	readonly name?: string;
+	readonly icon?: string;
 }
 
 // From codersdk/chats.go
@@ -3752,6 +3771,12 @@ export interface CreateChatRequest {
 	readonly system_prompt?: string;
 	readonly workspace_id?: string;
 	readonly model_config_id?: string;
+	/**
+	 * AgentID selects the chat agent (builtin or database) whose
+	 * persona supplies the base system prompt. Nil preserves the
+	 * default behavior (the builtin Coder agent).
+	 */
+	readonly agent_id?: string;
 	readonly reasoning_effort?: string;
 	readonly mcp_server_ids?: readonly string[];
 	readonly labels?: Record<string, string>;

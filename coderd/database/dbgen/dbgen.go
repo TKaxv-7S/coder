@@ -92,6 +92,7 @@ func Chat(t testing.TB, db database.Store, seed database.Chat) database.Chat {
 		WorkspaceID:       seed.WorkspaceID,
 		BuildID:           seed.BuildID,
 		AgentID:           seed.AgentID,
+		ChatAgentID:       seed.ChatAgentID,
 		ParentChatID:      seed.ParentChatID,
 		RootChatID:        seed.RootChatID,
 		LastModelConfigID: takeFirst(seed.LastModelConfigID, uuid.New()),
@@ -108,14 +109,14 @@ func Chat(t testing.TB, db database.Store, seed database.Chat) database.Chat {
 	return chat
 }
 
-func ChatPersona(t testing.TB, db database.Store, seed database.ChatPersona) database.ChatPersona {
+func ChatPersona(t testing.TB, db database.Store, seed database.ChatPersona, munge ...func(*database.InsertChatPersonaParams)) database.ChatPersona {
 	t.Helper()
 
 	createdBy := seed.CreatedBy
 	if createdBy == uuid.Nil {
 		createdBy = User(t, db, database.User{}).ID
 	}
-	persona, err := db.InsertChatPersona(genCtx, database.InsertChatPersonaParams{
+	params := database.InsertChatPersonaParams{
 		OrganizationID: seed.OrganizationID,
 		Slug:           takeFirst(seed.Slug, strings.ToLower(testutil.GetRandomName(t))),
 		Name:           takeFirst(seed.Name, testutil.GetRandomName(t)),
@@ -125,12 +126,16 @@ func ChatPersona(t testing.TB, db database.Store, seed database.ChatPersona) dat
 		ModelConfigID:  seed.ModelConfigID,
 		Enabled:        takeFirst(seed.Enabled, true),
 		CreatedBy:      createdBy,
-	})
+	}
+	for _, fn := range munge {
+		fn(&params)
+	}
+	persona, err := db.InsertChatPersona(genCtx, params)
 	require.NoError(t, err, "insert chat persona")
 	return persona
 }
 
-func ChatAgent(t testing.TB, db database.Store, seed database.ChatAgent) database.ChatAgent {
+func ChatAgent(t testing.TB, db database.Store, seed database.ChatAgent, munge ...func(*database.InsertChatAgentParams)) database.ChatAgent {
 	t.Helper()
 
 	createdBy := seed.CreatedBy
@@ -144,7 +149,7 @@ func ChatAgent(t testing.TB, db database.Store, seed database.ChatAgent) databas
 			CreatedBy:      createdBy,
 		}).ID
 	}
-	agent, err := db.InsertChatAgent(genCtx, database.InsertChatAgentParams{
+	params := database.InsertChatAgentParams{
 		OrganizationID: seed.OrganizationID,
 		Slug:           takeFirst(seed.Slug, strings.ToLower(testutil.GetRandomName(t))),
 		Name:           takeFirst(seed.Name, testutil.GetRandomName(t)),
@@ -155,7 +160,11 @@ func ChatAgent(t testing.TB, db database.Store, seed database.ChatAgent) databas
 		ModelConfigID:  seed.ModelConfigID,
 		Enabled:        takeFirst(seed.Enabled, true),
 		CreatedBy:      createdBy,
-	})
+	}
+	for _, fn := range munge {
+		fn(&params)
+	}
+	agent, err := db.InsertChatAgent(genCtx, params)
 	require.NoError(t, err, "insert chat agent")
 	return agent
 }

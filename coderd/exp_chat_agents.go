@@ -1,6 +1,7 @@
 package coderd
 
 import (
+	"context"
 	"net/http"
 	"regexp"
 	"strings"
@@ -8,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"cdr.dev/slog/v3"
 	"github.com/coder/coder/v2/coderd/audit"
 	"github.com/coder/coder/v2/coderd/database"
 	"github.com/coder/coder/v2/coderd/database/dbauthz"
@@ -878,4 +880,137 @@ func parseChatAgentID(rw http.ResponseWriter, r *http.Request) (uuid.UUID, bool)
 		return uuid.Nil, false
 	}
 	return agentID, true
+}
+
+// resolveCreateChatAgent resolves the agent selected for chat creation
+// along with its persona. Builtins are checked first; database rows go
+// through the caller's dbauthz context so read access is enforced. The
+// agent must be enabled and be builtin, deployment-scoped, or belong
+// to the chat's organization; its persona must be enabled and follow
+// the same scope rules.
+func (api *API) resolveCreateChatAgent(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	agentID uuid.UUID,
+) (database.ChatAgent, database.ChatPersona, int, *codersdk.Response) {
+	agent, _, err := chatd.ResolveChatAgent(ctx, api.Database, agentID)
+	if err != nil {
+		if httpapi.Is404Error(err) {
+			return database.ChatAgent{}, database.ChatPersona{}, http.StatusBadRequest, &codersdk.Response{
+				Message: "Chat agent does not exist.",
+			}
+		}
+		return database.ChatAgent{}, database.ChatPersona{}, http.StatusInternalServerError, &codersdk.Response{
+			Message: "Failed to resolve chat agent.",
+			Detail:  err.Error(),
+		}
+	}
+	if !agent.Enabled {
+		return database.ChatAgent{}, database.ChatPersona{}, http.StatusBadRequest, &codersdk.Response{
+			Message: "Chat agent is disabled.",
+		}
+	}
+	if agent.OrganizationID.Valid && agent.OrganizationID.UUID != organizationID {
+		return database.ChatAgent{}, database.ChatPersona{}, http.StatusBadRequest, &codersdk.Response{
+			Message: "Chat agent belongs to a different organization.",
+		}
+	}
+
+	persona, _, err := chatd.ResolveChatPersona(ctx, api.Database, agent.PersonaID)
+	if err != nil {
+		if httpapi.Is404Error(err) {
+			return database.ChatAgent{}, database.ChatPersona{}, http.StatusBadRequest, &codersdk.Response{
+				Message: "The chat agent's persona does not exist.",
+			}
+		}
+		return database.ChatAgent{}, database.ChatPersona{}, http.StatusInternalServerError, &codersdk.Response{
+			Message: "Failed to resolve chat persona.",
+			Detail:  err.Error(),
+		}
+	}
+	if !persona.Enabled {
+		return database.ChatAgent{}, database.ChatPersona{}, http.StatusBadRequest, &codersdk.Response{
+			Message: "The chat agent's persona is disabled.",
+		}
+	}
+	if persona.OrganizationID.Valid && persona.OrganizationID.UUID != organizationID {
+		return database.ChatAgent{}, database.ChatPersona{}, http.StatusBadRequest, &codersdk.Response{
+			Message: "The chat agent's persona belongs to a different organization.",
+		}
+	}
+	return agent, persona, 0, nil
+}
+
+// populateChatAgentSummaries fills slug, name, and icon on the ID-only
+// agent summaries that db2sdk.Chat attaches to chats created as an
+// agent. Builtins resolve in memory; database rows are collected and
+// fetched in a single batch. Soft-deleted agents still resolve so
+// attribution survives deletion. Failures are non-fatal: the summary
+// keeps its ID.
+func (api *API) populateChatAgentSummaries(ctx context.Context, chats ...*codersdk.Chat) {
+	var pending []*codersdk.ChatAgentSummary
+	var collect func(chat *codersdk.Chat)
+	collect = func(chat *codersdk.Chat) {
+		if chat.Agent != nil {
+			if builtin, ok := chatd.BuiltinChatAgentByID(chat.Agent.ID); ok {
+				chat.Agent.Slug = builtin.Slug
+				chat.Agent.Name = builtin.Name
+				chat.Agent.Icon = builtin.Icon
+			} else {
+				pending = append(pending, chat.Agent)
+			}
+		}
+		for i := range chat.Children {
+			collect(&chat.Children[i])
+		}
+	}
+	for _, chat := range chats {
+		if chat != nil {
+			collect(chat)
+		}
+	}
+	if len(pending) == 0 {
+		return
+	}
+
+	ids := make([]uuid.UUID, 0, len(pending))
+	seen := make(map[uuid.UUID]struct{}, len(pending))
+	for _, summary := range pending {
+		if _, ok := seen[summary.ID]; ok {
+			continue
+		}
+		seen[summary.ID] = struct{}{}
+		ids = append(ids, summary.ID)
+	}
+	// The chat rows themselves were already authorized; the agent
+	// summary is display metadata every member may read anyway.
+	//nolint:gocritic // See above.
+	agents, err := api.Database.GetChatAgentsByIDs(dbauthz.AsChatd(ctx), ids)
+	if err != nil {
+		api.Logger.Warn(ctx, "failed to resolve chat agent summaries", slog.Error(err))
+		return
+	}
+	byID := make(map[uuid.UUID]database.ChatAgent, len(agents))
+	for _, agent := range agents {
+		byID[agent.ID] = agent
+	}
+	for _, summary := range pending {
+		agent, ok := byID[summary.ID]
+		if !ok {
+			continue
+		}
+		summary.Slug = agent.Slug
+		summary.Name = agent.Name
+		summary.Icon = agent.Icon
+	}
+}
+
+// populateChatAgentSummariesForList applies populateChatAgentSummaries
+// to a slice of chats.
+func (api *API) populateChatAgentSummariesForList(ctx context.Context, chats []codersdk.Chat) {
+	ptrs := make([]*codersdk.Chat, len(chats))
+	for i := range chats {
+		ptrs[i] = &chats[i]
+	}
+	api.populateChatAgentSummaries(ctx, ptrs...)
 }

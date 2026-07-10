@@ -966,7 +966,9 @@ func parseSubagentToolChatID(raw string) (uuid.UUID, error) {
 // planModeOverride apply to any subagent. inheritedMCPServerIDs is an
 // Explore-only snapshot of the spawning parent turn's effective external MCP
 // entitlement. resolveExploreToolSnapshot computes and persists it on the
-// child chat. Non-Explore children ignore this field.
+// child chat. Non-Explore children ignore this field. chatAgentID,
+// personaSystemPrompt, and agentPromptAppend are set for agent:<slug>
+// children so the child runs as the selected chat agent.
 type childSubagentChatOptions struct {
 	chatMode                database.NullChatMode
 	systemPrompt            string
@@ -974,6 +976,9 @@ type childSubagentChatOptions struct {
 	reasoningEffortOverride *string
 	planModeOverride        *database.NullChatPlanMode
 	inheritedMCPServerIDs   []uuid.UUID
+	chatAgentID             uuid.NullUUID
+	personaSystemPrompt     string
+	agentPromptAppend       string
 }
 
 // resolveExploreToolSnapshot computes the child chat's inherited MCP
@@ -1099,8 +1104,9 @@ func (p *Server) createChildSubagentChatWithOptions(
 	childSystemPrompt := SanitizePromptText(opts.systemPrompt)
 	// Resolve the deployment prompt before opening the transaction so
 	// child chat creation does not hold one DB connection while waiting
-	// for another pool checkout.
-	deploymentPrompt := p.resolveDeploymentSystemPrompt(ctx)
+	// for another pool checkout. An active persona replaces the
+	// built-in default as the base prompt.
+	deploymentPrompt := p.resolveDeploymentSystemPromptWithBase(ctx, chatBasePrompt(opts.personaSystemPrompt))
 	// Delegated chats cannot call list_agents or message_agent, so
 	// strip the root-only orchestration guidance from their prompt.
 	deploymentPrompt = strings.Replace(deploymentPrompt, subagentOrchestrationPromptBlock, "", 1)
@@ -1134,6 +1140,15 @@ func (p *Server) createChildSubagentChatWithOptions(
 		}
 		initialMessages = append(initialMessages, systemMessage(deploymentContent, modelConfigID))
 	}
+	if agentAppend := SanitizePromptText(opts.agentPromptAppend); agentAppend != "" {
+		agentAppendContent, err := chatprompt.MarshalParts([]codersdk.ChatMessagePart{
+			codersdk.ChatMessageText(agentAppend),
+		})
+		if err != nil {
+			return database.Chat{}, xerrors.Errorf("marshal agent prompt append: %w", err)
+		}
+		initialMessages = append(initialMessages, systemMessage(agentAppendContent, modelConfigID))
+	}
 	if childSystemPrompt != "" {
 		childSystemPromptContent, err := chatprompt.MarshalParts([]codersdk.ChatMessagePart{
 			codersdk.ChatMessageText(childSystemPrompt),
@@ -1161,6 +1176,7 @@ func (p *Server) createChildSubagentChatWithOptions(
 		WorkspaceID:       parent.WorkspaceID,
 		BuildID:           parent.BuildID,
 		AgentID:           parent.AgentID,
+		ChatAgentID:       opts.chatAgentID,
 		ParentChatID:      uuid.NullUUID{UUID: parent.ID, Valid: true},
 		RootChatID:        uuid.NullUUID{UUID: rootChatID, Valid: true},
 		LastModelConfigID: modelConfigID,
