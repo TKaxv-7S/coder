@@ -1669,6 +1669,20 @@ func scopedOrgRoleIdentifiers(names []string, orgID uuid.UUID) []rbac.RoleIdenti
 	return out
 }
 
+// filterOrganizationReads authorizes organization reads using full per-object
+// evaluation (rbac.FilterFullEval) rather than partial-evaluation Prepare.
+// Subjects can belong to many organizations, and the Prepare cost scales
+// quadratically with the number of org-scoped roles, so full evaluation is
+// cheaper here. Authorization still flows through q.auth, so this preserves the
+// dbauthz authorization boundary.
+func (q *querier) filterOrganizationReads(ctx context.Context, orgs []database.Organization) ([]database.Organization, error) {
+	act, ok := ActorFromContext(ctx)
+	if !ok {
+		return nil, ErrNoActor
+	}
+	return rbac.FilterFullEval(ctx, q.auth, act, policy.ActionRead, orgs)
+}
+
 func (q *querier) AcquireChats(ctx context.Context, arg database.AcquireChatsParams) ([]database.Chat, error) {
 	// AcquireChats is a system-level operation used by the chat processor.
 	// Authorization is done at the system level, not per-user.
@@ -4209,14 +4223,19 @@ func (q *querier) GetOrganizationResourceCountByID(ctx context.Context, organiza
 }
 
 func (q *querier) GetOrganizations(ctx context.Context, args database.GetOrganizationsParams) ([]database.Organization, error) {
-	fetch := func(ctx context.Context, _ interface{}) ([]database.Organization, error) {
-		return q.db.GetOrganizations(ctx, args)
+	orgs, err := q.db.GetOrganizations(ctx, args)
+	if err != nil {
+		return nil, err
 	}
-	return fetchWithPostFilter(q.auth, policy.ActionRead, fetch)(ctx, nil)
+	return q.filterOrganizationReads(ctx, orgs)
 }
 
 func (q *querier) GetOrganizationsByUserID(ctx context.Context, userID database.GetOrganizationsByUserIDParams) ([]database.Organization, error) {
-	return fetchWithPostFilter(q.auth, policy.ActionRead, q.db.GetOrganizationsByUserID)(ctx, userID)
+	orgs, err := q.db.GetOrganizationsByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return q.filterOrganizationReads(ctx, orgs)
 }
 
 func (q *querier) GetOrganizationsWithPrebuildStatus(ctx context.Context, arg database.GetOrganizationsWithPrebuildStatusParams) ([]database.GetOrganizationsWithPrebuildStatusRow, error) {

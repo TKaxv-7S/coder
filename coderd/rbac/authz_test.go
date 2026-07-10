@@ -13,6 +13,7 @@ import (
 	"github.com/coder/coder/v2/coderd/coderdtest"
 	"github.com/coder/coder/v2/coderd/rbac"
 	"github.com/coder/coder/v2/coderd/rbac/policy"
+	"github.com/coder/coder/v2/coderd/rbac/rolestore"
 	"github.com/coder/coder/v2/testutil"
 )
 
@@ -258,6 +259,96 @@ func BenchmarkRBACFilter(b *testing.B) {
 			allowed, err := rbac.Filter(context.Background(), authorizer, c.Actor, policy.ActionRead, objects)
 			require.NoError(b, err)
 			_ = allowed
+		})
+	}
+}
+
+// BenchmarkRBACFilterOrganizations models the GET /api/v2/organizations
+// authorization path (coder/coder#21890). A user who belongs to N organizations
+// lists all N organizations, and each organization object is authorized in-memory
+// via rbac.Filter (the current dbauthz GetOrganizations behavior). Both the
+// number of objects and the subject's org-scoped roles grow with N, so this
+// exhibits the ~O(N^2) cost the issue reports.
+//
+// The "Filter" sub-benchmark measures the current path. The "PrepareCompileToSQL"
+// sub-benchmark measures the proposed SQL-filter path (one partial eval + one SQL
+// compile, independent of the number of objects), for comparison.
+//
+//	go test ./coderd/rbac -run=^$ -bench '^BenchmarkRBACFilterOrganizations$' -benchmem
+func BenchmarkRBACFilterOrganizations(b *testing.B) {
+	user := uuid.MustParse("10d03e62-7703-4df5-a358-4f76577d4e2f")
+	// noiseGroups add noise to the subject without ever matching an object.
+	noiseGroups := []string{uuid.NewString(), uuid.NewString(), uuid.NewString()}
+
+	// orgCounts is the number of organizations the user is a member of, which is
+	// also the number of organization objects being listed and filtered.
+	orgCounts := []int{1, 10, 50, 100, 200}
+
+	authorizer := rbac.NewStrictAuthorizer(prometheus.NewRegistry())
+
+	// organization-member is a system role expanded from the database in
+	// production (via rolestore), not from the static built-in role map, so we
+	// pre-expand it here the same way rolestore does. rbac.Roles implements
+	// ExpandableRoles, so the subject carries the fully expanded roles.
+	memberRole, err := rbac.RoleByName(rbac.RoleMember())
+	require.NoError(b, err)
+
+	for _, n := range orgCounts {
+		// Build a subject that is a member of n organizations, plus the
+		// organization objects that GetOrganizations would return.
+		orgIDs := make([]uuid.UUID, n)
+		roles := make(rbac.Roles, 0, n+1)
+		for i := range orgIDs {
+			orgIDs[i] = uuid.New()
+			orgMemberRole, err := rolestore.TestingGetSystemRole(rbac.RoleOrgMember(), orgIDs[i], rbac.OrgSettings{})
+			require.NoError(b, err)
+			roles = append(roles, orgMemberRole)
+		}
+		roles = append(roles, memberRole)
+
+		subject := rbac.Subject{
+			ID:     user.String(),
+			Roles:  roles,
+			Scope:  rbac.ScopeAll,
+			Groups: noiseGroups,
+		}.WithCachedASTValue()
+
+		// One rbac.Object per organization, matching Organization.RBACObject():
+		// ResourceOrganization.WithID(id).InOrg(id).
+		objects := make([]rbac.Object, n)
+		for i := range objects {
+			objects[i] = rbac.ResourceOrganization.WithID(orgIDs[i]).InOrg(orgIDs[i])
+		}
+
+		b.Run(fmt.Sprintf("Filter-%d", n), func(b *testing.B) {
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				allowed, err := rbac.Filter(context.Background(), authorizer, subject, policy.ActionRead, objects)
+				require.NoError(b, err)
+				require.Len(b, allowed, len(objects))
+			}
+		})
+
+		b.Run(fmt.Sprintf("PrepareCompileToSQL-%d", n), func(b *testing.B) {
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				prep, err := authorizer.Prepare(context.Background(), subject, policy.ActionRead, rbac.ResourceOrganization.Type)
+				require.NoError(b, err)
+				_, err = prep.CompileToSQL(context.Background(), rbac.ConfigWithoutACL())
+				require.NoError(b, err)
+			}
+		})
+
+		// FilterFullEval measures Option 1: authorizing each organization object
+		// individually with full evaluation (object known), instead of one
+		// partial-eval Prepare over an unknown object. This is the cold-call
+		// (no cache) cost of the dbauthz org read path after the change.
+		b.Run(fmt.Sprintf("FilterFullEval-%d", n), func(b *testing.B) {
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				_, err := rbac.FilterFullEval(context.Background(), authorizer, subject, policy.ActionRead, objects)
+				require.NoError(b, err)
+			}
 		})
 	}
 }

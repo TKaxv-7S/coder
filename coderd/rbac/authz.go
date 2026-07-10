@@ -281,6 +281,46 @@ func Filter[O Objecter](ctx context.Context, auth Authorizer, subject Subject, a
 	return filtered, nil
 }
 
+// FilterFullEval authorizes each object individually using full evaluation
+// (the object is known), never using partial-evaluation Prepare. For subjects
+// with many organization-scoped roles, the per-request Prepare cost grows
+// quadratically with the number of organizations, so authorizing each object
+// with full evaluation is cheaper on a cold call than a single Prepare over an
+// unknown object. Each Authorize call also flows through the authorizer's
+// per-(subject, action, object) cache when a Cacher is in use.
+//
+// Unlike Filter, this does not switch to Prepare for large object sets. Prefer
+// this for object types whose authorization does not benefit from a SQL filter
+// and where subjects commonly carry many org-scoped roles (e.g. organizations).
+func FilterFullEval[O Objecter](ctx context.Context, auth Authorizer, subject Subject, action policy.Action, objects []O) ([]O, error) {
+	if len(objects) == 0 {
+		return objects, nil
+	}
+	objectType := objects[0].RBACObject().Type
+	filtered := make([]O, 0, len(objects))
+
+	ctx, span := tracing.StartSpan(ctx,
+		rbacTraceAttributes(subject, action, objectType,
+			attribute.Int("num_objects", len(objects)),
+		),
+	)
+	defer span.End()
+
+	for _, o := range objects {
+		rbacObj := o.RBACObject()
+		if rbacObj.Type != objectType {
+			return nil, xerrors.Errorf("object types must be uniform across the set (%s), found %s", objectType, rbacObj.Type)
+		}
+		err := auth.Authorize(ctx, subject, action, rbacObj)
+		if err == nil {
+			filtered = append(filtered, o)
+		} else if !IsUnauthorizedError(err) {
+			return nil, err
+		}
+	}
+	return filtered, nil
+}
+
 // RegoAuthorizer will use a prepared rego query for performing authorize()
 type RegoAuthorizer struct {
 	query        rego.PreparedEvalQuery
