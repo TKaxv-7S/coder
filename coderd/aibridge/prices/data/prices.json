@@ -25,6 +25,14 @@
   },
   {
     "provider": "anthropic",
+    "model": "claude-mythos-5",
+    "input_price": 10000000,
+    "output_price": 50000000,
+    "cache_read_price": 1000000,
+    "cache_write_price": 12500000
+  },
+  {
+    "provider": "anthropic",
     "model": "claude-opus-4-1",
     "input_price": 15000000,
     "output_price": 75000000,

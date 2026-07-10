@@ -4,7 +4,10 @@
 embedded into the Coder binary at build time. Do not edit it manually; the
 next regeneration will overwrite any changes.
 
-The same Make target also regenerates the frontend known-models catalog at
+The Make target fetches models.dev once into `_gen/models-dev.json`, applying
+the upstream corrections in `scripts/aibridgepricesgen/overrides.jq`. Both
+`prices.json` and the frontend known-models catalog at
 `site/src/pages/AgentsPage/components/ChatModelAdminPanel/knownModels/knownModelsGenerated.json`
-from the same models.dev fetch, joined with the editorial curation in
-`scripts/aibridgepricesgen/catalog.json`.
+are generated from that single patched snapshot; the catalog is additionally
+joined with the editorial curation in
+`scripts/aibridgepricesgen/curation.json`.

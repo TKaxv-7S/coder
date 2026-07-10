@@ -6,12 +6,13 @@ export type { KnownModel, KnownModelSourceMetadata };
 
 // knownModelsGenerated.json is produced by `make gen/aibridge-prices` from
 // models.dev joined with the editorial curation in
-// scripts/aibridgepricesgen/catalog.json. Do not edit it manually. JSON
+// scripts/aibridgepricesgen/curation.json. Do not edit it manually. JSON
 // imports widen literal types (e.g. reasoningEffort becomes string), so this
 // cast is the single typed boundary; knownModelsGenerated.test.ts validates
-// shape and enum values for every entry.
+// shape and enum values for every entry. The keyof cast preserves the
+// literal provider-key union so isKnownProvider narrows usefully.
 const knownModelsByProvider = knownModelsGenerated as Record<
-	string,
+	keyof typeof knownModelsGenerated,
 	readonly KnownModel[]
 >;
 

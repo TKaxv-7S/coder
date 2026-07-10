@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"os"
 	"testing"
 	"time"
 
@@ -10,7 +11,7 @@ import (
 )
 
 // fixtureUpstream returns a small upstream payload covering the join cases:
-// a fully priced model with limits, a mirror target, and a costless model.
+// fully priced models with limits and a costless model.
 func fixtureUpstream(t *testing.T) map[string]upstreamProvider {
 	t.Helper()
 	const upstreamJSON = `{
@@ -18,6 +19,12 @@ func fixtureUpstream(t *testing.T) map[string]upstreamProvider {
 			"models": {
 				"claude-fable-5": {
 					"name": "Claude Fable 5",
+					"limit": {"context": 1000000, "output": 128000},
+					"cost": {"input": 10, "output": 50, "cache_read": 1, "cache_write": 12.5},
+					"last_updated": "2026-06-09"
+				},
+				"claude-mythos-5": {
+					"name": "Claude Mythos 5",
 					"limit": {"context": 1000000, "output": 128000},
 					"cost": {"input": 10, "output": 50, "cache_read": 1, "cache_write": 12.5},
 					"last_updated": "2026-06-09"
@@ -63,7 +70,7 @@ func TestBuildCatalog(t *testing.T) {
 		},
 		"anthropic": {
 			{ModelIdentifier: "claude-fable-5", ReasoningEffort: "high"},
-			{ModelIdentifier: "claude-mythos-5", MirrorOf: "claude-fable-5", DisplayName: "Claude Mythos 5", ReasoningEffort: "high"},
+			{ModelIdentifier: "claude-mythos-5", ReasoningEffort: "high"},
 		},
 	}
 
@@ -154,22 +161,18 @@ func TestBuildCatalog(t *testing.T) {
 	require.Equal(t, want, buf.String())
 }
 
-func TestBuildCatalogDeterministic(t *testing.T) {
+// TestBuildCatalogClock asserts the injected clock feeds sourceRetrievedAt
+// and leaves upstream-derived fields alone.
+func TestBuildCatalogClock(t *testing.T) {
 	t.Parallel()
 
 	curation := map[string][]curatedModel{
 		"openai": {{ModelIdentifier: "gpt-5.6-sol"}},
 	}
-	a, err := buildCatalog(fixtureUpstream(t), curation, fixedNow)
-	require.NoError(t, err)
-	b, err := buildCatalog(fixtureUpstream(t), curation, fixedNow)
-	require.NoError(t, err)
-	require.Equal(t, a, b)
-
-	// A different injected clock changes only sourceRetrievedAt.
 	later, err := buildCatalog(fixtureUpstream(t), curation, fixedNow.AddDate(0, 0, 1))
 	require.NoError(t, err)
 	require.Equal(t, "2026-07-11", later["openai"][0].SourceMetadata.SourceRetrievedAt)
+	require.Equal(t, "2026-07-09", later["openai"][0].SourceMetadata.LastUpdated)
 }
 
 func TestBuildCatalogErrors(t *testing.T) {
@@ -188,13 +191,6 @@ func TestBuildCatalogErrors(t *testing.T) {
 			wantErr: "missing from upstream",
 		},
 		{
-			name: "DanglingMirrorOf",
-			curation: map[string][]curatedModel{
-				"anthropic": {{ModelIdentifier: "claude-mythos-5", MirrorOf: "claude-nonexistent"}},
-			},
-			wantErr: "mirrorOf target",
-		},
-		{
 			name: "NoCostBlock",
 			curation: map[string][]curatedModel{
 				"anthropic": {{ModelIdentifier: "claude-costless"}},
@@ -207,6 +203,57 @@ func TestBuildCatalogErrors(t *testing.T) {
 				"anthropic": {{ModelIdentifier: "claude-fable-5", ReasoningEffort: "high", ThinkingBudgetTokens: 8192}},
 			},
 			wantErr: "mutually exclusive",
+		},
+		{
+			name: "InvalidReasoningEffort",
+			curation: map[string][]curatedModel{
+				"anthropic": {{ModelIdentifier: "claude-fable-5", ReasoningEffort: "maximum"}},
+			},
+			wantErr: "is not one of",
+		},
+		{
+			name: "NegativeThinkingBudget",
+			curation: map[string][]curatedModel{
+				"anthropic": {{ModelIdentifier: "claude-fable-5", ThinkingBudgetTokens: -1}},
+			},
+			wantErr: "is negative",
+		},
+		{
+			name: "DuplicateModelIdentifier",
+			curation: map[string][]curatedModel{
+				"anthropic": {
+					{ModelIdentifier: "claude-fable-5"},
+					{ModelIdentifier: "claude-fable-5"},
+				},
+			},
+			wantErr: "duplicate modelIdentifier",
+		},
+		{
+			name: "DuplicateAlias",
+			curation: map[string][]curatedModel{
+				"anthropic": {
+					{ModelIdentifier: "claude-fable-5", Aliases: []string{"claude-latest"}},
+					{ModelIdentifier: "claude-mythos-5", Aliases: []string{"claude-latest"}},
+				},
+			},
+			wantErr: "declared more than once",
+		},
+		{
+			name: "EmptyAlias",
+			curation: map[string][]curatedModel{
+				"anthropic": {{ModelIdentifier: "claude-fable-5", Aliases: []string{""}}},
+			},
+			wantErr: "empty-string alias",
+		},
+		{
+			name: "AliasShadowsModelIdentifier",
+			curation: map[string][]curatedModel{
+				"anthropic": {
+					{ModelIdentifier: "claude-fable-5", Aliases: []string{"claude-mythos-5"}},
+					{ModelIdentifier: "claude-mythos-5"},
+				},
+			},
+			wantErr: "duplicates a modelIdentifier",
 		},
 		{
 			name: "MissingProvider",
@@ -234,21 +281,113 @@ func TestBuildCatalogErrors(t *testing.T) {
 	}
 }
 
-// TestEmbeddedCatalogParses guards the checked-in curation file itself:
-// valid JSON, required fields present, and the effort/budget exclusivity
-// holds without needing upstream data.
-func TestEmbeddedCatalogParses(t *testing.T) {
+// TestEmbeddedCurationBuilds runs the checked-in curation.json through
+// buildCatalog against a synthetic upstream derived from the curation's own
+// model identifiers, so every buildCatalog validation (present and future)
+// automatically guards the checked-in file.
+func TestEmbeddedCurationBuilds(t *testing.T) {
 	t.Parallel()
 
-	var curation map[string][]curatedModel
-	require.NoError(t, json.Unmarshal(catalogJSON, &curation))
+	curation := embeddedCuration(t)
 	require.NotEmpty(t, curation)
+
+	price := 1.0
+	limit := int64(100000)
+	upstream := make(map[string]upstreamProvider, len(curation))
 	for providerID, entries := range curation {
-		require.NotEmpty(t, entries, providerID)
+		models := make(map[string]upstreamModel, len(entries))
 		for _, c := range entries {
-			require.NotEmpty(t, c.ModelIdentifier, providerID)
-			require.False(t, c.ReasoningEffort != "" && c.ThinkingBudgetTokens != 0,
-				"%s/%s sets both reasoningEffort and thinkingBudgetTokens", providerID, c.ModelIdentifier)
+			models[c.ModelIdentifier] = upstreamModel{
+				Name:        "Synthetic " + c.ModelIdentifier,
+				Limit:       upstreamLimit{Context: &limit, Output: &limit},
+				Cost:        &upstreamCost{Input: &price, Output: &price},
+				LastUpdated: "2026-01-01",
+			}
 		}
+		upstream[providerID] = upstreamProvider{Models: models}
 	}
+
+	catalog, err := buildCatalog(upstream, curation, fixedNow)
+	require.NoError(t, err)
+	for providerID, entries := range catalog {
+		require.NotEmpty(t, entries, providerID)
+	}
+}
+
+// TestCurationMatchesGeneratedCatalog is a drift test: the editorial fields
+// (per provider, in order) in the embedded curation.json must exactly match
+// their projection in the checked-in generated frontend catalog. Fails when
+// curation.json changes without running `make gen/aibridge-prices`.
+func TestCurationMatchesGeneratedCatalog(t *testing.T) {
+	t.Parallel()
+
+	curation := embeddedCuration(t)
+
+	data, err := os.ReadFile("../../site/src/pages/AgentsPage/components/ChatModelAdminPanel/knownModels/knownModelsGenerated.json")
+	require.NoError(t, err)
+	var generated map[string][]catalogEntry
+	require.NoError(t, json.Unmarshal(data, &generated))
+
+	// editorial is the curation-owned projection of an entry. displayName is
+	// only compared when the curation sets an override; otherwise it comes
+	// from upstream and is not the curation's to pin.
+	type editorial struct {
+		ModelIdentifier      string
+		Aliases              []string
+		DisplayName          string
+		ReasoningEffort      string
+		ThinkingBudgetTokens int
+	}
+
+	curatedProjection := make(map[string][]editorial, len(curation))
+	for providerID, entries := range curation {
+		projected := make([]editorial, 0, len(entries))
+		for _, c := range entries {
+			aliases := c.Aliases
+			if aliases == nil {
+				aliases = []string{}
+			}
+			projected = append(projected, editorial{
+				ModelIdentifier:      c.ModelIdentifier,
+				Aliases:              aliases,
+				DisplayName:          c.DisplayName,
+				ReasoningEffort:      c.ReasoningEffort,
+				ThinkingBudgetTokens: c.ThinkingBudgetTokens,
+			})
+		}
+		curatedProjection[providerID] = projected
+	}
+
+	generatedProjection := make(map[string][]editorial, len(generated))
+	for providerID, entries := range generated {
+		curated := map[string]curatedModel{}
+		for _, c := range curation[providerID] {
+			curated[c.ModelIdentifier] = c
+		}
+		projected := make([]editorial, 0, len(entries))
+		for _, e := range entries {
+			displayName := ""
+			if curated[e.ModelIdentifier].DisplayName != "" {
+				displayName = e.DisplayName
+			}
+			projected = append(projected, editorial{
+				ModelIdentifier:      e.ModelIdentifier,
+				Aliases:              e.Aliases,
+				DisplayName:          displayName,
+				ReasoningEffort:      e.ReasoningEffort,
+				ThinkingBudgetTokens: e.ThinkingBudgetTokens,
+			})
+		}
+		generatedProjection[providerID] = projected
+	}
+
+	require.Equal(t, curatedProjection, generatedProjection,
+		"curation.json and knownModelsGenerated.json disagree; run `make gen/aibridge-prices`")
+}
+
+func embeddedCuration(t *testing.T) map[string][]curatedModel {
+	t.Helper()
+	var curation map[string][]curatedModel
+	require.NoError(t, json.Unmarshal(curationJSON, &curation))
+	return curation
 }

@@ -131,7 +131,7 @@
 			"modelIdentifier": "claude-sonnet-4-5",
 			"displayName": "Claude Sonnet 4.5",
 			"aliases": ["claude-sonnet-4-5-20250929"],
-			"contextLimit": 1000000,
+			"contextLimit": 200000,
 			"maxOutputTokens": 64000,
 			"thinkingBudgetTokens": 8192,
 			"inputCost": 3,

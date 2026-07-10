@@ -43,8 +43,6 @@
 		},
 		{
 			"modelIdentifier": "claude-mythos-5",
-			"mirrorOf": "claude-fable-5",
-			"displayName": "Claude Mythos 5",
 			"reasoningEffort": "high"
 		},
 		{
