@@ -273,7 +273,17 @@ CREATE TYPE api_key_scope AS ENUM (
     'workspace_build_orchestration:create',
     'workspace_build_orchestration:delete',
     'workspace_build_orchestration:read',
-    'workspace_build_orchestration:update'
+    'workspace_build_orchestration:update',
+    'chat_persona:*',
+    'chat_persona:create',
+    'chat_persona:delete',
+    'chat_persona:read',
+    'chat_persona:update',
+    'chat_agent:*',
+    'chat_agent:create',
+    'chat_agent:delete',
+    'chat_agent:read',
+    'chat_agent:update'
 );
 
 CREATE TYPE app_sharing_level AS ENUM (
@@ -598,7 +608,9 @@ CREATE TYPE resource_type AS ENUM (
     'group_ai_budget',
     'user_skill',
     'ai_gateway_key',
-    'user_ai_budget_override'
+    'user_ai_budget_override',
+    'chat_persona',
+    'chat_agent'
 );
 
 CREATE TYPE shareable_workspace_owners AS ENUM (
@@ -1806,6 +1818,31 @@ COMMENT ON COLUMN boundary_usage_stats.window_start IS 'Start of the time window
 
 COMMENT ON COLUMN boundary_usage_stats.updated_at IS 'Timestamp of the last update to this row.';
 
+CREATE TABLE chat_agents (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id uuid,
+    slug text NOT NULL,
+    name text NOT NULL,
+    description text DEFAULT ''::text NOT NULL,
+    icon text DEFAULT ''::text NOT NULL,
+    persona_id uuid NOT NULL,
+    prompt_append text DEFAULT ''::text NOT NULL,
+    model_config_id uuid,
+    enabled boolean DEFAULT true NOT NULL,
+    deleted boolean DEFAULT false NOT NULL,
+    created_by uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+COMMENT ON COLUMN chat_agents.organization_id IS 'NULL means the agent is deployment-scoped; otherwise it belongs to the organization.';
+
+COMMENT ON COLUMN chat_agents.persona_id IS 'The persona supplying the base system prompt for chats created with this agent.';
+
+COMMENT ON COLUMN chat_agents.prompt_append IS 'Additional system prompt text appended after the persona prompt.';
+
+COMMENT ON COLUMN chat_agents.model_config_id IS 'Overrides the persona model preference when set.';
+
 CREATE TABLE chat_context_resources (
     chat_id uuid NOT NULL,
     source text NOT NULL,
@@ -1984,6 +2021,26 @@ CREATE TABLE chat_model_configs (
     CONSTRAINT chat_model_configs_context_limit_check CHECK ((context_limit > 0))
 );
 
+CREATE TABLE chat_personas (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id uuid,
+    slug text NOT NULL,
+    name text NOT NULL,
+    description text DEFAULT ''::text NOT NULL,
+    icon text DEFAULT ''::text NOT NULL,
+    system_prompt text NOT NULL,
+    model_config_id uuid,
+    enabled boolean DEFAULT true NOT NULL,
+    deleted boolean DEFAULT false NOT NULL,
+    created_by uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+COMMENT ON COLUMN chat_personas.organization_id IS 'NULL means the persona is deployment-scoped; otherwise it belongs to the organization.';
+
+COMMENT ON COLUMN chat_personas.model_config_id IS 'Preferred model for chats created with this persona. NULL falls back to the default model resolution.';
+
 CREATE SEQUENCE chat_queued_messages_position_seq
     START WITH 1
     INCREMENT BY 1
@@ -2079,6 +2136,7 @@ CREATE TABLE chats (
     context_dirty_resources jsonb,
     context_error text DEFAULT ''::text NOT NULL,
     last_reasoning_effort chat_reasoning_effort,
+    chat_agent_id uuid,
     CONSTRAINT chat_acl_only_on_root_chats CHECK ((((parent_chat_id IS NULL) AND (root_chat_id IS NULL)) OR ((user_acl = '{}'::jsonb) AND (group_acl = '{}'::jsonb)))),
     CONSTRAINT chat_group_acl_not_null_jsonb CHECK (((group_acl IS NOT NULL) AND (jsonb_typeof(group_acl) = 'object'::text))),
     CONSTRAINT chat_user_acl_not_null_jsonb CHECK (((user_acl IS NOT NULL) AND (jsonb_typeof(user_acl) = 'object'::text))),
@@ -2101,6 +2159,8 @@ COMMENT ON COLUMN chats.context_dirty_resources IS 'Deterministic prefix of reso
 COMMENT ON COLUMN chats.context_error IS 'Snapshot-level error copied from the pinned snapshot (count cap exceeded, watcher degraded, etc.). Empty when healthy.';
 
 COMMENT ON COLUMN chats.last_reasoning_effort IS 'Stores the most recent message effort once per-turn selection is wired.';
+
+COMMENT ON COLUMN chats.chat_agent_id IS 'The chat agent the chat was created as, if any. Distinct from agent_id, which is the workspace agent.';
 
 CREATE TABLE users (
     id uuid NOT NULL,
@@ -2175,6 +2235,7 @@ CREATE VIEW chats_expanded AS
     c.labels,
     c.build_id,
     c.agent_id,
+    c.chat_agent_id,
     c.pin_order,
     c.last_read_message_id,
     c.dynamic_tools,
@@ -4251,6 +4312,9 @@ ALTER TABLE ONLY boundary_sessions
 ALTER TABLE ONLY boundary_usage_stats
     ADD CONSTRAINT boundary_usage_stats_pkey PRIMARY KEY (replica_id);
 
+ALTER TABLE ONLY chat_agents
+    ADD CONSTRAINT chat_agents_pkey PRIMARY KEY (id);
+
 ALTER TABLE ONLY chat_context_resources
     ADD CONSTRAINT chat_context_resources_pkey PRIMARY KEY (chat_id, source);
 
@@ -4277,6 +4341,9 @@ ALTER TABLE ONLY chat_messages
 
 ALTER TABLE ONLY chat_model_configs
     ADD CONSTRAINT chat_model_configs_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY chat_personas
+    ADD CONSTRAINT chat_personas_pkey PRIMARY KEY (id);
 
 ALTER TABLE ONLY chat_queued_messages
     ADD CONSTRAINT chat_queued_messages_pkey PRIMARY KEY (id);
@@ -4703,6 +4770,10 @@ CREATE INDEX idx_boundary_logs_captured_at ON boundary_logs USING btree (capture
 
 CREATE INDEX idx_boundary_logs_session_seq ON boundary_logs USING btree (session_id, sequence_number);
 
+CREATE UNIQUE INDEX idx_chat_agents_deployment_slug ON chat_agents USING btree (slug) WHERE ((NOT deleted) AND (organization_id IS NULL));
+
+CREATE UNIQUE INDEX idx_chat_agents_org_slug ON chat_agents USING btree (organization_id, slug) WHERE ((NOT deleted) AND (organization_id IS NOT NULL));
+
 CREATE INDEX idx_chat_debug_runs_chat_started ON chat_debug_runs USING btree (chat_id, started_at DESC);
 
 CREATE UNIQUE INDEX idx_chat_debug_runs_id_chat ON chat_debug_runs USING btree (id, chat_id);
@@ -4746,6 +4817,10 @@ CREATE INDEX idx_chat_model_configs_ai_provider_id ON chat_model_configs USING b
 CREATE INDEX idx_chat_model_configs_enabled ON chat_model_configs USING btree (enabled);
 
 CREATE UNIQUE INDEX idx_chat_model_configs_single_default ON chat_model_configs USING btree ((1)) WHERE ((is_default = true) AND (deleted = false));
+
+CREATE UNIQUE INDEX idx_chat_personas_deployment_slug ON chat_personas USING btree (slug) WHERE ((NOT deleted) AND (organization_id IS NULL));
+
+CREATE UNIQUE INDEX idx_chat_personas_org_slug ON chat_personas USING btree (organization_id, slug) WHERE ((NOT deleted) AND (organization_id IS NOT NULL));
 
 CREATE INDEX idx_chat_queued_messages_chat_id ON chat_queued_messages USING btree (chat_id);
 
@@ -5082,6 +5157,18 @@ ALTER TABLE ONLY boundary_sessions
 ALTER TABLE ONLY boundary_sessions
     ADD CONSTRAINT boundary_sessions_workspace_agent_id_fkey FOREIGN KEY (workspace_agent_id) REFERENCES workspace_agents(id);
 
+ALTER TABLE ONLY chat_agents
+    ADD CONSTRAINT chat_agents_created_by_fkey FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY chat_agents
+    ADD CONSTRAINT chat_agents_model_config_id_fkey FOREIGN KEY (model_config_id) REFERENCES chat_model_configs(id);
+
+ALTER TABLE ONLY chat_agents
+    ADD CONSTRAINT chat_agents_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY chat_agents
+    ADD CONSTRAINT chat_agents_persona_id_fkey FOREIGN KEY (persona_id) REFERENCES chat_personas(id);
+
 ALTER TABLE ONLY chat_context_resources
     ADD CONSTRAINT chat_context_resources_chat_id_fkey FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE;
 
@@ -5127,6 +5214,15 @@ ALTER TABLE ONLY chat_model_configs
 ALTER TABLE ONLY chat_model_configs
     ADD CONSTRAINT chat_model_configs_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES users(id);
 
+ALTER TABLE ONLY chat_personas
+    ADD CONSTRAINT chat_personas_created_by_fkey FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY chat_personas
+    ADD CONSTRAINT chat_personas_model_config_id_fkey FOREIGN KEY (model_config_id) REFERENCES chat_model_configs(id);
+
+ALTER TABLE ONLY chat_personas
+    ADD CONSTRAINT chat_personas_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
+
 ALTER TABLE ONLY chat_queued_messages
     ADD CONSTRAINT chat_queued_messages_api_key_id_fkey FOREIGN KEY (api_key_id) REFERENCES api_keys(id) ON DELETE SET NULL;
 
@@ -5138,6 +5234,9 @@ ALTER TABLE ONLY chats
 
 ALTER TABLE ONLY chats
     ADD CONSTRAINT chats_build_id_fkey FOREIGN KEY (build_id) REFERENCES workspace_builds(id) ON DELETE SET NULL;
+
+ALTER TABLE ONLY chats
+    ADD CONSTRAINT chats_chat_agent_id_fkey FOREIGN KEY (chat_agent_id) REFERENCES chat_agents(id);
 
 ALTER TABLE ONLY chats
     ADD CONSTRAINT chats_last_model_config_id_fkey FOREIGN KEY (last_model_config_id) REFERENCES chat_model_configs(id);

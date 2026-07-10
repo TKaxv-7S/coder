@@ -465,6 +465,16 @@ const (
 	ApiKeyScopeWorkspaceBuildOrchestrationDelete   APIKeyScope = "workspace_build_orchestration:delete"
 	ApiKeyScopeWorkspaceBuildOrchestrationRead     APIKeyScope = "workspace_build_orchestration:read"
 	ApiKeyScopeWorkspaceBuildOrchestrationUpdate   APIKeyScope = "workspace_build_orchestration:update"
+	ApiKeyScopeChatPersona                         APIKeyScope = "chat_persona:*"
+	ApiKeyScopeChatPersonaCreate                   APIKeyScope = "chat_persona:create"
+	ApiKeyScopeChatPersonaDelete                   APIKeyScope = "chat_persona:delete"
+	ApiKeyScopeChatPersonaRead                     APIKeyScope = "chat_persona:read"
+	ApiKeyScopeChatPersonaUpdate                   APIKeyScope = "chat_persona:update"
+	ApiKeyScopeChatAgent                           APIKeyScope = "chat_agent:*"
+	ApiKeyScopeChatAgentCreate                     APIKeyScope = "chat_agent:create"
+	ApiKeyScopeChatAgentDelete                     APIKeyScope = "chat_agent:delete"
+	ApiKeyScopeChatAgentRead                       APIKeyScope = "chat_agent:read"
+	ApiKeyScopeChatAgentUpdate                     APIKeyScope = "chat_agent:update"
 )
 
 func (e *APIKeyScope) Scan(src interface{}) error {
@@ -739,7 +749,17 @@ func (e APIKeyScope) Valid() bool {
 		ApiKeyScopeWorkspaceBuildOrchestrationCreate,
 		ApiKeyScopeWorkspaceBuildOrchestrationDelete,
 		ApiKeyScopeWorkspaceBuildOrchestrationRead,
-		ApiKeyScopeWorkspaceBuildOrchestrationUpdate:
+		ApiKeyScopeWorkspaceBuildOrchestrationUpdate,
+		ApiKeyScopeChatPersona,
+		ApiKeyScopeChatPersonaCreate,
+		ApiKeyScopeChatPersonaDelete,
+		ApiKeyScopeChatPersonaRead,
+		ApiKeyScopeChatPersonaUpdate,
+		ApiKeyScopeChatAgent,
+		ApiKeyScopeChatAgentCreate,
+		ApiKeyScopeChatAgentDelete,
+		ApiKeyScopeChatAgentRead,
+		ApiKeyScopeChatAgentUpdate:
 		return true
 	}
 	return false
@@ -983,6 +1003,16 @@ func AllAPIKeyScopeValues() []APIKeyScope {
 		ApiKeyScopeWorkspaceBuildOrchestrationDelete,
 		ApiKeyScopeWorkspaceBuildOrchestrationRead,
 		ApiKeyScopeWorkspaceBuildOrchestrationUpdate,
+		ApiKeyScopeChatPersona,
+		ApiKeyScopeChatPersonaCreate,
+		ApiKeyScopeChatPersonaDelete,
+		ApiKeyScopeChatPersonaRead,
+		ApiKeyScopeChatPersonaUpdate,
+		ApiKeyScopeChatAgent,
+		ApiKeyScopeChatAgentCreate,
+		ApiKeyScopeChatAgentDelete,
+		ApiKeyScopeChatAgentRead,
+		ApiKeyScopeChatAgentUpdate,
 	}
 }
 
@@ -3537,6 +3567,8 @@ const (
 	ResourceTypeUserSkill                   ResourceType = "user_skill"
 	ResourceTypeAIGatewayKey                ResourceType = "ai_gateway_key"
 	ResourceTypeUserAIBudgetOverride        ResourceType = "user_ai_budget_override"
+	ResourceTypeChatPersona                 ResourceType = "chat_persona"
+	ResourceTypeChatAgent                   ResourceType = "chat_agent"
 )
 
 func (e *ResourceType) Scan(src interface{}) error {
@@ -3610,7 +3642,9 @@ func (e ResourceType) Valid() bool {
 		ResourceTypeGroupAIBudget,
 		ResourceTypeUserSkill,
 		ResourceTypeAIGatewayKey,
-		ResourceTypeUserAIBudgetOverride:
+		ResourceTypeUserAIBudgetOverride,
+		ResourceTypeChatPersona,
+		ResourceTypeChatAgent:
 		return true
 	}
 	return false
@@ -3653,6 +3687,8 @@ func AllResourceTypeValues() []ResourceType {
 		ResourceTypeUserSkill,
 		ResourceTypeAIGatewayKey,
 		ResourceTypeUserAIBudgetOverride,
+		ResourceTypeChatPersona,
+		ResourceTypeChatAgent,
 	}
 }
 
@@ -4972,6 +5008,7 @@ type Chat struct {
 	Labels                   StringMap               `db:"labels" json:"labels"`
 	BuildID                  uuid.NullUUID           `db:"build_id" json:"build_id"`
 	AgentID                  uuid.NullUUID           `db:"agent_id" json:"agent_id"`
+	ChatAgentID              uuid.NullUUID           `db:"chat_agent_id" json:"chat_agent_id"`
 	PinOrder                 int32                   `db:"pin_order" json:"pin_order"`
 	LastReadMessageID        sql.NullInt64           `db:"last_read_message_id" json:"last_read_message_id"`
 	DynamicTools             pqtype.NullRawMessage   `db:"dynamic_tools" json:"dynamic_tools"`
@@ -4995,6 +5032,27 @@ type Chat struct {
 	ContextDirtySince        sql.NullTime            `db:"context_dirty_since" json:"context_dirty_since"`
 	ContextDirtyResources    pqtype.NullRawMessage   `db:"context_dirty_resources" json:"context_dirty_resources"`
 	ContextError             string                  `db:"context_error" json:"context_error"`
+}
+
+type ChatAgent struct {
+	ID uuid.UUID `db:"id" json:"id"`
+	// NULL means the agent is deployment-scoped; otherwise it belongs to the organization.
+	OrganizationID uuid.NullUUID `db:"organization_id" json:"organization_id"`
+	Slug           string        `db:"slug" json:"slug"`
+	Name           string        `db:"name" json:"name"`
+	Description    string        `db:"description" json:"description"`
+	Icon           string        `db:"icon" json:"icon"`
+	// The persona supplying the base system prompt for chats created with this agent.
+	PersonaID uuid.UUID `db:"persona_id" json:"persona_id"`
+	// Additional system prompt text appended after the persona prompt.
+	PromptAppend string `db:"prompt_append" json:"prompt_append"`
+	// Overrides the persona model preference when set.
+	ModelConfigID uuid.NullUUID `db:"model_config_id" json:"model_config_id"`
+	Enabled       bool          `db:"enabled" json:"enabled"`
+	Deleted       bool          `db:"deleted" json:"deleted"`
+	CreatedBy     uuid.UUID     `db:"created_by" json:"created_by"`
+	CreatedAt     time.Time     `db:"created_at" json:"created_at"`
+	UpdatedAt     time.Time     `db:"updated_at" json:"updated_at"`
 }
 
 // Per-chat pinned copy of the agent context resources a chat is hydrated against. Copied from workspace_agent_context_resources at chat hydration and context refresh; survives agent replacement and workspace rebuilds.
@@ -5152,6 +5210,24 @@ type ChatModelConfig struct {
 	AIProviderID         uuid.NullUUID   `db:"ai_provider_id" json:"ai_provider_id"`
 }
 
+type ChatPersona struct {
+	ID uuid.UUID `db:"id" json:"id"`
+	// NULL means the persona is deployment-scoped; otherwise it belongs to the organization.
+	OrganizationID uuid.NullUUID `db:"organization_id" json:"organization_id"`
+	Slug           string        `db:"slug" json:"slug"`
+	Name           string        `db:"name" json:"name"`
+	Description    string        `db:"description" json:"description"`
+	Icon           string        `db:"icon" json:"icon"`
+	SystemPrompt   string        `db:"system_prompt" json:"system_prompt"`
+	// Preferred model for chats created with this persona. NULL falls back to the default model resolution.
+	ModelConfigID uuid.NullUUID `db:"model_config_id" json:"model_config_id"`
+	Enabled       bool          `db:"enabled" json:"enabled"`
+	Deleted       bool          `db:"deleted" json:"deleted"`
+	CreatedBy     uuid.UUID     `db:"created_by" json:"created_by"`
+	CreatedAt     time.Time     `db:"created_at" json:"created_at"`
+	UpdatedAt     time.Time     `db:"updated_at" json:"updated_at"`
+}
+
 type ChatQueuedMessage struct {
 	ID            int64           `db:"id" json:"id"`
 	ChatID        uuid.UUID       `db:"chat_id" json:"chat_id"`
@@ -5216,6 +5292,8 @@ type ChatTable struct {
 	ContextError string `db:"context_error" json:"context_error"`
 	// Stores the most recent message effort once per-turn selection is wired.
 	LastReasoningEffort NullChatReasoningEffort `db:"last_reasoning_effort" json:"last_reasoning_effort"`
+	// The chat agent the chat was created as, if any. Distinct from agent_id, which is the workspace agent.
+	ChatAgentID uuid.NullUUID `db:"chat_agent_id" json:"chat_agent_id"`
 }
 
 type ChatUsageLimitConfig struct {

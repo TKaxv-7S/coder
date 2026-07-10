@@ -441,6 +441,10 @@ func ReloadBuiltinRoles(opts *RoleOptions) {
 				// All users can see OAuth2 provider applications.
 				ResourceOauth2App.Type:      {policy.ActionRead},
 				ResourceWorkspaceProxy.Type: {policy.ActionRead},
+				// All members can read deployment-scoped chat personas
+				// and agents so they can use them in chats.
+				ResourceChatPersona.Type: {policy.ActionRead},
+				ResourceChatAgent.Type:   {policy.ActionRead},
 			}),
 			denyPermissions...,
 		),
@@ -1153,6 +1157,10 @@ func OrgMemberPermissions(org OrgSettings) OrgRolePermissions {
 		ResourceOrganization.Type: {policy.ActionRead},
 		// Can read available roles.
 		ResourceAssignOrgRole.Type: {policy.ActionRead},
+		// All org members can read the org's chat personas and
+		// agents so they can use them in chats.
+		ResourceChatPersona.Type: {policy.ActionRead},
+		ResourceChatAgent.Type:   {policy.ActionRead},
 	}
 
 	// In all modes of workspace sharing but `none`, members need to
@@ -1243,6 +1251,10 @@ func OrgServiceAccountPermissions(org OrgSettings) OrgRolePermissions {
 		ResourceOrganization.Type: {policy.ActionRead},
 		// Can read available roles.
 		ResourceAssignOrgRole.Type: {policy.ActionRead},
+		// Service accounts can read the org's chat personas and
+		// agents so they can use them in chats.
+		ResourceChatPersona.Type: {policy.ActionRead},
+		ResourceChatAgent.Type:   {policy.ActionRead},
 	}
 
 	// When workspace sharing is enabled, service accounts need to see

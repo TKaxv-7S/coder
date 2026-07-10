@@ -73,6 +73,18 @@ export const RBACResourceActions: Partial<
 		share: "share a chat with other users or groups",
 		update: "update chat title or settings",
 	},
+	chat_agent: {
+		create: "create a chat agent",
+		delete: "delete a chat agent",
+		read: "read a chat agent",
+		update: "update a chat agent",
+	},
+	chat_persona: {
+		create: "create a chat persona",
+		delete: "delete a chat persona",
+		read: "read a chat persona",
+		update: "update a chat persona",
+	},
 	connection_log: {
 		read: "read connection logs",
 		update: "upsert connection log entries",

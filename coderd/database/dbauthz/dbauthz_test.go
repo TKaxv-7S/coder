@@ -1280,6 +1280,75 @@ func (s *MethodTestSuite) TestChats() {
 		dbm.EXPECT().InsertChatModelConfig(gomock.Any(), arg).Return(config, nil).AnyTimes()
 		check.Args(arg).Asserts(rbac.ResourceDeploymentConfig, policy.ActionUpdate).Returns(config)
 	}))
+	s.Run("GetChatPersonaByID", s.Mocked(func(dbm *dbmock.MockStore, faker *gofakeit.Faker, check *expects) {
+		persona := testutil.Fake(s.T(), faker, database.ChatPersona{})
+		dbm.EXPECT().GetChatPersonaByID(gomock.Any(), persona.ID).Return(persona, nil).AnyTimes()
+		check.Args(persona.ID).Asserts(persona, policy.ActionRead).Returns(persona)
+	}))
+	s.Run("GetChatPersonas", s.Mocked(func(dbm *dbmock.MockStore, faker *gofakeit.Faker, check *expects) {
+		orgID := uuid.New()
+		deployment := testutil.Fake(s.T(), faker, database.ChatPersona{})
+		deployment.OrganizationID = uuid.NullUUID{}
+		orgScoped := testutil.Fake(s.T(), faker, database.ChatPersona{})
+		orgScoped.OrganizationID = uuid.NullUUID{UUID: orgID, Valid: true}
+		dbm.EXPECT().GetChatPersonas(gomock.Any(), orgID).Return([]database.ChatPersona{deployment, orgScoped}, nil).AnyTimes()
+		check.Args(orgID).Asserts(deployment, policy.ActionRead, orgScoped, policy.ActionRead).Returns(slice.New(deployment, orgScoped))
+	}))
+	s.Run("InsertChatPersona", s.Mocked(func(dbm *dbmock.MockStore, faker *gofakeit.Faker, check *expects) {
+		orgID := uuid.New()
+		arg := testutil.Fake(s.T(), faker, database.InsertChatPersonaParams{})
+		arg.OrganizationID = uuid.NullUUID{UUID: orgID, Valid: true}
+		persona := testutil.Fake(s.T(), faker, database.ChatPersona{})
+		dbm.EXPECT().InsertChatPersona(gomock.Any(), arg).Return(persona, nil).AnyTimes()
+		check.Args(arg).Asserts(rbac.ResourceChatPersona.InOrg(orgID), policy.ActionCreate).Returns(persona)
+	}))
+	s.Run("UpdateChatPersona", s.Mocked(func(dbm *dbmock.MockStore, faker *gofakeit.Faker, check *expects) {
+		persona := testutil.Fake(s.T(), faker, database.ChatPersona{})
+		arg := testutil.Fake(s.T(), faker, database.UpdateChatPersonaParams{ID: persona.ID})
+		dbm.EXPECT().GetChatPersonaByID(gomock.Any(), persona.ID).Return(persona, nil).AnyTimes()
+		dbm.EXPECT().UpdateChatPersona(gomock.Any(), arg).Return(persona, nil).AnyTimes()
+		check.Args(arg).Asserts(persona, policy.ActionUpdate).Returns(persona)
+	}))
+	s.Run("UpdateChatPersonaDeletedByID", s.Mocked(func(dbm *dbmock.MockStore, faker *gofakeit.Faker, check *expects) {
+		persona := testutil.Fake(s.T(), faker, database.ChatPersona{})
+		dbm.EXPECT().GetChatPersonaByID(gomock.Any(), persona.ID).Return(persona, nil).AnyTimes()
+		dbm.EXPECT().UpdateChatPersonaDeletedByID(gomock.Any(), persona.ID).Return(nil).AnyTimes()
+		check.Args(persona.ID).Asserts(persona, policy.ActionDelete).Returns()
+	}))
+	s.Run("GetChatAgentByID", s.Mocked(func(dbm *dbmock.MockStore, faker *gofakeit.Faker, check *expects) {
+		agent := testutil.Fake(s.T(), faker, database.ChatAgent{})
+		dbm.EXPECT().GetChatAgentByID(gomock.Any(), agent.ID).Return(agent, nil).AnyTimes()
+		check.Args(agent.ID).Asserts(agent, policy.ActionRead).Returns(agent)
+	}))
+	s.Run("GetChatAgents", s.Mocked(func(dbm *dbmock.MockStore, faker *gofakeit.Faker, check *expects) {
+		orgID := uuid.New()
+		deployment := testutil.Fake(s.T(), faker, database.ChatAgent{})
+		deployment.OrganizationID = uuid.NullUUID{}
+		orgScoped := testutil.Fake(s.T(), faker, database.ChatAgent{})
+		orgScoped.OrganizationID = uuid.NullUUID{UUID: orgID, Valid: true}
+		dbm.EXPECT().GetChatAgents(gomock.Any(), orgID).Return([]database.ChatAgent{deployment, orgScoped}, nil).AnyTimes()
+		check.Args(orgID).Asserts(deployment, policy.ActionRead, orgScoped, policy.ActionRead).Returns(slice.New(deployment, orgScoped))
+	}))
+	s.Run("InsertChatAgent", s.Mocked(func(dbm *dbmock.MockStore, faker *gofakeit.Faker, check *expects) {
+		arg := testutil.Fake(s.T(), faker, database.InsertChatAgentParams{})
+		arg.OrganizationID = uuid.NullUUID{}
+		agent := testutil.Fake(s.T(), faker, database.ChatAgent{})
+		dbm.EXPECT().InsertChatAgent(gomock.Any(), arg).Return(agent, nil).AnyTimes()
+		check.Args(arg).Asserts(rbac.ResourceChatAgent, policy.ActionCreate).Returns(agent)
+	}))
+	s.Run("UpdateChatAgent", s.Mocked(func(dbm *dbmock.MockStore, faker *gofakeit.Faker, check *expects) {
+		agent := testutil.Fake(s.T(), faker, database.ChatAgent{})
+		arg := testutil.Fake(s.T(), faker, database.UpdateChatAgentParams{ID: agent.ID})
+		dbm.EXPECT().GetChatAgentByID(gomock.Any(), agent.ID).Return(agent, nil).AnyTimes()
+		dbm.EXPECT().UpdateChatAgent(gomock.Any(), arg).Return(agent, nil).AnyTimes()
+		check.Args(arg).Asserts(agent, policy.ActionUpdate).Returns(agent)
+	}))
+	s.Run("UpdateChatAgentDeletedByID", s.Mocked(func(dbm *dbmock.MockStore, faker *gofakeit.Faker, check *expects) {
+		agent := testutil.Fake(s.T(), faker, database.ChatAgent{})
+		dbm.EXPECT().GetChatAgentByID(gomock.Any(), agent.ID).Return(agent, nil).AnyTimes()
+		dbm.EXPECT().UpdateChatAgentDeletedByID(gomock.Any(), agent.ID).Return(nil).AnyTimes()
+		check.Args(agent.ID).Asserts(agent, policy.ActionDelete).Returns()
+	}))
 
 	s.Run("PopNextQueuedMessage", s.Mocked(func(dbm *dbmock.MockStore, faker *gofakeit.Faker, check *expects) {
 		chat := testutil.Fake(s.T(), faker, database.Chat{})

@@ -152,6 +152,10 @@ func ResourceTarget[T Auditable](tgt T) string {
 		// for display; collisions affect the display label and search
 		// filter but not the primary resource identifier.
 		return typed.ID.String()[:8]
+	case database.ChatPersona:
+		return typed.Name
+	case database.ChatAgent:
+		return typed.Name
 	case database.UserSecret:
 		return typed.Name
 	case database.UserSkill:
@@ -234,6 +238,10 @@ func ResourceID[T Auditable](tgt T) uuid.UUID {
 		return typed.UserID
 	case database.Chat:
 		return typed.ID
+	case database.ChatPersona:
+		return typed.ID
+	case database.ChatAgent:
+		return typed.ID
 	case database.UserSecret:
 		return typed.ID
 	case database.UserSkill:
@@ -307,6 +315,10 @@ func ResourceType[T Auditable](tgt T) database.ResourceType {
 		return database.ResourceTypeUserAIBudgetOverride
 	case database.Chat:
 		return database.ResourceTypeChat
+	case database.ChatPersona:
+		return database.ResourceTypeChatPersona
+	case database.ChatAgent:
+		return database.ResourceTypeChatAgent
 	case database.UserSecret:
 		return database.ResourceTypeUserSecret
 	case database.UserSkill:
@@ -392,6 +404,12 @@ func ResourceRequiresOrgID[T Auditable]() bool {
 		// Chats always have a non-null organization_id (since
 		// migration 000467).
 		return true
+	case database.ChatPersona:
+		// Personas can be deployment-scoped (NULL organization_id).
+		return false
+	case database.ChatAgent:
+		// Agents can be deployment-scoped (NULL organization_id).
+		return false
 	case database.UserSecret:
 		// User secrets are global to the user across organizations.
 		return false

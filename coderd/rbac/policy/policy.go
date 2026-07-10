@@ -114,6 +114,22 @@ var RBACPermissions = map[string]PermissionDefinition{
 	"chat": {
 		Actions: chatActions,
 	},
+	"chat_persona": {
+		Actions: map[Action]ActionDefinition{
+			ActionCreate: "create a chat persona",
+			ActionRead:   "read a chat persona",
+			ActionUpdate: "update a chat persona",
+			ActionDelete: "delete a chat persona",
+		},
+	},
+	"chat_agent": {
+		Actions: map[Action]ActionDefinition{
+			ActionCreate: "create a chat agent",
+			ActionRead:   "read a chat agent",
+			ActionUpdate: "update a chat agent",
+			ActionDelete: "delete a chat agent",
+		},
+	},
 	// Dormant workspaces have the same perms as workspaces.
 	"workspace_dormant": {
 		Actions: workspaceActions,

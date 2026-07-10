@@ -244,6 +244,28 @@ func (c ChatFile) RBACObject() rbac.Object {
 	return rbac.ResourceChat.WithID(c.ID).WithOwner(c.OwnerID.String()).InOrg(c.OrganizationID)
 }
 
+// RBACObject returns the persona scoped to its organization when set.
+// Deployment-scoped personas (NULL organization_id) authorize against
+// the site-level object.
+func (p ChatPersona) RBACObject() rbac.Object {
+	obj := rbac.ResourceChatPersona.WithID(p.ID)
+	if p.OrganizationID.Valid {
+		obj = obj.InOrg(p.OrganizationID.UUID)
+	}
+	return obj
+}
+
+// RBACObject returns the agent scoped to its organization when set.
+// Deployment-scoped agents (NULL organization_id) authorize against
+// the site-level object.
+func (a ChatAgent) RBACObject() rbac.Object {
+	obj := rbac.ResourceChatAgent.WithID(a.ID)
+	if a.OrganizationID.Valid {
+		obj = obj.InOrg(a.OrganizationID.UUID)
+	}
+	return obj
+}
+
 func (c GetChatFileMetadataByChatIDRow) RBACObject() rbac.Object {
 	return rbac.ResourceChat.WithID(c.ID).WithOwner(c.OwnerID.String()).InOrg(c.OrganizationID)
 }

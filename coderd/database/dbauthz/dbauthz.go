@@ -3013,6 +3013,14 @@ func (q *querier) GetChatAdvisorConfig(ctx context.Context) (string, error) {
 	return q.db.GetChatAdvisorConfig(ctx)
 }
 
+func (q *querier) GetChatAgentByID(ctx context.Context, id uuid.UUID) (database.ChatAgent, error) {
+	return fetch(q.log, q.auth, q.db.GetChatAgentByID)(ctx, id)
+}
+
+func (q *querier) GetChatAgents(ctx context.Context, organizationID uuid.UUID) ([]database.ChatAgent, error) {
+	return fetchWithPostFilter(q.auth, policy.ActionRead, q.db.GetChatAgents)(ctx, organizationID)
+}
+
 func (q *querier) GetChatAutoArchiveDays(ctx context.Context, defaultAutoArchiveDays int32) (int32, error) {
 	// Chat auto-archive is a deployment-wide config read by dbpurge.
 	// Only requires a valid actor in context. The HTTP GET handler
@@ -3416,6 +3424,10 @@ func (q *querier) GetChatModelConfigsForTelemetry(ctx context.Context) ([]databa
 	return q.db.GetChatModelConfigsForTelemetry(ctx)
 }
 
+func (q *querier) GetChatPersonaByID(ctx context.Context, id uuid.UUID) (database.ChatPersona, error) {
+	return fetch(q.log, q.auth, q.db.GetChatPersonaByID)(ctx, id)
+}
+
 func (q *querier) GetChatPersonalModelOverridesEnabled(ctx context.Context) (bool, error) {
 	// The personal model overrides flag is a deployment-wide setting read by
 	// authenticated chat users. We only require that an explicit actor is
@@ -3424,6 +3436,10 @@ func (q *querier) GetChatPersonalModelOverridesEnabled(ctx context.Context) (boo
 		return false, ErrNoActor
 	}
 	return q.db.GetChatPersonalModelOverridesEnabled(ctx)
+}
+
+func (q *querier) GetChatPersonas(ctx context.Context, organizationID uuid.UUID) ([]database.ChatPersona, error) {
+	return fetchWithPostFilter(q.auth, policy.ActionRead, q.db.GetChatPersonas)(ctx, organizationID)
 }
 
 func (q *querier) GetChatPlanModeInstructions(ctx context.Context) (string, error) {
@@ -5914,6 +5930,19 @@ func (q *querier) InsertChat(ctx context.Context, arg database.InsertChatParams)
 	return insert(q.log, q.auth, rbac.ResourceChat.WithOwner(arg.OwnerID.String()).InOrg(arg.OrganizationID), q.db.InsertChat)(ctx, arg)
 }
 
+func (q *querier) InsertChatAgent(ctx context.Context, arg database.InsertChatAgentParams) (database.ChatAgent, error) {
+	// Deployment-scoped agents (NULL organization_id) authorize against
+	// the site-level object; org agents authorize in their organization.
+	obj := rbac.ResourceChatAgent
+	if arg.OrganizationID.Valid {
+		obj = obj.InOrg(arg.OrganizationID.UUID)
+	}
+	if err := q.authorizeContext(ctx, policy.ActionCreate, obj); err != nil {
+		return database.ChatAgent{}, err
+	}
+	return q.db.InsertChatAgent(ctx, arg)
+}
+
 func (q *querier) InsertChatDebugRun(ctx context.Context, arg database.InsertChatDebugRunParams) (database.ChatDebugRun, error) {
 	chat, err := q.db.GetChatByID(ctx, arg.ChatID)
 	if err != nil {
@@ -5963,6 +5992,19 @@ func (q *querier) InsertChatModelConfig(ctx context.Context, arg database.Insert
 		return database.ChatModelConfig{}, err
 	}
 	return q.db.InsertChatModelConfig(ctx, arg)
+}
+
+func (q *querier) InsertChatPersona(ctx context.Context, arg database.InsertChatPersonaParams) (database.ChatPersona, error) {
+	// Deployment-scoped personas (NULL organization_id) authorize against
+	// the site-level object; org personas authorize in their organization.
+	obj := rbac.ResourceChatPersona
+	if arg.OrganizationID.Valid {
+		obj = obj.InOrg(arg.OrganizationID.UUID)
+	}
+	if err := q.authorizeContext(ctx, policy.ActionCreate, obj); err != nil {
+		return database.ChatPersona{}, err
+	}
+	return q.db.InsertChatPersona(ctx, arg)
 }
 
 func (q *querier) InsertChatQueuedMessage(ctx context.Context, arg database.InsertChatQueuedMessageParams) (database.ChatQueuedMessage, error) {
@@ -7194,6 +7236,18 @@ func (q *querier) UpdateChatACLByID(ctx context.Context, arg database.UpdateChat
 	return fetchAndExec(q.log, q.auth, policy.ActionShare, fetch, q.db.UpdateChatACLByID)(ctx, arg)
 }
 
+func (q *querier) UpdateChatAgent(ctx context.Context, arg database.UpdateChatAgentParams) (database.ChatAgent, error) {
+	fetch := func(ctx context.Context, arg database.UpdateChatAgentParams) (database.ChatAgent, error) {
+		return q.db.GetChatAgentByID(ctx, arg.ID)
+	}
+	return updateWithReturn(q.log, q.auth, fetch, q.db.UpdateChatAgent)(ctx, arg)
+}
+
+func (q *querier) UpdateChatAgentDeletedByID(ctx context.Context, id uuid.UUID) error {
+	// Soft deletes require the delete permission on the agent.
+	return deleteQ(q.log, q.auth, q.db.GetChatAgentByID, q.db.UpdateChatAgentDeletedByID)(ctx, id)
+}
+
 func (q *querier) UpdateChatBuildAgentBinding(ctx context.Context, arg database.UpdateChatBuildAgentBindingParams) (database.Chat, error) {
 	chat, err := q.db.GetChatByID(ctx, arg.ID)
 	if err != nil {
@@ -7322,6 +7376,18 @@ func (q *querier) UpdateChatModelConfig(ctx context.Context, arg database.Update
 		return database.ChatModelConfig{}, err
 	}
 	return q.db.UpdateChatModelConfig(ctx, arg)
+}
+
+func (q *querier) UpdateChatPersona(ctx context.Context, arg database.UpdateChatPersonaParams) (database.ChatPersona, error) {
+	fetch := func(ctx context.Context, arg database.UpdateChatPersonaParams) (database.ChatPersona, error) {
+		return q.db.GetChatPersonaByID(ctx, arg.ID)
+	}
+	return updateWithReturn(q.log, q.auth, fetch, q.db.UpdateChatPersona)(ctx, arg)
+}
+
+func (q *querier) UpdateChatPersonaDeletedByID(ctx context.Context, id uuid.UUID) error {
+	// Soft deletes require the delete permission on the persona.
+	return deleteQ(q.log, q.auth, q.db.GetChatPersonaByID, q.db.UpdateChatPersonaDeletedByID)(ctx, id)
 }
 
 func (q *querier) UpdateChatPinOrder(ctx context.Context, arg database.UpdateChatPinOrderParams) error {

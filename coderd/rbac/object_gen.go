@@ -128,6 +128,26 @@ var (
 		Type: "chat",
 	}
 
+	// ResourceChatAgent
+	// Valid Actions
+	//  - "ActionCreate" :: create a chat agent
+	//  - "ActionDelete" :: delete a chat agent
+	//  - "ActionRead" :: read a chat agent
+	//  - "ActionUpdate" :: update a chat agent
+	ResourceChatAgent = Object{
+		Type: "chat_agent",
+	}
+
+	// ResourceChatPersona
+	// Valid Actions
+	//  - "ActionCreate" :: create a chat persona
+	//  - "ActionDelete" :: delete a chat persona
+	//  - "ActionRead" :: read a chat persona
+	//  - "ActionUpdate" :: update a chat persona
+	ResourceChatPersona = Object{
+		Type: "chat_persona",
+	}
+
 	// ResourceConnectionLog
 	// Valid Actions
 	//  - "ActionRead" :: read connection logs
@@ -511,6 +531,8 @@ func AllResources() []Objecter {
 		ResourceBoundaryLog,
 		ResourceBoundaryUsage,
 		ResourceChat,
+		ResourceChatAgent,
+		ResourceChatPersona,
 		ResourceConnectionLog,
 		ResourceCryptoKey,
 		ResourceDebugInfo,

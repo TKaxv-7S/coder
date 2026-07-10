@@ -1460,6 +1460,90 @@ func TestRolePermissions(t *testing.T) {
 				false: {setOtherOrg, memberMe, orgMemberMe, agentsAccessUser, userAdmin, templateAdmin, orgTemplateAdmin, orgUserAdmin, orgAuditor, orgWorkspaceAccessUser},
 			},
 		},
+		{
+			// Deployment-scoped personas are managed by site owners only.
+			Name:     "ChatPersonaDeploymentManage",
+			Actions:  []policy.Action{policy.ActionCreate, policy.ActionUpdate, policy.ActionDelete},
+			Resource: rbac.ResourceChatPersona.WithID(uuid.New()),
+			AuthorizeMap: map[bool][]hasAuthSubjects{
+				true:  {owner},
+				false: {setOtherOrg, setOrgNotMe, memberMe, orgMemberMe, agentsAccessUser, orgWorkspaceAccessUser, templateAdmin, userAdmin},
+			},
+		},
+		{
+			// Every member can read deployment-scoped personas so they
+			// can use them in chats.
+			Name:     "ChatPersonaDeploymentRead",
+			Actions:  []policy.Action{policy.ActionRead},
+			Resource: rbac.ResourceChatPersona.WithID(uuid.New()),
+			AuthorizeMap: map[bool][]hasAuthSubjects{
+				true:  {owner, setOtherOrg, setOrgNotMe, memberMe, orgMemberMe, agentsAccessUser, orgWorkspaceAccessUser, templateAdmin, userAdmin},
+				false: {},
+			},
+		},
+		{
+			// Org-scoped personas are managed by org admins.
+			Name:     "ChatPersonaOrgManage",
+			Actions:  []policy.Action{policy.ActionCreate, policy.ActionUpdate, policy.ActionDelete},
+			Resource: rbac.ResourceChatPersona.WithID(uuid.New()).InOrg(orgID),
+			AuthorizeMap: map[bool][]hasAuthSubjects{
+				true:  {owner, orgAdmin},
+				false: {setOtherOrg, memberMe, orgMemberMe, agentsAccessUser, orgWorkspaceAccessUser, orgAuditor, orgUserAdmin, orgTemplateAdmin, templateAdmin, userAdmin},
+			},
+		},
+		{
+			// The site-wide member read grant applies to org-scoped
+			// personas too, so every member can read them.
+			Name:     "ChatPersonaOrgRead",
+			Actions:  []policy.Action{policy.ActionRead},
+			Resource: rbac.ResourceChatPersona.WithID(uuid.New()).InOrg(orgID),
+			AuthorizeMap: map[bool][]hasAuthSubjects{
+				true:  {owner, setOtherOrg, setOrgNotMe, memberMe, orgMemberMe, agentsAccessUser, orgWorkspaceAccessUser, templateAdmin, userAdmin},
+				false: {},
+			},
+		},
+		{
+			// Deployment-scoped agents are managed by site owners only.
+			Name:     "ChatAgentDeploymentManage",
+			Actions:  []policy.Action{policy.ActionCreate, policy.ActionUpdate, policy.ActionDelete},
+			Resource: rbac.ResourceChatAgent.WithID(uuid.New()),
+			AuthorizeMap: map[bool][]hasAuthSubjects{
+				true:  {owner},
+				false: {setOtherOrg, setOrgNotMe, memberMe, orgMemberMe, agentsAccessUser, orgWorkspaceAccessUser, templateAdmin, userAdmin},
+			},
+		},
+		{
+			// Every member can read deployment-scoped agents so they can
+			// use them in chats.
+			Name:     "ChatAgentDeploymentRead",
+			Actions:  []policy.Action{policy.ActionRead},
+			Resource: rbac.ResourceChatAgent.WithID(uuid.New()),
+			AuthorizeMap: map[bool][]hasAuthSubjects{
+				true:  {owner, setOtherOrg, setOrgNotMe, memberMe, orgMemberMe, agentsAccessUser, orgWorkspaceAccessUser, templateAdmin, userAdmin},
+				false: {},
+			},
+		},
+		{
+			// Org-scoped agents are managed by org admins.
+			Name:     "ChatAgentOrgManage",
+			Actions:  []policy.Action{policy.ActionCreate, policy.ActionUpdate, policy.ActionDelete},
+			Resource: rbac.ResourceChatAgent.WithID(uuid.New()).InOrg(orgID),
+			AuthorizeMap: map[bool][]hasAuthSubjects{
+				true:  {owner, orgAdmin},
+				false: {setOtherOrg, memberMe, orgMemberMe, agentsAccessUser, orgWorkspaceAccessUser, orgAuditor, orgUserAdmin, orgTemplateAdmin, templateAdmin, userAdmin},
+			},
+		},
+		{
+			// The site-wide member read grant applies to org-scoped
+			// agents too, so every member can read them.
+			Name:     "ChatAgentOrgRead",
+			Actions:  []policy.Action{policy.ActionRead},
+			Resource: rbac.ResourceChatAgent.WithID(uuid.New()).InOrg(orgID),
+			AuthorizeMap: map[bool][]hasAuthSubjects{
+				true:  {owner, setOtherOrg, setOrgNotMe, memberMe, orgMemberMe, agentsAccessUser, orgWorkspaceAccessUser, templateAdmin, userAdmin},
+				false: {},
+			},
+		},
 	}
 	// Build coverage set from test case definitions statically,
 	// so we don't need shared mutable state during execution.

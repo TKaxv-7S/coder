@@ -35,6 +35,8 @@ var AuditActionMap = map[string][]codersdk.AuditAction{
 	"AuditableGroupAIBudget":        {codersdk.AuditActionWrite, codersdk.AuditActionDelete},
 	"AuditableUserAIBudgetOverride": {codersdk.AuditActionWrite, codersdk.AuditActionDelete},
 	"Chat":                          {codersdk.AuditActionCreate, codersdk.AuditActionWrite}, // chats get 'archived' by users, not deleted.
+	"ChatPersona":                   {codersdk.AuditActionCreate, codersdk.AuditActionWrite, codersdk.AuditActionDelete},
+	"ChatAgent":                     {codersdk.AuditActionCreate, codersdk.AuditActionWrite, codersdk.AuditActionDelete},
 	"UserSecret":                    {codersdk.AuditActionCreate, codersdk.AuditActionWrite, codersdk.AuditActionDelete},
 	"UserSkill":                     {codersdk.AuditActionCreate, codersdk.AuditActionWrite, codersdk.AuditActionDelete},
 }
@@ -447,6 +449,7 @@ var auditableResourcesTypes = map[any]map[string]Action{
 		"workspace_id":                ActionTrack,
 		"build_id":                    ActionIgnore, // Internal lifecycle.
 		"agent_id":                    ActionIgnore, // Internal lifecycle.
+		"chat_agent_id":               ActionTrack,
 		"title":                       ActionSecret, // May contain sensitive content.
 		"status":                      ActionIgnore, // Churns every message.
 		"worker_id":                   ActionIgnore, // Internal.
@@ -483,6 +486,37 @@ var auditableResourcesTypes = map[any]map[string]Action{
 		"generation_attempt":          ActionIgnore, // Internal retry counter.
 		"runner_id":                   ActionIgnore, // Internal ownership identifier.
 		"requires_action_deadline_at": ActionIgnore, // Internal pending-action deadline.
+	},
+	&database.ChatPersona{}: {
+		"id":              ActionTrack,
+		"organization_id": ActionIgnore, // Never changes after creation.
+		"slug":            ActionTrack,
+		"name":            ActionTrack,
+		"description":     ActionTrack,
+		"icon":            ActionTrack,
+		"system_prompt":   ActionTrack,
+		"model_config_id": ActionTrack,
+		"enabled":         ActionTrack,
+		"deleted":         ActionIgnore, // Implicit when a delete event is fired.
+		"created_by":      ActionTrack,
+		"created_at":      ActionIgnore, // Never changes.
+		"updated_at":      ActionIgnore, // Bumped on every mutation.
+	},
+	&database.ChatAgent{}: {
+		"id":              ActionTrack,
+		"organization_id": ActionIgnore, // Never changes after creation.
+		"slug":            ActionTrack,
+		"name":            ActionTrack,
+		"description":     ActionTrack,
+		"icon":            ActionTrack,
+		"persona_id":      ActionTrack,
+		"prompt_append":   ActionTrack,
+		"model_config_id": ActionTrack,
+		"enabled":         ActionTrack,
+		"deleted":         ActionIgnore, // Implicit when a delete event is fired.
+		"created_by":      ActionTrack,
+		"created_at":      ActionIgnore, // Never changes.
+		"updated_at":      ActionIgnore, // Bumped on every mutation.
 	},
 	&database.UserSkill{}: {
 		"id":          ActionTrack,

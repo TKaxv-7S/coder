@@ -570,9 +570,19 @@ export type APIKeyScope =
 	| "boundary_usage:delete"
 	| "boundary_usage:read"
 	| "boundary_usage:update"
+	| "chat_agent:*"
+	| "chat_agent:create"
+	| "chat_agent:delete"
+	| "chat_agent:read"
+	| "chat_agent:update"
 	| "chat:*"
 	| "chat:create"
 	| "chat:delete"
+	| "chat_persona:*"
+	| "chat_persona:create"
+	| "chat_persona:delete"
+	| "chat_persona:read"
+	| "chat_persona:update"
 	| "chat:read"
 	| "chat:share"
 	| "chat:update"
@@ -810,9 +820,19 @@ export const APIKeyScopes: APIKeyScope[] = [
 	"boundary_usage:delete",
 	"boundary_usage:read",
 	"boundary_usage:update",
+	"chat_agent:*",
+	"chat_agent:create",
+	"chat_agent:delete",
+	"chat_agent:read",
+	"chat_agent:update",
 	"chat:*",
 	"chat:create",
 	"chat:delete",
+	"chat_persona:*",
+	"chat_persona:create",
+	"chat_persona:delete",
+	"chat_persona:read",
+	"chat_persona:update",
 	"chat:read",
 	"chat:share",
 	"chat:update",
@@ -7233,6 +7253,8 @@ export type RBACResource =
 	| "boundary_log"
 	| "boundary_usage"
 	| "chat"
+	| "chat_agent"
+	| "chat_persona"
 	| "connection_log"
 	| "crypto_key"
 	| "debug_info"
@@ -7286,6 +7308,8 @@ export const RBACResources: RBACResource[] = [
 	"boundary_log",
 	"boundary_usage",
 	"chat",
+	"chat_agent",
+	"chat_persona",
 	"connection_log",
 	"crypto_key",
 	"debug_info",
@@ -7438,6 +7462,8 @@ export type ResourceType =
 	| "ai_seat"
 	| "api_key"
 	| "chat"
+	| "chat_agent"
+	| "chat_persona"
 	| "convert_login"
 	| "custom_role"
 	| "git_ssh_key"
@@ -7475,6 +7501,8 @@ export const ResourceTypes: ResourceType[] = [
 	"ai_seat",
 	"api_key",
 	"chat",
+	"chat_agent",
+	"chat_persona",
 	"convert_login",
 	"custom_role",
 	"git_ssh_key",

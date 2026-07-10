@@ -371,6 +371,10 @@ type sqlcQuerier interface {
 	// result into codersdk.AdvisorConfig. Returns '{}' when unset so zero
 	// values apply by default.
 	GetChatAdvisorConfig(ctx context.Context) (string, error)
+	GetChatAgentByID(ctx context.Context, id uuid.UUID) (ChatAgent, error)
+	// Returns deployment-scoped agents and, when an organization ID is
+	// given, that organization's agents as well.
+	GetChatAgents(ctx context.Context, organizationID uuid.UUID) ([]ChatAgent, error)
 	// Auto-archive window in days. 0 disables.
 	GetChatAutoArchiveDays(ctx context.Context, defaultAutoArchiveDays int32) (int32, error)
 	GetChatByID(ctx context.Context, id uuid.UUID) (Chat, error)
@@ -448,9 +452,13 @@ type sqlcQuerier interface {
 	// Returns all model configurations for telemetry snapshot collection.
 	// deleted = false guarantees ai_provider_id is non-null, so INNER JOIN is safe.
 	GetChatModelConfigsForTelemetry(ctx context.Context) ([]GetChatModelConfigsForTelemetryRow, error)
+	GetChatPersonaByID(ctx context.Context, id uuid.UUID) (ChatPersona, error)
 	// GetChatPersonalModelOverridesEnabled returns whether users may configure
 	// personal chat model overrides. It defaults to false when unset.
 	GetChatPersonalModelOverridesEnabled(ctx context.Context) (bool, error)
+	// Returns deployment-scoped personas and, when an organization ID is
+	// given, that organization's personas as well.
+	GetChatPersonas(ctx context.Context, organizationID uuid.UUID) ([]ChatPersona, error)
 	GetChatPlanModeInstructions(ctx context.Context) (string, error)
 	GetChatQueuedMessageByID(ctx context.Context, arg GetChatQueuedMessageByIDParams) (ChatQueuedMessage, error)
 	// Returns the queue head (lowest position, then lowest id).
@@ -1030,6 +1038,7 @@ type sqlcQuerier interface {
 	InsertBoundaryLogs(ctx context.Context, arg InsertBoundaryLogsParams) ([]BoundaryLog, error)
 	InsertBoundarySession(ctx context.Context, arg InsertBoundarySessionParams) (BoundarySession, error)
 	InsertChat(ctx context.Context, arg InsertChatParams) (Chat, error)
+	InsertChatAgent(ctx context.Context, arg InsertChatAgentParams) (ChatAgent, error)
 	// updated_at is the retention clock used by DeleteOldChatDebugRuns.
 	// Set it on every write to keep retention semantics correct.
 	InsertChatDebugRun(ctx context.Context, arg InsertChatDebugRunParams) (ChatDebugRun, error)
@@ -1043,6 +1052,7 @@ type sqlcQuerier interface {
 	InsertChatFile(ctx context.Context, arg InsertChatFileParams) (InsertChatFileRow, error)
 	InsertChatMessages(ctx context.Context, arg InsertChatMessagesParams) ([]ChatMessage, error)
 	InsertChatModelConfig(ctx context.Context, arg InsertChatModelConfigParams) (ChatModelConfig, error)
+	InsertChatPersona(ctx context.Context, arg InsertChatPersonaParams) (ChatPersona, error)
 	// Legacy queue insertion path. When no caller-supplied creator exists,
 	// preserve the created_by invariant by attributing the queued row to the
 	// chat owner.
@@ -1326,6 +1336,10 @@ type sqlcQuerier interface {
 	UpdateAIProvider(ctx context.Context, arg UpdateAIProviderParams) (AIProvider, error)
 	UpdateAPIKeyByID(ctx context.Context, arg UpdateAPIKeyByIDParams) error
 	UpdateChatACLByID(ctx context.Context, arg UpdateChatACLByIDParams) error
+	UpdateChatAgent(ctx context.Context, arg UpdateChatAgentParams) (ChatAgent, error)
+	// Soft delete keeps the row so chats referencing the agent retain FK
+	// integrity.
+	UpdateChatAgentDeletedByID(ctx context.Context, id uuid.UUID) error
 	UpdateChatBuildAgentBinding(ctx context.Context, arg UpdateChatBuildAgentBindingParams) (Chat, error)
 	UpdateChatByID(ctx context.Context, arg UpdateChatByIDParams) (Chat, error)
 	// Uses COALESCE so that passing NULL from Go means "keep the
@@ -1375,6 +1389,10 @@ type sqlcQuerier interface {
 	UpdateChatLastTurnSummary(ctx context.Context, arg UpdateChatLastTurnSummaryParams) (int64, error)
 	UpdateChatMCPServerIDs(ctx context.Context, arg UpdateChatMCPServerIDsParams) (Chat, error)
 	UpdateChatModelConfig(ctx context.Context, arg UpdateChatModelConfigParams) (ChatModelConfig, error)
+	UpdateChatPersona(ctx context.Context, arg UpdateChatPersonaParams) (ChatPersona, error)
+	// Soft delete keeps the row so agents and chats referencing the
+	// persona retain FK integrity.
+	UpdateChatPersonaDeletedByID(ctx context.Context, id uuid.UUID) error
 	UpdateChatPinOrder(ctx context.Context, arg UpdateChatPinOrderParams) error
 	UpdateChatPlanModeByID(ctx context.Context, arg UpdateChatPlanModeByIDParams) (Chat, error)
 	// Stores the client-visible retry payload. retry_state_version is
