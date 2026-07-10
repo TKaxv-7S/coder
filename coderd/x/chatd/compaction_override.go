@@ -60,7 +60,7 @@ func (p *Server) resolveCompactionOverrideConfig(
 		)
 	}
 
-	return p.resolveConfiguredModelOverride(
+	modelConfig, overrideEffort, overrideSet, err := p.resolveConfiguredModelOverride(
 		ctx,
 		compactionOverrideContext,
 		raw,
@@ -71,6 +71,10 @@ func (p *Server) resolveCompactionOverrideConfig(
 		},
 		modelOverrideFailureModeSoft,
 	)
+	if err != nil || !overrideSet {
+		return database.ChatModelConfig{}, overrideSet, err
+	}
+	return withResolvedReasoningEffort(modelConfig, overrideEffort), true, nil
 }
 
 // buildCompactionOverrideModel resolves the route and constructs the model
