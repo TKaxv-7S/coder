@@ -123,7 +123,7 @@ This allows you to reduce resource costs during off-hours while maintaining avai
 
 Configure scheduling by adding a `scheduling` block within your `prebuilds` configuration:
 
-```hcl
+```terraform
 data "coder_workspace_preset" "goland" {
    name = "GoLand: Large"
    parameters {
@@ -187,7 +187,7 @@ Cron expressions follow the format: `* HOUR DOM MONTH DAY-OF-WEEK`
 
 **Example schedules:**
 
-```hcl
+```terraform
 # Business hours only (8AM-6:59PM, Mon-Fri)
 schedule {
   cron = "* 8-18 * * 1-5"
@@ -367,7 +367,7 @@ For example, when these values are used in immutable fields like the AWS instanc
 
 To prevent this, add a `lifecycle` block with `ignore_changes`:
 
-```hcl
+```terraform
 resource "docker_container" "workspace" {
   lifecycle {
     ignore_changes = [env, image] # include all fields which caused drift

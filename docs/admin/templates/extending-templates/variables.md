@@ -6,7 +6,7 @@ construction of customizable templates. Unlike parameters, which are primarily
 for workspace customization, template variables remain under the control of the
 template author, ensuring workspace users cannot modify them.
 
-```hcl
+```terraform
 variable "CLOUD_API_KEY" {
   type        = string
   description = "API key for the service"

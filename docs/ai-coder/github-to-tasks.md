@@ -110,7 +110,7 @@ You can also choose to modify the other [input parameters](https://github.com/co
 
 If your prompt uses the GitHub CLI `gh`, your template must pass the user's GitHub token to the agent. Add this to your template's Terraform:
 
-```hcl
+```terraform
 data "coder_external_auth" "github" {
   id = "github" # Must match your CODER_EXTERNAL_AUTH_0_ID
 }

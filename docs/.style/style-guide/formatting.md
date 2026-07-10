@@ -139,13 +139,15 @@ Use the most specific language tag available:
 - `powershell` for Windows command-line blocks.
   PowerShell is the default Windows shell in the Coder docs.
   `pwsh` is not a valid tag; use `powershell`.
-- `hcl` for Terraform and HCL.
-  `tf` and `terraform` are not the canonical tag; use `hcl`.
+- `terraform` for Terraform and HCL.
+  `tf` and `hcl` are not the canonical tag; use `terraform`.
+  Shiki ships `terraform` and `hcl` as two distinct grammars; `terraform` is the more specific one and matches what nearly every Coder docs code block actually is.
 - `yaml` for YAML.
 - `go` for Go.
 - `json` for JSON.
+- `dotenv` for `.env`-style `KEY=VALUE` blocks.
 - `text` for command output shown on its own, and for any block with no syntax to highlight.
-  `env`, `output`, `none`, and `url` are not valid tags; use `text`.
+  `output`, `none`, and `url` are not valid tags; use `text`.
 - `dockerfile` for Dockerfiles, lowercase.
   `Dockerfile` (capitalized) is not a valid tag.
 

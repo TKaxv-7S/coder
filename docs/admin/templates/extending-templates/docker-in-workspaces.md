@@ -23,7 +23,7 @@ inside Coder workspaces. See [Systemd in Docker](#systemd-in-docker).
 After [installing Sysbox](https://github.com/nestybox/sysbox#installation) on
 the Coder host, modify your template to use the sysbox-runc runtime:
 
-```hcl
+```terraform
 resource "docker_container" "workspace" {
   # ...
   name    = "coder-${data.coder_workspace.me.owner}-${lower(data.coder_workspace.me.name)}"
@@ -52,7 +52,7 @@ After
 modify your template to use the sysbox-runc RuntimeClass. This requires the
 Kubernetes Terraform provider version 2.16.0 or greater.
 
-```hcl
+```terraform
 terraform {
   required_providers {
     coder = {
@@ -169,7 +169,7 @@ $ kubectl create secret docker-registry <name> \
   --docker-email=<service-account-email>
 ```
 
-```hcl
+```terraform
 env {
   name = "CODER_IMAGE_PULL_SECRET"
   value_from {
@@ -311,7 +311,7 @@ your nodes cannot run Sysbox.
 
 ### Use a privileged sidecar container in Docker-based templates
 
-```hcl
+```terraform
 resource "coder_agent" "main" {
   os             = "linux"
   arch           = "amd64"
@@ -348,7 +348,7 @@ resource "docker_container" "workspace" {
 
 ### Use a privileged sidecar container in Kubernetes-based templates
 
-```hcl
+```terraform
 terraform {
   required_providers {
     coder = {
@@ -420,7 +420,7 @@ After
 modify your template to use the sysbox-runc RuntimeClass. This requires the
 Kubernetes Terraform provider version 2.16.0 or greater.
 
-```hcl
+```terraform
 terraform {
   required_providers {
     coder = {

@@ -107,7 +107,7 @@ default (shows all), add this block inside the
 [`coder_agent`](https://registry.terraform.io/providers/coder/coder/latest/docs/resources/agent)
 of a template and configure as needed:
 
-```hcl
+```terraform
   display_apps {
     vscode = false
     vscode_insiders = false
@@ -143,7 +143,7 @@ In the template, set
 option to `authenticated` and when a workspace is built with this template, the
 pretty globe shows up next to path-based `code-server`:
 
-```hcl
+```terraform
 resource "coder_app" "code-server" {
   ...
   share        = "authenticated"
@@ -292,7 +292,7 @@ One way is to reference a Terraform module from a GitHub repo to avoid
 duplication and then just extend it or pass template-specific
 parameters/resources:
 
-```hcl
+```terraform
 # template1/main.tf
 module "central-coder-module" {
   source = "github.com/org/central-coder-module"
@@ -303,7 +303,7 @@ resource "ebs_volume" "custom_template1_only_resource" {
 }
 ```
 
-```hcl
+```terraform
 # template2/main.tf
 module "central-coder-module" {
   source = "github.com/org/central-coder-module"
@@ -350,7 +350,7 @@ duplicate name errors.
 
 This code produces a hashed value that will be difficult to replicate.
 
-```hcl
+```terraform
 locals {
   concatenated_string = "${data.coder_workspace.me.name}+${data.coder_workspace_owner.me.name}"
   hashed_string = md5(local.concatenated_string)
@@ -538,7 +538,7 @@ To achieve this, template admins can use the environment variable
 This variable allows the system to check if the executed application is on the
 block list, which includes `scp`, `rsync`, `ftp`, and `nc`.
 
-```hcl
+```terraform
 resource "docker_container" "workspace" {
   ...
   env = [

@@ -43,7 +43,7 @@ Add the following command to your template's `startup_script`:
 
 If you are using our [jetbrains-gateway](https://registry.coder.com/modules/coder/jetbrains-gateway) module, you can configure it by adding the following snippet to your template:
 
-```hcl
+```terraform
 module "jetbrains_gateway" {
   count          = data.coder_workspace.me.start_count
   source         = "registry.coder.com/modules/jetbrains-gateway/coder"

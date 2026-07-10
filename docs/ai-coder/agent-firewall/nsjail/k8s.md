@@ -108,7 +108,7 @@ sysctl -w user.max_user_namespaces=65536
 If `sysctl -w` is not allowed, configure it via Bottlerocket bootstrap settings
 when creating the node group (e.g., in Terraform):
 
-```hcl
+```terraform
 bootstrap_extra_args = <<-EOT
   [settings.kernel.sysctl]
   "user.max_user_namespaces" = "65536"

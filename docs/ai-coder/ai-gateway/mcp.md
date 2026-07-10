@@ -38,7 +38,7 @@ See the diagram in [Implementation Details](./reference.md#implementation-detail
 
 You can also control which tools are injected by using an allow and/or a deny regular expression on the tool names:
 
-```text
+```dotenv
 CODER_EXTERNAL_AUTH_0_MCP_TOOL_ALLOW_REGEX=(.+_gist.*)
 CODER_EXTERNAL_AUTH_0_MCP_TOOL_DENY_REGEX=(create_gist)
 ```

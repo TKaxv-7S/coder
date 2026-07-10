@@ -51,7 +51,7 @@ Create or update your Terraform CLI configuration file to use Artifactory.
 
 On Linux/macOS, create `~/.terraformrc`. On Windows, create `%APPDATA%\terraform.rc`.
 
-```hcl
+```terraform
 host "<your-artifactory-host>" {
   services = {
     "modules.v1" = "https://<your-artifactory-host>/artifactory/api/terraform/coder-registry/v1/modules/"
@@ -79,7 +79,7 @@ Replace:
 
 Update your Coder templates to use Artifactory instead of the public registry:
 
-```hcl
+```terraform
 # Before: Direct from Coder registry
 module "code-server" {
   source   = "registry.coder.com/coder/code-server/coder"
@@ -170,7 +170,7 @@ The Artifactory mirror supports all namespaces from the Coder registry:
 
 All modules use the same source format:
 
-```hcl
+```terraform
 source = "<your-artifactory-host>/<namespace>/<module>/coder"
 ```
 

@@ -62,7 +62,7 @@ workloads.
 The following Kubernetes template snippet enables process
 priority management on the workspace container:
 
-```hcl
+```terraform
 resource "kubernetes_deployment" "workspace" {
   # ... other configuration
 

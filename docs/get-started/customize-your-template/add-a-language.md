@@ -22,7 +22,7 @@ A parameter is a question Coder asks when someone creates a workspace.
 Each parameter comes from a `coder_parameter` [data source](https://developer.hashicorp.com/terraform/language/data-sources) in the template.
 The **Programming Languages** parameter is a multi-select list, and each language the reader can choose is an `option` block:
 
-```hcl
+```terraform
 data "coder_parameter" "languages" {
   name         = "languages"
   display_name = "Programming Languages"
@@ -54,7 +54,7 @@ Adding an `option` adds a choice to that list.
 In `main.tf`, find the `data "coder_parameter" "languages"` block.
 Add a Ruby `option` after the last existing option, before the parameter's closing brace:
 
-```hcl
+```terraform
   option {
     name  = "Ruby"
     value = "ruby"
@@ -203,7 +203,7 @@ The shipped presets cover combinations like Go and Python, but none selects Ruby
 
 In `main.tf`, find the `# --- Presets ---` section and add a Ruby preset next to the existing ones:
 
-```hcl
+```terraform
 data "coder_workspace_preset" "ruby_dev" {
   name = "Ruby Development"
   icon = "/icon/ruby.svg"
@@ -292,7 +292,7 @@ Your template files after this guide's changes, starting from the Quickstart tem
 
 ### main.tf
 
-```hcl
+```terraform
 terraform {
   required_providers {
     coder = {

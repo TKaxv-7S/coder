@@ -96,7 +96,7 @@ If configuring within a Coder workspace, you can use the
 
 For the centralized API key flow, set `enable_ai_gateway`:
 
-```hcl
+```terraform
 module "codex" {
   source            = "registry.coder.com/coder-labs/codex/coder"
   version           = "~> 5.0"
@@ -111,7 +111,7 @@ through `base_config_toml` and inject the Coder API token with a
 `coder_env` resource. Users authenticate by running `codex login` with
 their ChatGPT account:
 
-```hcl
+```terraform
 resource "coder_env" "coder_api_token" {
   agent_id = coder_agent.main.id
   name     = "CODER_API_TOKEN"

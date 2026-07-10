@@ -57,7 +57,7 @@ Your Coder administrator can add Antigravity as a one-click workspace app using
 the [Antigravity module](https://registry.coder.com/modules/coder/antigravity)
 from the Coder registry:
 
-```hcl
+```terraform
 module "antigravity" {
   count    = data.coder_workspace.me.start_count
   source   = "registry.coder.com/coder/antigravity/coder"
