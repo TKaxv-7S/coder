@@ -31,6 +31,7 @@ import (
 	"github.com/coder/coder/v2/agent/agentexec"
 	"github.com/coder/coder/v2/agent/agentrsa"
 	"github.com/coder/coder/v2/agent/usershell"
+	"github.com/coder/coder/v2/coderd/idemetadata"
 	"github.com/coder/coder/v2/codersdk"
 	"github.com/coder/coder/v2/pty"
 )
@@ -155,9 +156,10 @@ type Server struct {
 
 	config *Config
 
-	connCountVSCode     atomic.Int64
-	connCountJetBrains  atomic.Int64
-	connCountSSHSession atomic.Int64
+	// connCounts tracks active sessions per session type
+	// (map[string]*atomic.Int64). Counters are created on demand, so any
+	// session type reported by a client is counted.
+	connCounts sync.Map
 
 	metrics *sshServerMetrics
 }
@@ -232,7 +234,7 @@ func NewServer(ctx context.Context, logger slog.Logger, prometheusRegistry *prom
 		ChannelHandlers: map[string]ssh.ChannelHandler{
 			"direct-tcpip": func(srv *ssh.Server, conn *gossh.ServerConn, newChan gossh.NewChannel, ctx ssh.Context) {
 				// Wrapper is designed to find and track JetBrains Gateway connections.
-				wrapped := NewJetbrainsChannelWatcher(ctx, s.logger, s.config.ReportConnection, newChan, &s.connCountJetBrains)
+				wrapped := NewJetbrainsChannelWatcher(ctx, s.logger, s.config.ReportConnection, newChan, s.getOrCreateConnCounter(MagicSessionTypeJetBrains))
 				ssh.DirectTCPIPHandler(srv, conn, wrapped, ctx)
 			},
 			"direct-streamlocal@openssh.com": func(srv *ssh.Server, conn *gossh.ServerConn, newChan gossh.NewChannel, ctx ssh.Context) {
@@ -324,21 +326,27 @@ func NewServer(ctx context.Context, logger slog.Logger, prometheusRegistry *prom
 	return s, nil
 }
 
-type ConnStats struct {
-	Sessions  int64
-	VSCode    int64
-	JetBrains int64
+// getOrCreateConnCounter returns the active session counter for the given
+// session type, creating it on first use.
+func (s *Server) getOrCreateConnCounter(sessionType MagicSessionType) *atomic.Int64 {
+	counter, _ := s.connCounts.LoadOrStore(string(sessionType), &atomic.Int64{})
+	//nolint:forcetypeassert // Only *atomic.Int64 values are stored.
+	return counter.(*atomic.Int64)
 }
 
-func (s *Server) ConnStats() ConnStats {
-	return ConnStats{
-		Sessions:  s.connCountSSHSession.Load(),
-		VSCode:    s.connCountVSCode.Load(),
-		JetBrains: s.connCountJetBrains.Load(),
-	}
+// ConnStats returns a snapshot of active sessions per session type.
+func (s *Server) ConnStats() map[string]int64 {
+	stats := make(map[string]int64)
+	s.connCounts.Range(func(key, value any) bool {
+		//nolint:forcetypeassert // Only string keys and *atomic.Int64 values are stored.
+		stats[key.(string)] = value.(*atomic.Int64).Load()
+		return true
+	})
+	return stats
 }
 
-func extractMagicSessionType(env []string) (magicType MagicSessionType, rawType string, filteredEnv []string) {
+func extractMagicSessionType(env []string) (sessionType MagicSessionType, filteredEnv []string) {
+	var rawType string
 	for _, kv := range env {
 		if !strings.HasPrefix(kv, MagicSessionTypeEnvironmentVariable) {
 			continue
@@ -348,19 +356,16 @@ func extractMagicSessionType(env []string) (magicType MagicSessionType, rawType 
 		// Keep going, we'll use the last instance of the env.
 	}
 
-	// Always force lowercase checking to be case-insensitive.
-	switch MagicSessionType(strings.ToLower(rawType)) {
-	case MagicSessionTypeVSCode:
-		magicType = MagicSessionTypeVSCode
-	case MagicSessionTypeJetBrains:
-		magicType = MagicSessionTypeJetBrains
-	case "", MagicSessionTypeSSH:
-		magicType = MagicSessionTypeSSH
-	default:
-		magicType = MagicSessionTypeUnknown
+	if rawType == "" {
+		// No magic session type set: this is a plain SSH session.
+		sessionType = MagicSessionTypeSSH
+	} else {
+		// Clean, do not classify: the raw string is preserved (well-known
+		// names are canonicalized) so new IDEs flow through unchanged.
+		sessionType = MagicSessionType(idemetadata.Normalize(rawType))
 	}
 
-	return magicType, rawType, slices.DeleteFunc(env, func(kv string) bool {
+	return sessionType, slices.DeleteFunc(env, func(kv string) bool {
 		return strings.HasPrefix(kv, MagicSessionTypeEnvironmentVariable+"=")
 	})
 }
@@ -423,7 +428,7 @@ func (s *Server) sessionHandler(session ssh.Session) {
 	logger.Info(ctx, "handling ssh session")
 
 	env := session.Environ()
-	magicType, magicTypeRaw, env := extractMagicSessionType(env)
+	magicType, env := extractMagicSessionType(env)
 
 	// It's not safe to assume RemoteAddr() returns a non-nil value. slog.F usage is fine because it correctly
 	// handles nil.
@@ -449,19 +454,15 @@ func (s *Server) sessionHandler(session ssh.Session) {
 
 	reportSession := true
 
-	switch magicType {
-	case MagicSessionTypeVSCode:
-		s.connCountVSCode.Add(1)
-		defer s.connCountVSCode.Add(-1)
-	case MagicSessionTypeJetBrains:
+	if idemetadata.Lookup(string(magicType)).Family == idemetadata.FamilyJetBrains {
 		// Do nothing here because JetBrains launches hundreds of ssh sessions.
-		// We instead track JetBrains in the single persistent tcp forwarding channel.
+		// We instead track JetBrains in the single persistent tcp forwarding
+		// channel, matched by family to include IDE-specific identifiers.
 		reportSession = false
-	case MagicSessionTypeSSH:
-		s.connCountSSHSession.Add(1)
-		defer s.connCountSSHSession.Add(-1)
-	case MagicSessionTypeUnknown:
-		logger.Warn(ctx, "invalid magic ssh session type specified", slog.F("raw_type", magicTypeRaw))
+	} else {
+		counter := s.getOrCreateConnCounter(magicType)
+		counter.Add(1)
+		defer counter.Add(-1)
 	}
 
 	closeCause := func(_ string) {}

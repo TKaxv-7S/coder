@@ -154,35 +154,41 @@ WITH
 	-- every minute (per user).
 	insights AS (
 		SELECT
-			template_id,
-			user_id,
-			COUNT(DISTINCT CASE WHEN session_count_ssh > 0 THEN date_trunc('minute', created_at) ELSE NULL END) AS ssh_mins,
-			-- TODO(mafredri): Enable when we have the column.
-			-- COUNT(DISTINCT CASE WHEN session_count_sftp > 0 THEN date_trunc('minute', created_at) ELSE NULL END) AS sftp_mins,
-			COUNT(DISTINCT CASE WHEN session_count_reconnecting_pty > 0 THEN date_trunc('minute', created_at) ELSE NULL END) AS reconnecting_pty_mins,
-			COUNT(DISTINCT CASE WHEN session_count_vscode > 0 THEN date_trunc('minute', created_at) ELSE NULL END) AS vscode_mins,
-			COUNT(DISTINCT CASE WHEN session_count_jetbrains > 0 THEN date_trunc('minute', created_at) ELSE NULL END) AS jetbrains_mins,
+			was.template_id,
+			was.user_id,
+			COUNT(DISTINCT CASE WHEN sc.ssh > 0 THEN date_trunc('minute', was.created_at) ELSE NULL END) AS ssh_mins,
+			COUNT(DISTINCT CASE WHEN sc.reconnecting_pty > 0 THEN date_trunc('minute', was.created_at) ELSE NULL END) AS reconnecting_pty_mins,
+			COUNT(DISTINCT CASE WHEN sc.vscode > 0 THEN date_trunc('minute', was.created_at) ELSE NULL END) AS vscode_mins,
+			COUNT(DISTINCT CASE WHEN sc.jetbrains > 0 THEN date_trunc('minute', was.created_at) ELSE NULL END) AS jetbrains_mins,
 			-- NOTE(mafredri): The agent stats are currently very unreliable, and
 			-- sometimes the connections are missing, even during active sessions.
 			-- Since we can't fully rely on this, we check for "any connection
 			-- within this bucket". A better solution here would be preferable.
-			MAX(connection_count) > 0 AS has_connection
+			MAX(was.connection_count) > 0 AS has_connection
 		FROM
-			workspace_agent_stats
+			workspace_agent_stats was
+		-- One lateral row per stats row, so the aggregates above don't fan out.
+		LEFT JOIN LATERAL (
+			SELECT
+				coalesce(SUM(count) FILTER (WHERE app_name = 'ssh'), 0)::bigint AS ssh,
+				coalesce(SUM(count) FILTER (WHERE app_name = 'reconnecting_pty'), 0)::bigint AS reconnecting_pty,
+				coalesce(SUM(count) FILTER (WHERE app_name = 'vscode'), 0)::bigint AS vscode,
+				coalesce(SUM(count) FILTER (WHERE app_name = 'jetbrains'), 0)::bigint AS jetbrains
+			FROM workspace_agent_session_counts
+			WHERE workspace_agent_stats_id = was.id
+		) sc ON TRUE
 		WHERE
-			created_at >= @start_time::timestamptz
-			AND created_at < @end_time::timestamptz
+			was.created_at >= @start_time::timestamptz
+			AND was.created_at < @end_time::timestamptz
 			-- Inclusion criteria to filter out empty results.
 			AND (
-				session_count_ssh > 0
-				-- TODO(mafredri): Enable when we have the column.
-				-- OR session_count_sftp > 0
-				OR session_count_reconnecting_pty > 0
-				OR session_count_vscode > 0
-				OR session_count_jetbrains > 0
+				sc.ssh > 0
+				OR sc.reconnecting_pty > 0
+				OR sc.vscode > 0
+				OR sc.jetbrains > 0
 			)
 		GROUP BY
-			template_id, user_id
+			was.template_id, was.user_id
 	)
 
 SELECT
@@ -555,54 +561,58 @@ WITH
 		SELECT
 			-- Truncate the minute to the nearest half hour, this is the bucket size
 			-- for the data.
-			date_trunc('hour', created_at) + trunc(date_part('minute', created_at) / 30) * 30 * '1 minute'::interval AS time_bucket,
-			template_id,
-			user_id,
+			date_trunc('hour', was.created_at) + trunc(date_part('minute', was.created_at) / 30) * 30 * '1 minute'::interval AS time_bucket,
+			was.template_id,
+			was.user_id,
 			-- Store each unique minute bucket for later merge between datasets.
 			array_agg(
 				DISTINCT CASE
 				WHEN
-					session_count_ssh > 0
-					-- TODO(mafredri): Enable when we have the column.
-					-- OR session_count_sftp > 0
-					OR session_count_reconnecting_pty > 0
-					OR session_count_vscode > 0
-					OR session_count_jetbrains > 0
+					sc.ssh > 0
+					OR sc.reconnecting_pty > 0
+					OR sc.vscode > 0
+					OR sc.jetbrains > 0
 				THEN
-					date_trunc('minute', created_at)
+					date_trunc('minute', was.created_at)
 				ELSE
 					NULL
 				END
 			) AS minute_buckets,
-			COUNT(DISTINCT CASE WHEN session_count_ssh > 0 THEN date_trunc('minute', created_at) ELSE NULL END) AS ssh_mins,
-			-- TODO(mafredri): Enable when we have the column.
-			-- COUNT(DISTINCT CASE WHEN session_count_sftp > 0 THEN date_trunc('minute', created_at) ELSE NULL END) AS sftp_mins,
-			COUNT(DISTINCT CASE WHEN session_count_reconnecting_pty > 0 THEN date_trunc('minute', created_at) ELSE NULL END) AS reconnecting_pty_mins,
-			COUNT(DISTINCT CASE WHEN session_count_vscode > 0 THEN date_trunc('minute', created_at) ELSE NULL END) AS vscode_mins,
-			COUNT(DISTINCT CASE WHEN session_count_jetbrains > 0 THEN date_trunc('minute', created_at) ELSE NULL END) AS jetbrains_mins,
+			COUNT(DISTINCT CASE WHEN sc.ssh > 0 THEN date_trunc('minute', was.created_at) ELSE NULL END) AS ssh_mins,
+			COUNT(DISTINCT CASE WHEN sc.reconnecting_pty > 0 THEN date_trunc('minute', was.created_at) ELSE NULL END) AS reconnecting_pty_mins,
+			COUNT(DISTINCT CASE WHEN sc.vscode > 0 THEN date_trunc('minute', was.created_at) ELSE NULL END) AS vscode_mins,
+			COUNT(DISTINCT CASE WHEN sc.jetbrains > 0 THEN date_trunc('minute', was.created_at) ELSE NULL END) AS jetbrains_mins,
 			-- NOTE(mafredri): The agent stats are currently very unreliable, and
 			-- sometimes the connections are missing, even during active sessions.
 			-- Since we can't fully rely on this, we check for "any connection
 			-- during this half-hour". A better solution here would be preferable.
-			MAX(connection_count) > 0 AS has_connection
+			MAX(was.connection_count) > 0 AS has_connection
 		FROM
-			workspace_agent_stats
+			workspace_agent_stats was
+		-- One lateral row per stats row, so the aggregates above don't fan out.
+		LEFT JOIN LATERAL (
+			SELECT
+				coalesce(SUM(count) FILTER (WHERE app_name = 'ssh'), 0)::bigint AS ssh,
+				coalesce(SUM(count) FILTER (WHERE app_name = 'reconnecting_pty'), 0)::bigint AS reconnecting_pty,
+				coalesce(SUM(count) FILTER (WHERE app_name = 'vscode'), 0)::bigint AS vscode,
+				coalesce(SUM(count) FILTER (WHERE app_name = 'jetbrains'), 0)::bigint AS jetbrains
+			FROM workspace_agent_session_counts
+			WHERE workspace_agent_stats_id = was.id
+		) sc ON TRUE
 		WHERE
 			-- created_at >= @start_time::timestamptz
 			-- AND created_at < @end_time::timestamptz
-			created_at >= (SELECT t FROM latest_start)
-			AND created_at < NOW()
+			was.created_at >= (SELECT t FROM latest_start)
+			AND was.created_at < NOW()
 			-- Inclusion criteria to filter out empty results.
 			AND (
-				session_count_ssh > 0
-				-- TODO(mafredri): Enable when we have the column.
-				-- OR session_count_sftp > 0
-				OR session_count_reconnecting_pty > 0
-				OR session_count_vscode > 0
-				OR session_count_jetbrains > 0
+				sc.ssh > 0
+				OR sc.reconnecting_pty > 0
+				OR sc.vscode > 0
+				OR sc.jetbrains > 0
 			)
 		GROUP BY
-			time_bucket, template_id, user_id
+			time_bucket, was.template_id, was.user_id
 	),
 	stats AS (
 		SELECT

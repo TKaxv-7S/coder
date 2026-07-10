@@ -308,7 +308,10 @@ func TestCache_DeploymentStats(t *testing.T) {
 		DeploymentStats: time.Minute,
 	}, false)
 
-	err := db.InsertWorkspaceAgentStats(context.Background(), database.InsertWorkspaceAgentStatsParams{
+	sessionCounts, err := json.Marshal([]map[string]int64{{"vscode": 1}})
+	require.NoError(t, err)
+
+	err = db.InsertWorkspaceAgentStats(context.Background(), database.InsertWorkspaceAgentStatsParams{
 		ID:                 []uuid.UUID{uuid.New()},
 		CreatedAt:          []time.Time{clock.Now()},
 		WorkspaceID:        []uuid.UUID{uuid.New()},
@@ -317,17 +320,14 @@ func TestCache_DeploymentStats(t *testing.T) {
 		AgentID:            []uuid.UUID{uuid.New()},
 		ConnectionsByProto: json.RawMessage(`[{}]`),
 
-		RxPackets:                   []int64{0},
-		RxBytes:                     []int64{1},
-		TxPackets:                   []int64{0},
-		TxBytes:                     []int64{1},
-		ConnectionCount:             []int64{1},
-		SessionCountVSCode:          []int64{1},
-		SessionCountJetBrains:       []int64{0},
-		SessionCountReconnectingPTY: []int64{0},
-		SessionCountSSH:             []int64{0},
-		ConnectionMedianLatencyMS:   []float64{10},
-		Usage:                       []bool{false},
+		RxPackets:                 []int64{0},
+		RxBytes:                   []int64{1},
+		TxPackets:                 []int64{0},
+		TxBytes:                   []int64{1},
+		ConnectionCount:           []int64{1},
+		SessionCounts:             sessionCounts,
+		ConnectionMedianLatencyMS: []float64{10},
+		Usage:                     []bool{false},
 	})
 	require.NoError(t, err)
 

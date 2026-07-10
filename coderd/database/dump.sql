@@ -3780,6 +3780,16 @@ CREATE TABLE workspace_agent_scripts (
     id uuid DEFAULT gen_random_uuid() NOT NULL
 );
 
+CREATE TABLE workspace_agent_session_counts (
+    workspace_agent_stats_id uuid NOT NULL,
+    app_name text NOT NULL,
+    count bigint DEFAULT 0 NOT NULL
+);
+
+COMMENT ON TABLE workspace_agent_session_counts IS 'Session counts per app for each workspace agent stats row. Rows are removed together with their parent workspace_agent_stats row.';
+
+COMMENT ON COLUMN workspace_agent_session_counts.app_name IS 'App identifier as reported by the client (e.g. vscode, jetbrains, ssh, reconnecting_pty). Stored raw; display names and family grouping are applied at the API boundary.';
+
 CREATE SEQUENCE workspace_agent_startup_logs_id_seq
     START WITH 1
     INCREMENT BY 1
@@ -3803,10 +3813,6 @@ CREATE TABLE workspace_agent_stats (
     tx_packets bigint DEFAULT 0 NOT NULL,
     tx_bytes bigint DEFAULT 0 NOT NULL,
     connection_median_latency_ms double precision DEFAULT '-1'::integer NOT NULL,
-    session_count_vscode bigint DEFAULT 0 NOT NULL,
-    session_count_jetbrains bigint DEFAULT 0 NOT NULL,
-    session_count_reconnecting_pty bigint DEFAULT 0 NOT NULL,
-    session_count_ssh bigint DEFAULT 0 NOT NULL,
     usage boolean DEFAULT false NOT NULL
 );
 
@@ -4551,6 +4557,9 @@ ALTER TABLE ONLY workspace_agent_script_timings
 ALTER TABLE ONLY workspace_agent_scripts
     ADD CONSTRAINT workspace_agent_scripts_id_key UNIQUE (id);
 
+ALTER TABLE ONLY workspace_agent_session_counts
+    ADD CONSTRAINT workspace_agent_session_counts_pkey PRIMARY KEY (workspace_agent_stats_id, app_name);
+
 ALTER TABLE ONLY workspace_agent_logs
     ADD CONSTRAINT workspace_agent_startup_logs_pkey PRIMARY KEY (id);
 
@@ -4905,7 +4914,7 @@ COMMENT ON INDEX workspace_agent_scripts_workspace_agent_id_idx IS 'Foreign key 
 
 CREATE INDEX workspace_agent_startup_logs_id_agent_id_idx ON workspace_agent_logs USING btree (agent_id, id);
 
-CREATE INDEX workspace_agent_stats_template_id_created_at_user_id_idx ON workspace_agent_stats USING btree (template_id, created_at, user_id) INCLUDE (session_count_vscode, session_count_jetbrains, session_count_reconnecting_pty, session_count_ssh, connection_median_latency_ms) WHERE (connection_count > 0);
+CREATE INDEX workspace_agent_stats_template_id_created_at_user_id_idx ON workspace_agent_stats USING btree (template_id, created_at, user_id) INCLUDE (connection_median_latency_ms) WHERE (connection_count > 0);
 
 COMMENT ON INDEX workspace_agent_stats_template_id_created_at_user_id_idx IS 'Support index for template insights endpoint to build interval reports faster.';
 
@@ -5435,6 +5444,9 @@ ALTER TABLE ONLY workspace_agent_script_timings
 
 ALTER TABLE ONLY workspace_agent_scripts
     ADD CONSTRAINT workspace_agent_scripts_workspace_agent_id_fkey FOREIGN KEY (workspace_agent_id) REFERENCES workspace_agents(id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY workspace_agent_session_counts
+    ADD CONSTRAINT workspace_agent_session_counts_workspace_agent_stats_id_fkey FOREIGN KEY (workspace_agent_stats_id) REFERENCES workspace_agent_stats(id) ON DELETE CASCADE;
 
 ALTER TABLE ONLY workspace_agent_logs
     ADD CONSTRAINT workspace_agent_startup_logs_agent_id_fkey FOREIGN KEY (agent_id) REFERENCES workspace_agents(id) ON DELETE CASCADE;
