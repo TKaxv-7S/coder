@@ -64,11 +64,13 @@ type CompactionOptions struct {
 	ChatID              uuid.UUID
 	HistoryTipMessageID int64
 
-	// ResolvedProvider, ResolvedModel, and ModelConfigID identify the
-	// model generating the summary; see GenerateCompactionOptions.
+	// ResolvedProvider, ResolvedModel, ModelConfigID, and
+	// ProviderOptions describe the model generating the summary; see
+	// GenerateCompactionOptions.
 	ResolvedProvider string
 	ResolvedModel    string
 	ModelConfigID    uuid.UUID
+	ProviderOptions  fantasy.ProviderOptions
 
 	// ToolCallID and ToolName identify the synthetic tool call
 	// used to represent compaction in the message stream.
@@ -178,6 +180,7 @@ func normalizedCompactionGenerateConfig(opts GenerateCompactionOptions) (Compact
 		ResolvedProvider:    opts.ResolvedProvider,
 		ResolvedModel:       opts.ResolvedModel,
 		ModelConfigID:       opts.ModelConfigID,
+		ProviderOptions:     opts.ProviderOptions,
 		ToolCallID:          opts.ToolCallID,
 		ToolName:            opts.ToolName,
 		PublishMessagePart:  opts.PublishMessagePart,
@@ -392,8 +395,9 @@ func generateCompactionSummary(
 	}()
 
 	response, err := model.Generate(summaryCtx, fantasy.Call{
-		Prompt:     summaryPrompt,
-		ToolChoice: &toolChoice,
+		Prompt:          summaryPrompt,
+		ToolChoice:      &toolChoice,
+		ProviderOptions: options.ProviderOptions,
 	})
 	if err != nil {
 		return "", xerrors.Errorf("generate summary text: %w", err)

@@ -5879,6 +5879,13 @@ func TestActiveServer_CompactionModelOverride(t *testing.T) {
 			AIProviderID: chatModel.AIProviderID,
 			ContextLimit: contextLimit,
 		})
+		lowEffort := "low"
+		overrideModel = updateChatModelCallConfig(t, db, overrideModel, codersdk.ChatModelCallConfig{
+			ReasoningEffort: &codersdk.ChatModelReasoningEffortConfig{
+				Default: &lowEffort,
+				Max:     &lowEffort,
+			},
+		})
 		require.NoError(t, db.UpsertChatCompactionModelOverride(ctx, overrideModel.ID.String()))
 		return overrideModel
 	}
@@ -5895,6 +5902,10 @@ func TestActiveServer_CompactionModelOverride(t *testing.T) {
 			if !req.Stream {
 				if strings.Contains(body, "You are performing a context compaction") {
 					require.Equal(t, overrideModelName, req.Model)
+					// The override config's reasoning effort must reach the
+					// summary request (Anthropic serializes it as
+					// output_config effort).
+					require.Contains(t, string(req.OutputConfig), `"effort":"low"`)
 					return anthropicCompactionResponse(compactionSummary)
 				}
 				return chattest.AnthropicNonStreamingResponse("title")
@@ -5905,6 +5916,8 @@ func TestActiveServer_CompactionModelOverride(t *testing.T) {
 				return highUsageReadFileResponse("/tmp/a.txt")
 			default:
 				require.Contains(t, body, compactionSummary)
+				require.Empty(t, string(req.OutputConfig),
+					"the override reasoning effort must not leak into chat model generations")
 				return chattest.AnthropicStreamingResponse(chattest.AnthropicTextChunksWithCacheUsage(chattest.AnthropicUsage{
 					InputTokens:  20,
 					OutputTokens: 5,

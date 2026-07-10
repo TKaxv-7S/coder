@@ -2,6 +2,7 @@ package chatd
 
 import (
 	"context"
+	"encoding/json"
 
 	"charm.land/fantasy"
 	"github.com/google/uuid"
@@ -10,6 +11,7 @@ import (
 	"github.com/coder/coder/v2/coderd/database"
 	"github.com/coder/coder/v2/coderd/database/dbauthz"
 	"github.com/coder/coder/v2/coderd/x/chatd/chatprovider"
+	"github.com/coder/coder/v2/codersdk"
 )
 
 const compactionOverrideContext = "compaction"
@@ -38,6 +40,9 @@ type compactionModelOverride struct {
 	model            fantasy.LanguageModel
 	resolvedProvider string
 	resolvedModel    string
+	// providerOptions carry the override config's provider options and
+	// resolved reasoning effort for the summary call.
+	providerOptions fantasy.ProviderOptions
 }
 
 // resolveCompactionOverrideConfig resolves the stored deployment-wide
@@ -119,10 +124,43 @@ func (p *Server) buildCompactionOverrideModel(
 			err,
 		)
 	}
+	providerOptions, err := compactionOverrideProviderOptions(model, modelConfig)
+	if err != nil {
+		return compactionModelOverride{}, err
+	}
 	return compactionModelOverride{
 		modelConfig:      modelConfig,
 		model:            model,
 		resolvedProvider: resolvedProvider,
 		resolvedModel:    resolvedModel,
+		providerOptions:  providerOptions,
 	}, nil
+}
+
+// compactionOverrideProviderOptions converts the override config's call
+// options (provider options plus the admin-resolved reasoning effort folded
+// in by resolveCompactionOverrideConfig) into provider options for the
+// summary call.
+func compactionOverrideProviderOptions(
+	model fantasy.LanguageModel,
+	modelConfig database.ChatModelConfig,
+) (fantasy.ProviderOptions, error) {
+	callConfig := codersdk.ChatModelCallConfig{}
+	if len(modelConfig.Options) > 0 {
+		if err := json.Unmarshal(modelConfig.Options, &callConfig); err != nil {
+			return nil, xerrors.Errorf(
+				"parse compaction model override call config: %w",
+				err,
+			)
+		}
+	}
+	providerOptions := chatprovider.ProviderOptionsFromChatModelConfig(
+		model,
+		callConfig.ProviderOptions,
+	)
+	reasoningEffort := chatprovider.ResolveReasoningEffort(
+		nil,
+		callConfig.ReasoningEffort,
+	)
+	return chatprovider.ApplyReasoningEffort(model, providerOptions, reasoningEffort), nil
 }

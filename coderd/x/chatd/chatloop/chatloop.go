@@ -288,6 +288,10 @@ type GenerateCompactionOptions struct {
 	ResolvedModel    string
 	ModelConfigID    uuid.UUID
 
+	// ProviderOptions are provider-specific call options for the summary
+	// model, such as a compaction override's configured reasoning effort.
+	ProviderOptions fantasy.ProviderOptions
+
 	PublishMessagePart func(codersdk.ChatMessageRole, codersdk.ChatMessagePart)
 }
 
