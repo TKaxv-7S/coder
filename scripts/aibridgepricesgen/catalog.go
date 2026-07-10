@@ -100,7 +100,7 @@ func buildCatalog(upstream map[string]upstreamProvider, curation map[string][]cu
 				return nil, xerrors.Errorf("%s/%s: model missing from upstream (patch it in via overrides.jq if intentional)", providerID, c.ModelIdentifier)
 			}
 			if !m.Cost.hasPricing() {
-				return nil, xerrors.Errorf("%s/%s: upstream model has no cost block", providerID, c.ModelIdentifier)
+				return nil, xerrors.Errorf("%s/%s: upstream model has no pricing data", providerID, c.ModelIdentifier)
 			}
 			if m.Limit.Context == nil || m.Limit.Output == nil {
 				return nil, xerrors.Errorf("%s/%s: upstream model missing limit.context or limit.output", providerID, c.ModelIdentifier)
