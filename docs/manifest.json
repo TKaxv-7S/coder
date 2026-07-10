@@ -1554,6 +1554,11 @@
 			"icon_path": "./images/icons/notes.svg",
 			"children": [
 				{
+					"title": "Glossary",
+					"description": "Definitions of Coder terms and product names",
+					"path": "./reference/glossary.md"
+				},
+				{
 					"title": "REST API",
 					"description": "Learn how to use Coderd API",
 					"path": "./reference/api/index.md",
