@@ -1074,6 +1074,12 @@
 									"state": ["beta"]
 								},
 								{
+									"title": "Personas and agents",
+									"description": "Define named personas and agents that control chat prompts and models",
+									"path": "./ai-coder/agents/platform-controls/personas-and-agents.md",
+									"state": ["early access"]
+								},
+								{
 									"title": "Spend Management",
 									"description": "Spend limits and cost tracking for Coder Agents",
 									"path": "./ai-coder/agents/platform-controls/usage-insights.md",

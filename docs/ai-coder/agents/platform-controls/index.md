@@ -54,6 +54,16 @@ commit message formats, preferred libraries, or repository-specific context.
 
 This setting is available under **AI Settings** > **Coder Agents** > **Instructions** and is only accessible to administrators. Developers do not see or interact with it.
 
+### Personas and agents
+
+Administrators can define named personas (a system prompt plus an optional
+preferred model) and agents (a persona plus optional extra instructions and
+a model override) at the deployment or organization level. Developers pick
+an agent when starting a chat, and running chats can delegate to them
+through the `spawn_agent` tool.
+
+See [Personas and agents](./personas-and-agents.md) for details.
+
 ### Plan mode instructions
 
 Administrators can add deployment-wide instructions that apply only when a chat
