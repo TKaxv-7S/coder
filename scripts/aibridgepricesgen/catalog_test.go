@@ -163,7 +163,7 @@ func TestBuildCatalogErrors(t *testing.T) {
 			curation: map[string][]curatedModel{
 				"anthropic": {{ModelIdentifier: "claude-costless"}},
 			},
-			wantErr: "no cost block",
+			wantErr: "no pricing data",
 		},
 		{
 			name: "MissingUpstreamLimit",
