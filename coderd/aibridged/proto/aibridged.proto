@@ -235,7 +235,7 @@ message AIProviderKindBedrock {
   string small_fast_model = 5;
   string role_arn = 6;
   string external_id = 7;
-  // protocol selects the Bedrock wire protocol ("invoke-model" or "mantle").
-  // Empty fallbacks to invoke-model.
-  string protocol = 8;
+  // The Bedrock wire protocol is selected by the provider's type
+  // ("bedrock" for InvokeModel, "bedrock-mantle" for mantle), carried in
+  // AIProvider.type, so no protocol field is needed here.
 }

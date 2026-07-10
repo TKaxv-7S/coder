@@ -214,7 +214,6 @@ func protoToProviderSpec(pp *proto.AIProvider) aiProviderSpec {
 		)
 		bedrock.RoleARN = b.GetRoleArn()
 		bedrock.ExternalID = b.GetExternalId()
-		bedrock.Protocol = codersdk.AIProviderBedrockProtocol(b.GetProtocol())
 		spec.Bedrock = ptr.Ref(bedrock)
 	}
 	return spec
@@ -280,14 +279,16 @@ func buildProvider(ctx context.Context, spec aiProviderSpec, cfg codersdk.AIBrid
 			SendActorHeaders: sendActorHeaders,
 		}), nil
 
-	case database.AIProviderTypeAnthropic, database.AIProviderTypeBedrock:
-		bedrock := bedrockConfig(spec.BaseURL, spec.Bedrock)
-		// A spec typed 'bedrock' authenticates exclusively via settings;
-		// without populated Bedrock credentials it cannot make upstream
-		// calls, so refuse rather than falling back to an unsigned
-		// Anthropic client.
-		if spec.Type == database.AIProviderTypeBedrock && bedrock == nil {
-			return nil, xerrors.New("bedrock provider has no bedrock credentials configured")
+	case database.AIProviderTypeAnthropic,
+		database.AIProviderTypeBedrock,
+		database.AIProviderTypeBedrockMantle:
+		bedrock := bedrockConfig(spec.Type, spec.BaseURL, spec.Bedrock)
+		// A spec typed 'bedrock' or 'bedrock-mantle' authenticates
+		// exclusively via settings; without populated Bedrock credentials it
+		// cannot make upstream calls, so refuse rather than falling back to
+		// an unsigned Anthropic client.
+		if spec.Type.IsBedrock() && bedrock == nil {
+			return nil, xerrors.Errorf("%s provider has no bedrock credentials configured", spec.Type)
 		}
 		// Bedrock-backed Anthropic authenticates via AWS credentials in
 		// the settings blob, not bearer keys. A bearer-token Anthropic
@@ -333,12 +334,23 @@ func buildAIProviderKeyPool(providerName string, keys []string, metrics *aibridg
 	return keypool.New(providerName, keys, quartz.NewReal(), metrics)
 }
 
+// bedrockProtocol maps the provider type to the aibridge runtime wire
+// protocol. The type is the sole source of this distinction: 'bedrock-mantle'
+// targets the mantle endpoint, and every other type (including the legacy
+// 'bedrock' and the Anthropic-via-Bedrock path) uses InvokeModel.
+func bedrockProtocol(t database.AIProviderType) config.BedrockProtocol {
+	if t == database.AIProviderTypeBedrockMantle {
+		return config.BedrockProtocolMantle
+	}
+	return config.BedrockProtocolInvokeModel
+}
+
 // bedrockConfig returns nil when the settings are absent or when the
 // Bedrock fields are not actually configured. The provider's BaseURL is
 // the generic upstream endpoint and is always non-empty, so it cannot
 // serve as a Bedrock detection signal; gate on the settings alone via
 // [codersdk.AIProviderBedrockSettings.IsConfigured].
-func bedrockConfig(baseURL string, bedrock *codersdk.AIProviderBedrockSettings) *aibridge.AWSBedrockConfig {
+func bedrockConfig(providerType database.AIProviderType, baseURL string, bedrock *codersdk.AIProviderBedrockSettings) *aibridge.AWSBedrockConfig {
 	if bedrock == nil {
 		return nil
 	}
@@ -357,7 +369,7 @@ func bedrockConfig(baseURL string, bedrock *codersdk.AIProviderBedrockSettings) 
 		SmallFastModel:  bedrockSettings.SmallFastModel,
 		RoleARN:         bedrockSettings.RoleARN,
 		ExternalID:      bedrockSettings.ExternalID,
-		Protocol:        config.BedrockProtocol(bedrockSettings.ResolvedProtocol()),
+		Protocol:        bedrockProtocol(providerType),
 	}
 }
 

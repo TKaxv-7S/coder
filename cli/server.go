@@ -3178,23 +3178,29 @@ func ReadAIProvidersFromEnv(logger slog.Logger, environ []string) ([]codersdk.AI
 		isBedrock := codersdk.IsBedrockConfigured(p.BedrockBaseURL, settings)
 
 		// BEDROCK_* fields are accepted on anthropic (mutually exclusive
-		// with KEYS) and required on bedrock. Any other TYPE rejecting
-		// them prevents silently-ignored credentials.
-		isBedrockType := providerType == database.AIProviderTypeBedrock
+		// with KEYS) and required on bedrock and bedrock-mantle. Any other
+		// TYPE rejecting them prevents silently-ignored credentials.
+		isBedrockType := providerType.IsBedrock()
 		isAnthropicType := providerType == database.AIProviderTypeAnthropic
 		if !isAnthropicType && !isBedrockType && isBedrock {
-			return nil, xerrors.Errorf("provider %d (%s): BEDROCK_* fields are only supported with TYPE %q or %q",
-				i, p.Type, database.AIProviderTypeAnthropic, database.AIProviderTypeBedrock)
+			return nil, xerrors.Errorf("provider %d (%s): BEDROCK_* fields are only supported with TYPE %q, %q, or %q",
+				i, p.Type, database.AIProviderTypeAnthropic, database.AIProviderTypeBedrock, database.AIProviderTypeBedrockMantle)
 		}
 
 		if isBedrockType && !isBedrock {
 			return nil, xerrors.Errorf("provider %d (%s): TYPE %q requires BEDROCK_* fields to be configured",
-				i, p.Type, database.AIProviderTypeBedrock)
+				i, p.Type, p.Type)
+		}
+
+		// The mantle endpoint signs requests with SigV4, which requires a region.
+		if providerType == database.AIProviderTypeBedrockMantle && p.BedrockRegion == "" {
+			return nil, xerrors.Errorf("provider %d (%s): TYPE %q requires BEDROCK_REGION",
+				i, p.Type, database.AIProviderTypeBedrockMantle)
 		}
 
 		if isBedrockType && len(p.Keys) > 0 {
 			return nil, xerrors.Errorf("provider %d (%s): KEY/KEYS are not supported for TYPE %q (use BEDROCK_* fields)",
-				i, p.Type, database.AIProviderTypeBedrock)
+				i, p.Type, p.Type)
 		}
 
 		if providerType == database.AIProviderTypeCopilot && len(p.Keys) > 0 {

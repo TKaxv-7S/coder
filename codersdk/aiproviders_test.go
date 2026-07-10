@@ -228,12 +228,13 @@ func TestAIProviderRequest_ValidateBedrockMantle(t *testing.T) {
 	t.Run("MantleRequiresRegion", func(t *testing.T) {
 		t.Parallel()
 		create := codersdk.CreateAIProviderRequest{
-			Type:    codersdk.AIProviderTypeBedrock,
-			Name:    "bedrock",
+			Type:    codersdk.AIProviderTypeBedrockMantle,
+			Name:    "bedrock-mantle",
 			BaseURL: "https://bedrock-mantle.us-east-1.api.aws",
 			Settings: codersdk.AIProviderSettings{
 				Bedrock: &codersdk.AIProviderBedrockSettings{
-					Protocol: codersdk.AIProviderBedrockProtocolMantle,
+					AccessKey:       ptr.Ref("AKIA"),
+					AccessKeySecret: ptr.Ref("secret"),
 				},
 			},
 		}
@@ -245,13 +246,18 @@ func TestAIProviderRequest_ValidateBedrockMantle(t *testing.T) {
 
 	t.Run("InvokeModelDoesNotRequireRegionField", func(t *testing.T) {
 		t.Parallel()
-		// The default (invoke-model) protocol keeps its existing rules; the
+		// type=bedrock (InvokeModel) keeps its existing rules; the
 		// mantle-specific region check must not fire for it.
 		create := codersdk.CreateAIProviderRequest{
-			Type:     codersdk.AIProviderTypeBedrock,
-			Name:     "bedrock",
-			BaseURL:  "https://bedrock-runtime.us-east-1.amazonaws.com",
-			Settings: codersdk.AIProviderSettings{},
+			Type:    codersdk.AIProviderTypeBedrock,
+			Name:    "bedrock",
+			BaseURL: "https://bedrock-runtime.us-east-1.amazonaws.com",
+			Settings: codersdk.AIProviderSettings{
+				Bedrock: &codersdk.AIProviderBedrockSettings{
+					AccessKey:       ptr.Ref("AKIA"),
+					AccessKeySecret: ptr.Ref("secret"),
+				},
+			},
 		}
 		require.False(t, hasFieldError(create.Validate(), "settings.region"))
 	})

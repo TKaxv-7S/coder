@@ -1027,3 +1027,17 @@ type UpsertConnectionLogParams struct {
 func (r GetLatestWorkspaceBuildWithStatusByWorkspaceIDRow) RBACObject() rbac.Object {
 	return r.WorkspaceTable.RBACObject()
 }
+
+// IsBedrock reports whether the provider type authenticates against AWS
+// Bedrock via the Bedrock credential settings rather than a bearer key.
+// Both the legacy InvokeModel type (AIProviderTypeBedrock) and the mantle
+// type (AIProviderTypeBedrockMantle) qualify; they share the same credential
+// surface and differ only in wire protocol.
+func (t AIProviderType) IsBedrock() bool {
+	switch t {
+	case AIProviderTypeBedrock, AIProviderTypeBedrockMantle:
+		return true
+	default:
+		return false
+	}
+}

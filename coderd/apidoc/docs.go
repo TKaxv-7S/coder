@@ -15453,6 +15453,7 @@ const docTemplate = `{
                 "openrouter",
                 "vercel",
                 "bedrock",
+                "bedrock-mantle",
                 "copilot"
             ],
             "x-enum-varnames": [
@@ -15464,6 +15465,7 @@ const docTemplate = `{
                 "AIProviderTypeOpenrouter",
                 "AIProviderTypeVercel",
                 "AIProviderTypeBedrock",
+                "AIProviderTypeBedrockMantle",
                 "AIProviderTypeCopilot"
             ]
         },

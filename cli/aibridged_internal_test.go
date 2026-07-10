@@ -13,6 +13,7 @@ import (
 	"cdr.dev/slog/v3"
 	"cdr.dev/slog/v3/sloggers/slogtest"
 	"github.com/coder/coder/v2/aibridge"
+	"github.com/coder/coder/v2/aibridge/config"
 	"github.com/coder/coder/v2/coderd"
 	agplaibridge "github.com/coder/coder/v2/coderd/aibridge"
 	"github.com/coder/coder/v2/coderd/aibridged"
@@ -268,7 +269,7 @@ func TestBuildProviders(t *testing.T) {
 			Name:    aibridge.ProviderAnthropic,
 			BaseUrl: "https://api.anthropic.com/",
 		}
-		assert.Nil(t, bedrockConfig(row.BaseUrl, codersdk.AIProviderSettings{}.Bedrock))
+		assert.Nil(t, bedrockConfig(row.Type, row.BaseUrl, codersdk.AIProviderSettings{}.Bedrock))
 	})
 
 	t.Run("NativeAnthropicCustomBaseURL", func(t *testing.T) {
@@ -278,7 +279,7 @@ func TestBuildProviders(t *testing.T) {
 			Name:    "anthropic-proxy",
 			BaseUrl: "https://internal-proxy.example.com/anthropic/",
 		}
-		assert.Nil(t, bedrockConfig(row.BaseUrl, codersdk.AIProviderSettings{}.Bedrock))
+		assert.Nil(t, bedrockConfig(row.Type, row.BaseUrl, codersdk.AIProviderSettings{}.Bedrock))
 	})
 
 	t.Run("BedrockSettingsPresent", func(t *testing.T) {
@@ -303,7 +304,7 @@ func TestBuildProviders(t *testing.T) {
 				RoleARN:         roleARN,
 			},
 		}
-		got := bedrockConfig(row.BaseUrl, settings.Bedrock)
+		got := bedrockConfig(row.Type, row.BaseUrl, settings.Bedrock)
 		require.NotNil(t, got)
 		assert.Equal(t, row.BaseUrl, got.BaseURL)
 		assert.Equal(t, "us-west-2", got.Region)
@@ -312,6 +313,30 @@ func TestBuildProviders(t *testing.T) {
 		assert.Equal(t, model, got.Model)
 		assert.Equal(t, smallModel, got.SmallFastModel)
 		assert.Equal(t, roleARN, got.RoleARN)
+		// type=anthropic (and type=bedrock) resolve to the InvokeModel protocol.
+		assert.Equal(t, config.BedrockProtocolInvokeModel, got.Protocol)
+	})
+
+	t.Run("BedrockMantleTypeSelectsMantleProtocol", func(t *testing.T) {
+		t.Parallel()
+		accessKey := "AKID"
+		secret := "secret"
+		row := database.AIProvider{
+			Type:    database.AIProviderTypeBedrockMantle,
+			Name:    "bedrock-mantle",
+			BaseUrl: "https://bedrock-mantle.us-east-1.api.aws/anthropic",
+		}
+		settings := codersdk.AIProviderSettings{
+			Bedrock: &codersdk.AIProviderBedrockSettings{
+				Region:          "us-east-1",
+				AccessKey:       &accessKey,
+				AccessKeySecret: &secret,
+			},
+		}
+		got := bedrockConfig(row.Type, row.BaseUrl, settings.Bedrock)
+		require.NotNil(t, got)
+		// The provider type, not a settings field, selects the wire protocol.
+		assert.Equal(t, config.BedrockProtocolMantle, got.Protocol)
 	})
 
 	t.Run("BedrockSettingsEmpty", func(t *testing.T) {
@@ -327,7 +352,7 @@ func TestBuildProviders(t *testing.T) {
 		settings := codersdk.AIProviderSettings{
 			Bedrock: &codersdk.AIProviderBedrockSettings{},
 		}
-		assert.Nil(t, bedrockConfig(row.BaseUrl, settings.Bedrock))
+		assert.Nil(t, bedrockConfig(row.Type, row.BaseUrl, settings.Bedrock))
 	})
 }
 

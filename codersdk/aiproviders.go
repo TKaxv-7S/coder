@@ -40,13 +40,34 @@ const (
 	AIProviderTypeVercel       AIProviderType = "vercel"
 	// AIProviderTypeBedrock routes through aibridge's Anthropic client
 	// using the Bedrock discriminator in Settings; native support is
-	// future work.
+	// future work. It targets the legacy InvokeModel wire protocol
+	// (bedrock-runtime.{region}.amazonaws.com).
 	AIProviderTypeBedrock AIProviderType = "bedrock"
+	// AIProviderTypeBedrockMantle also routes through aibridge's Anthropic
+	// client, but targets the AWS Bedrock mantle endpoint
+	// (bedrock-mantle.{region}.api.aws/anthropic/v1/messages), which serves
+	// Claude through the native Messages API. It shares the Bedrock
+	// credential settings; the type, not a settings field, selects the wire
+	// protocol.
+	AIProviderTypeBedrockMantle AIProviderType = "bedrock-mantle"
 	// AIProviderTypeCopilot routes through aibridge's Copilot client,
 	// which uses request-time GitHub OAuth tokens rather than pre-shared
 	// API keys.
 	AIProviderTypeCopilot AIProviderType = "copilot"
 )
+
+// IsBedrock reports whether the provider type authenticates against AWS
+// Bedrock (via the Bedrock credential settings) rather than a bearer key.
+// Both the legacy InvokeModel type and the mantle type qualify; they share
+// the same credential surface and differ only in wire protocol.
+func (t AIProviderType) IsBedrock() bool {
+	switch t {
+	case AIProviderTypeBedrock, AIProviderTypeBedrockMantle:
+		return true
+	default:
+		return false
+	}
+}
 
 // AgentsUnsupportedProviderType is an AIProviderType the Coder Agents harness
 // cannot use. Declaring these as an enum exposes the generated
@@ -239,6 +260,7 @@ func (req CreateAIProviderRequest) Validate() []ValidationError {
 		AIProviderTypeAnthropic,
 		AIProviderTypeAzure,
 		AIProviderTypeBedrock,
+		AIProviderTypeBedrockMantle,
 		AIProviderTypeCopilot,
 		AIProviderTypeGoogle,
 		AIProviderTypeOpenAICompat,
@@ -257,22 +279,30 @@ func (req CreateAIProviderRequest) Validate() []ValidationError {
 	validations = append(validations, validateAIProviderAPIKeys(req.APIKeys)...)
 	if req.Settings.Bedrock != nil &&
 		req.Type != AIProviderTypeAnthropic &&
-		req.Type != AIProviderTypeBedrock {
+		!req.Type.IsBedrock() {
 		validations = append(validations, ValidationError{
 			Field:  "settings",
-			Detail: "bedrock settings are only valid for type=anthropic or type=bedrock",
+			Detail: "bedrock settings are only valid for type=anthropic, type=bedrock, or type=bedrock-mantle",
 		})
 	}
-	if req.Type == AIProviderTypeBedrock && (req.Settings.Bedrock == nil || !req.Settings.Bedrock.IsConfigured()) {
+	if req.Type.IsBedrock() && (req.Settings.Bedrock == nil || !req.Settings.Bedrock.IsConfigured()) {
 		validations = append(validations, ValidationError{
 			Field:  "settings",
-			Detail: "type=bedrock requires bedrock settings",
+			Detail: fmt.Sprintf("type=%s requires bedrock settings", req.Type),
 		})
 	}
-	if req.Type == AIProviderTypeBedrock && len(req.APIKeys) > 0 {
+	if req.Type.IsBedrock() && len(req.APIKeys) > 0 {
 		validations = append(validations, ValidationError{
 			Field:  "api_keys",
-			Detail: "type=bedrock does not accept api_keys",
+			Detail: fmt.Sprintf("type=%s does not accept api_keys", req.Type),
+		})
+	}
+	// The mantle endpoint signs requests with SigV4, which requires a region.
+	if req.Type == AIProviderTypeBedrockMantle &&
+		req.Settings.Bedrock != nil && req.Settings.Bedrock.Region == "" {
+		validations = append(validations, ValidationError{
+			Field:  "settings.region",
+			Detail: "region is required for type=bedrock-mantle",
 		})
 	}
 	if req.Settings.Bedrock != nil {
@@ -281,13 +311,6 @@ func (req CreateAIProviderRequest) Validate() []ValidationError {
 			validations = append(validations, ValidationError{
 				Field:  "settings.external_id",
 				Detail: "external_id is server-generated and cannot be set",
-			})
-		}
-		// The Mantle protocol signs requests with SigV4, which requires a region.
-		if req.Settings.Bedrock.ResolvedProtocol() == AIProviderBedrockProtocolMantle && req.Settings.Bedrock.Region == "" {
-			validations = append(validations, ValidationError{
-				Field:  "settings.region",
-				Detail: "region is required for the mantle protocol",
 			})
 		}
 	}

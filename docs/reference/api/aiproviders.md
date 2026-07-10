@@ -71,9 +71,9 @@ Status Code **200**
 
 #### Enumerated Values
 
-| Property | Value(s)                                                                                                |
-|----------|---------------------------------------------------------------------------------------------------------|
-| `type`   | `anthropic`, `azure`, `bedrock`, `copilot`, `google`, `openai`, `openai-compat`, `openrouter`, `vercel` |
+| Property | Value(s)                                                                                                                  |
+|----------|---------------------------------------------------------------------------------------------------------------------------|
+| `type`   | `anthropic`, `azure`, `bedrock`, `bedrock-mantle`, `copilot`, `google`, `openai`, `openai-compat`, `openrouter`, `vercel` |
 
 To perform this operation, you must be authenticated. [Learn more](authentication.md).
 

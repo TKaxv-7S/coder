@@ -328,13 +328,13 @@ func (api *API) aiProvidersUpdate(rw http.ResponseWriter, r *http.Request) {
 			}
 			existing = mergeAIProviderSettings(existing, *req.Settings)
 		}
-		// Bedrock settings are only meaningful for anthropic- or
-		// bedrock-typed providers; rejecting the mismatch keeps a
+		// Bedrock settings are only meaningful for anthropic-, bedrock-, or
+		// bedrock-mantle-typed providers; rejecting the mismatch keeps a
 		// misconfiguration from sitting silently in the encrypted
 		// blob.
 		if existing.Bedrock != nil &&
 			old.Type != database.AIProviderTypeAnthropic &&
-			old.Type != database.AIProviderTypeBedrock {
+			!old.Type.IsBedrock() {
 			return errAIProviderBedrockTypeMismatch
 		}
 		// Generate the server-owned external ID when the provider assumes a role

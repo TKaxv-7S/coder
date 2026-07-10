@@ -314,14 +314,6 @@ export interface AIProvider {
 }
 
 // From codersdk/aiproviders_bedrock.go
-export type AIProviderBedrockProtocol = "invoke-model" | "mantle";
-
-export const AIProviderBedrockProtocols: AIProviderBedrockProtocol[] = [
-	"invoke-model",
-	"mantle",
-];
-
-// From codersdk/aiproviders_bedrock.go
 /**
  * AIProviderBedrockSettings configures providers that authenticate
  * against AWS Bedrock. AccessKey and AccessKeySecret are write-only:
@@ -370,12 +362,6 @@ export interface AIProviderBedrockSettings {
 	 * update may echo the stored value back).
 	 */
 	readonly external_id?: string;
-	/**
-	 * Protocol selects the Bedrock wire protocol. An empty value resolves to
-	 * AIProviderBedrockProtocolInvokeModel, so existing rows keep the legacy
-	 * behavior without a schema version bump.
-	 */
-	readonly protocol?: AIProviderBedrockProtocol;
 }
 
 // From codersdk/aiproviders_bedrock.go
@@ -484,6 +470,7 @@ export type AIProviderType =
 	| "anthropic"
 	| "azure"
 	| "bedrock"
+	| "bedrock-mantle"
 	| "copilot"
 	| "google"
 	| "openai"
@@ -495,6 +482,7 @@ export const AIProviderTypes: AIProviderType[] = [
 	"anthropic",
 	"azure",
 	"bedrock",
+	"bedrock-mantle",
 	"copilot",
 	"google",
 	"openai",

@@ -13792,6 +13792,7 @@
 				"openrouter",
 				"vercel",
 				"bedrock",
+				"bedrock-mantle",
 				"copilot"
 			],
 			"x-enum-varnames": [
@@ -13803,6 +13804,7 @@
 				"AIProviderTypeOpenrouter",
 				"AIProviderTypeVercel",
 				"AIProviderTypeBedrock",
+				"AIProviderTypeBedrockMantle",
 				"AIProviderTypeCopilot"
 			]
 		},
