@@ -295,6 +295,15 @@ export interface Env {
   mergeStrategy: string;
 }
 
+/**
+ * ScriptDependency declares that a script must wait for another script
+ * (identified by its Terraform resource address) to reach required_status.
+ */
+export interface ScriptDependency {
+  resourceAddress: string;
+  requiredStatus: string;
+}
+
 /** Script represents a script to be run on the workspace. */
 export interface Script {
   displayName: string;
@@ -307,6 +316,7 @@ export interface Script {
   timeoutSeconds: number;
   logPath: string;
   resourceAddress: string;
+  dependencies: ScriptDependency[];
 }
 
 export interface Devcontainer {
@@ -1063,6 +1073,18 @@ export const Env = {
   },
 };
 
+export const ScriptDependency = {
+  encode(message: ScriptDependency, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.resourceAddress !== "") {
+      writer.uint32(10).string(message.resourceAddress);
+    }
+    if (message.requiredStatus !== "") {
+      writer.uint32(18).string(message.requiredStatus);
+    }
+    return writer;
+  },
+};
+
 export const Script = {
   encode(message: Script, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
     if (message.displayName !== "") {
@@ -1094,6 +1116,9 @@ export const Script = {
     }
     if (message.resourceAddress !== "") {
       writer.uint32(82).string(message.resourceAddress);
+    }
+    for (const v of message.dependencies) {
+      ScriptDependency.encode(v!, writer.uint32(90).fork()).ldelim();
     }
     return writer;
   },

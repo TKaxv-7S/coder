@@ -138,6 +138,38 @@ type agentScriptAttributes struct {
 	TimeoutSeconds   int32  `mapstructure:"timeout"`
 }
 
+// agentScriptOrderAttributes represents the attributes of a
+// coder_script_order resource, which declares ordering dependencies
+// between coder_script resources.
+type agentScriptOrderAttributes struct {
+	Rules []agentScriptOrderRule `mapstructure:"rule"`
+}
+
+type agentScriptOrderRule struct {
+	// Run and After hold coder_script resource ids (e.g. the value of
+	// coder_script.install.id).
+	Run   []string `mapstructure:"run"`
+	After []string `mapstructure:"after"`
+	// State is the provider-facing lifecycle state ("completes" or
+	// "starts") that the After scripts must reach.
+	State string `mapstructure:"state"`
+}
+
+// scriptOrderStateToStatus translates the provider-facing coder_script_order
+// state ("completes"/"starts") into the agent unit status vocabulary
+// ("completed"/"started") carried on the wire. An empty state defaults to
+// "completed".
+func scriptOrderStateToStatus(state string) (string, error) {
+	switch state {
+	case "", "completes", "completed":
+		return "completed", nil
+	case "starts", "started":
+		return "started", nil
+	default:
+		return "", xerrors.Errorf("invalid script order state %q (want \"completes\" or \"starts\")", state)
+	}
+}
+
 // A mapping of attributes on the "healthcheck" resource.
 type appHealthcheckAttributes struct {
 	URL       string `mapstructure:"url"`
@@ -641,6 +673,10 @@ func ConvertState(ctx context.Context, modules []*tfjson.StateModule, rawGraph s
 	// Associate scripts with agents.
 	// Sort for deterministic ordering, same as envs above.
 	sortedScriptResources := sortedResources["coder_script"]
+	// scriptByProviderID maps a coder_script resource's provider id (the
+	// value referenced as coder_script.<name>.id) to its proto.Script, so
+	// coder_script_order rules can resolve run/after references.
+	scriptByProviderID := map[string]*proto.Script{}
 	for _, resource := range sortedScriptResources {
 		var attrs agentScriptAttributes
 		err = mapstructure.Decode(resource.AttributeValues, &attrs)
@@ -661,6 +697,10 @@ func ConvertState(ctx context.Context, modules []*tfjson.StateModule, rawGraph s
 			ResourceAddress:  resource.Address,
 		}
 
+		if id, ok := resource.AttributeValues["id"].(string); ok && id != "" {
+			scriptByProviderID[id] = script
+		}
+
 	scriptAgentLoop:
 		for _, agents := range resourceAgents {
 			for _, agent := range agents {
@@ -675,6 +715,47 @@ func ConvertState(ctx context.Context, modules []*tfjson.StateModule, rawGraph s
 						dc.Scripts = append(dc.Scripts, script)
 						break scriptAgentLoop
 					}
+				}
+			}
+		}
+	}
+
+	// Associate script ordering rules (coder_script_order) with scripts.
+	// Each rule declares that every script in `run` depends on every
+	// script in `after` reaching the required lifecycle state. Edges are
+	// recorded on the dependent (run) script's proto keyed by the
+	// dependency's Terraform resource address, which is the unit name the
+	// agent uses.
+	for _, resource := range sortedResources["coder_script_order"] {
+		var attrs agentScriptOrderAttributes
+		err = mapstructure.Decode(resource.AttributeValues, &attrs)
+		if err != nil {
+			return nil, xerrors.Errorf("decode script order attributes: %w", err)
+		}
+
+		for ruleIdx, rule := range attrs.Rules {
+			requiredStatus, err := scriptOrderStateToStatus(rule.State)
+			if err != nil {
+				return nil, xerrors.Errorf("%s rule %d: %w", resource.Address, ruleIdx, err)
+			}
+
+			for _, afterID := range rule.After {
+				afterScript, ok := scriptByProviderID[afterID]
+				if !ok {
+					return nil, xerrors.Errorf("%s rule %d: \"after\" references unknown coder_script id %q", resource.Address, ruleIdx, afterID)
+				}
+				for _, runID := range rule.Run {
+					runScript, ok := scriptByProviderID[runID]
+					if !ok {
+						return nil, xerrors.Errorf("%s rule %d: \"run\" references unknown coder_script id %q", resource.Address, ruleIdx, runID)
+					}
+					if runScript == afterScript {
+						return nil, xerrors.Errorf("%s rule %d: script %q cannot depend on itself", resource.Address, ruleIdx, runScript.ResourceAddress)
+					}
+					runScript.Dependencies = append(runScript.Dependencies, &proto.ScriptDependency{
+						ResourceAddress: afterScript.ResourceAddress,
+						RequiredStatus:  requiredStatus,
+					})
 				}
 			}
 		}

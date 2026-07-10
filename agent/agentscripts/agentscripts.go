@@ -60,7 +60,16 @@ type Options struct {
 	// UnitManager, when set, causes the runner to register each script as a
 	// sync unit during Init and to update unit status as scripts execute.
 	UnitManager *unit.Manager
+	// DependencyWaitTimeout bounds how long a script waits for its declared
+	// unit dependencies to be satisfied before running anyway. Zero uses
+	// defaultDependencyWaitTimeout. Only applies when UnitManager is set.
+	DependencyWaitTimeout time.Duration
 }
+
+// defaultDependencyWaitTimeout bounds dependency waits so a missing or stuck
+// dependency cannot hang workspace startup forever. On timeout the script runs
+// anyway (fail-open).
+const defaultDependencyWaitTimeout = 5 * time.Minute
 
 // New creates a runner for the provided scripts.
 func New(opts Options) *Runner {
@@ -162,6 +171,29 @@ func (r *Runner) Init(scripts []codersdk.WorkspaceAgentScript, scriptCompleted S
 					continue
 				}
 				return xerrors.Errorf("register script unit %q: %w", unitName, err)
+			}
+		}
+
+		// Second pass: now that every script is registered, add the
+		// declared ordering edges. Each dependency makes this script's
+		// unit wait for the referenced unit (by resource address) to
+		// reach the required status.
+		for _, script := range scripts {
+			unitName := scriptUnitName(script)
+			if unitName == "" {
+				continue
+			}
+			for _, dep := range script.Dependencies {
+				if dep.ResourceAddress == "" {
+					continue
+				}
+				requiredStatus, err := dependencyStatus(dep.RequiredStatus)
+				if err != nil {
+					return xerrors.Errorf("script unit %q dependency on %q: %w", unitName, dep.ResourceAddress, err)
+				}
+				if err := r.UnitManager.AddDependency(unit.ID(unitName), unit.ID(dep.ResourceAddress), requiredStatus); err != nil {
+					return xerrors.Errorf("add script unit dependency %q -> %q: %w", unitName, dep.ResourceAddress, err)
+				}
 			}
 		}
 	}
@@ -362,6 +394,9 @@ func (r *Runner) run(ctx context.Context, script codersdk.WorkspaceAgentScript, 
 	cmd.Stdout = io.MultiWriter(fileWriter, infoW)
 	cmd.Stderr = io.MultiWriter(fileWriter, errW)
 
+	// Wait for declared unit dependencies to be satisfied before running.
+	r.waitForDependencies(ctx, script)
+
 	// Mark the script's sync unit as started before execution begins.
 	r.setUnitStatus(ctx, script, unit.StatusStarted)
 
@@ -549,4 +584,49 @@ func scriptUnitName(script codersdk.WorkspaceAgentScript) string {
 		return script.ResourceAddress
 	}
 	return script.DisplayName
+}
+
+// dependencyStatus maps a wire dependency status string onto a unit.Status.
+func dependencyStatus(status string) (unit.Status, error) {
+	switch status {
+	case string(unit.StatusStarted):
+		return unit.StatusStarted, nil
+	case string(unit.StatusComplete), "":
+		return unit.StatusComplete, nil
+	default:
+		return "", xerrors.Errorf("unknown dependency status %q", status)
+	}
+}
+
+// waitForDependencies blocks until the script's unit dependencies are
+// satisfied, bounded by the configured timeout. It is a no-op when no
+// UnitManager is configured, the script has no usable unit name, or the script
+// declares no dependencies. On timeout it logs a warning and returns so the
+// script runs anyway (fail-open), preventing a stuck dependency from hanging
+// workspace startup indefinitely.
+func (r *Runner) waitForDependencies(ctx context.Context, script codersdk.WorkspaceAgentScript) {
+	unitName := scriptUnitName(script)
+	if r.UnitManager == nil || unitName == "" || len(script.Dependencies) == 0 {
+		return
+	}
+
+	timeout := r.DependencyWaitTimeout
+	if timeout <= 0 {
+		timeout = defaultDependencyWaitTimeout
+	}
+
+	waitCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	if err := r.UnitManager.WaitUntilReady(waitCtx, unit.ID(unitName)); err != nil {
+		if ctx.Err() != nil {
+			// Parent context canceled (agent shutting down); let the caller
+			// handle it.
+			return
+		}
+		r.Logger.Warn(ctx, "proceeding with script before its dependencies were satisfied",
+			slog.F("unit_name", unitName),
+			slog.F("timeout", timeout),
+			slog.Error(err))
+	}
 }

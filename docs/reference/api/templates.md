@@ -2503,6 +2503,12 @@ curl -X GET http://coder-server:8080/api/v2/templateversions/{templateversion}/d
         "scripts": [
           {
             "cron": "string",
+            "dependencies": [
+              {
+                "required_status": "string",
+                "resource_address": "string"
+              }
+            ],
             "display_name": "string",
             "exit_code": 0,
             "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
@@ -2632,6 +2638,9 @@ Status Code **200**
 | `»» resource_id`                | string(uuid)                                                                                           | false    |              |                                                                                                                                                                                                                                                |
 | `»» scripts`                    | array                                                                                                  | false    |              |                                                                                                                                                                                                                                                |
 | `»»» cron`                      | string                                                                                                 | false    |              |                                                                                                                                                                                                                                                |
+| `»»» dependencies`              | array                                                                                                  | false    |              |                                                                                                                                                                                                                                                |
+| `»»»» required_status`          | string                                                                                                 | false    |              |                                                                                                                                                                                                                                                |
+| `»»»» resource_address`         | string                                                                                                 | false    |              |                                                                                                                                                                                                                                                |
 | `»»» display_name`              | string                                                                                                 | false    |              |                                                                                                                                                                                                                                                |
 | `»»» exit_code`                 | integer                                                                                                | false    |              |                                                                                                                                                                                                                                                |
 | `»»» id`                        | string(uuid)                                                                                           | false    |              |                                                                                                                                                                                                                                                |
@@ -3175,6 +3184,12 @@ curl -X GET http://coder-server:8080/api/v2/templateversions/{templateversion}/r
         "scripts": [
           {
             "cron": "string",
+            "dependencies": [
+              {
+                "required_status": "string",
+                "resource_address": "string"
+              }
+            ],
             "display_name": "string",
             "exit_code": 0,
             "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
@@ -3304,6 +3319,9 @@ Status Code **200**
 | `»» resource_id`                | string(uuid)                                                                                           | false    |              |                                                                                                                                                                                                                                                |
 | `»» scripts`                    | array                                                                                                  | false    |              |                                                                                                                                                                                                                                                |
 | `»»» cron`                      | string                                                                                                 | false    |              |                                                                                                                                                                                                                                                |
+| `»»» dependencies`              | array                                                                                                  | false    |              |                                                                                                                                                                                                                                                |
+| `»»»» required_status`          | string                                                                                                 | false    |              |                                                                                                                                                                                                                                                |
+| `»»»» resource_address`         | string                                                                                                 | false    |              |                                                                                                                                                                                                                                                |
 | `»»» display_name`              | string                                                                                                 | false    |              |                                                                                                                                                                                                                                                |
 | `»»» exit_code`                 | integer                                                                                                | false    |              |                                                                                                                                                                                                                                                |
 | `»»» id`                        | string(uuid)                                                                                           | false    |              |                                                                                                                                                                                                                                                |

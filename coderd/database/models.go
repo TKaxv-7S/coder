@@ -6483,6 +6483,8 @@ type WorkspaceAgentScript struct {
 	DisplayName      string    `db:"display_name" json:"display_name"`
 	ID               uuid.UUID `db:"id" json:"id"`
 	ResourceAddress  string    `db:"resource_address" json:"resource_address"`
+	// Declared ordering dependencies for this script, as a JSON array of {resource_address, required_status} objects derived from coder_script_order resources.
+	Dependencies json.RawMessage `db:"dependencies" json:"dependencies"`
 }
 
 type WorkspaceAgentScriptTiming struct {

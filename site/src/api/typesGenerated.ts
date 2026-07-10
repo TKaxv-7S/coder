@@ -10588,8 +10588,20 @@ export interface WorkspaceAgentScript {
 	readonly timeout: number;
 	readonly display_name: string;
 	readonly resource_address: string;
+	readonly dependencies?: readonly WorkspaceAgentScriptDependency[];
 	readonly exit_code?: number;
 	readonly status?: WorkspaceAgentScriptStatus;
+}
+
+// From codersdk/workspaceagents.go
+/**
+ * WorkspaceAgentScriptDependency declares that a script must wait for another
+ * script (identified by its Terraform resource address) to reach
+ * RequiredStatus before it runs.
+ */
+export interface WorkspaceAgentScriptDependency {
+	readonly resource_address: string;
+	readonly required_status: string;
 }
 
 // From codersdk/workspaceagents.go

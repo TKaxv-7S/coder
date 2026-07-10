@@ -196,19 +196,28 @@ const (
 )
 
 type WorkspaceAgentScript struct {
-	ID               uuid.UUID                   `json:"id" format:"uuid"`
-	LogSourceID      uuid.UUID                   `json:"log_source_id" format:"uuid"`
-	LogPath          string                      `json:"log_path"`
-	Script           string                      `json:"script"`
-	Cron             string                      `json:"cron"`
-	RunOnStart       bool                        `json:"run_on_start"`
-	RunOnStop        bool                        `json:"run_on_stop"`
-	StartBlocksLogin bool                        `json:"start_blocks_login"`
-	Timeout          time.Duration               `json:"timeout"`
-	DisplayName      string                      `json:"display_name"`
-	ResourceAddress  string                      `json:"resource_address"`
-	ExitCode         *int32                      `json:"exit_code,omitempty"`
-	Status           *WorkspaceAgentScriptStatus `json:"status,omitempty"`
+	ID               uuid.UUID                        `json:"id" format:"uuid"`
+	LogSourceID      uuid.UUID                        `json:"log_source_id" format:"uuid"`
+	LogPath          string                           `json:"log_path"`
+	Script           string                           `json:"script"`
+	Cron             string                           `json:"cron"`
+	RunOnStart       bool                             `json:"run_on_start"`
+	RunOnStop        bool                             `json:"run_on_stop"`
+	StartBlocksLogin bool                             `json:"start_blocks_login"`
+	Timeout          time.Duration                    `json:"timeout"`
+	DisplayName      string                           `json:"display_name"`
+	ResourceAddress  string                           `json:"resource_address"`
+	Dependencies     []WorkspaceAgentScriptDependency `json:"dependencies,omitempty"`
+	ExitCode         *int32                           `json:"exit_code,omitempty"`
+	Status           *WorkspaceAgentScriptStatus      `json:"status,omitempty"`
+}
+
+// WorkspaceAgentScriptDependency declares that a script must wait for another
+// script (identified by its Terraform resource address) to reach
+// RequiredStatus before it runs.
+type WorkspaceAgentScriptDependency struct {
+	ResourceAddress string `json:"resource_address"`
+	RequiredStatus  string `json:"required_status"`
 }
 
 type WorkspaceAgentHealth struct {

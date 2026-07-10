@@ -742,10 +742,21 @@ func WorkspaceAgentScript(t testing.TB, db database.Store, orig database.Workspa
 		DisplayName:      []string{takeFirst(orig.DisplayName, "")},
 		ID:               []uuid.UUID{takeFirst(orig.ID, uuid.New())},
 		ResourceAddress:  []string{takeFirst(orig.ResourceAddress, "")},
+		Dependencies:     []string{dependenciesOrDefault(orig.Dependencies)},
 	})
 	require.NoError(t, err, "insert workspace agent script")
 	require.NotEmpty(t, scripts, "insert workspace agent script returned no scripts")
 	return scripts[0]
+}
+
+// dependenciesOrDefault returns the JSON text of a script's dependencies
+// column, defaulting to an empty JSON array when unset so the NOT NULL
+// jsonb column is always satisfied.
+func dependenciesOrDefault(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return "[]"
+	}
+	return string(raw)
 }
 
 func WorkspaceAgentScripts(t testing.TB, db database.Store, count int, orig database.WorkspaceAgentScript) []database.WorkspaceAgentScript {

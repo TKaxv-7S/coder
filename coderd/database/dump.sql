@@ -3778,8 +3778,11 @@ CREATE TABLE workspace_agent_scripts (
     timeout_seconds integer NOT NULL,
     display_name text NOT NULL,
     id uuid DEFAULT gen_random_uuid() NOT NULL,
-    resource_address text DEFAULT ''::text NOT NULL
+    resource_address text DEFAULT ''::text NOT NULL,
+    dependencies jsonb DEFAULT '[]'::jsonb NOT NULL
 );
+
+COMMENT ON COLUMN workspace_agent_scripts.dependencies IS 'Declared ordering dependencies for this script, as a JSON array of {resource_address, required_status} objects derived from coder_script_order resources.';
 
 CREATE SEQUENCE workspace_agent_startup_logs_id_seq
     START WITH 1

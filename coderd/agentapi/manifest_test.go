@@ -126,6 +126,7 @@ func TestGetManifest(t *testing.T) {
 				RunOnStart:       true,
 				RunOnStop:        false,
 				TimeoutSeconds:   60,
+				Dependencies:     json.RawMessage(`[{"resource_address":"coder_script.clone","required_status":"completed"}]`),
 			},
 			{
 				ID:               uuid.New(),
@@ -202,6 +203,9 @@ func TestGetManifest(t *testing.T) {
 				RunOnStop:        scripts[0].RunOnStop,
 				StartBlocksLogin: scripts[0].StartBlocksLogin,
 				Timeout:          durationpb.New(time.Duration(scripts[0].TimeoutSeconds) * time.Second),
+				Dependencies: []*agentproto.WorkspaceAgentScriptDependency{
+					{ResourceAddress: "coder_script.clone", RequiredStatus: "completed"},
+				},
 			},
 			{
 				Id:               scripts[1].ID[:],

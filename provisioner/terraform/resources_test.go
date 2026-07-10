@@ -1254,6 +1254,165 @@ func TestInvalidTerraformAddress(t *testing.T) {
 	require.Equal(t, state.Resources[0].ModulePath, "invalid terraform address")
 }
 
+func TestConvertScriptOrder(t *testing.T) {
+	t.Parallel()
+
+	// The graph wires both scripts and the compute resource to the agent so
+	// ConvertState associates the scripts with the agent. coder_script_order
+	// has no graph edges of its own; it is matched purely by resource type.
+	graph := `digraph {
+		compound = "true"
+		newrank = "true"
+		subgraph "root" {
+			"[root] coder_agent.dev (expand)" [label = "coder_agent.dev", shape = "box"]
+			"[root] coder_script.clone (expand)" [label = "coder_script.clone", shape = "box"]
+			"[root] coder_script.install (expand)" [label = "coder_script.install", shape = "box"]
+			"[root] null_resource.dev (expand)" [label = "null_resource.dev", shape = "box"]
+			"[root] coder_script.clone (expand)" -> "[root] coder_agent.dev (expand)"
+			"[root] coder_script.install (expand)" -> "[root] coder_agent.dev (expand)"
+			"[root] null_resource.dev (expand)" -> "[root] coder_agent.dev (expand)"
+		}
+	}`
+
+	scriptOrderRule := func(state string) map[string]interface{} {
+		return map[string]interface{}{
+			"rule": []interface{}{
+				map[string]interface{}{
+					"run":   []interface{}{"install-id"},
+					"after": []interface{}{"clone-id"},
+					"state": state,
+				},
+			},
+		}
+	}
+
+	module := func(orderState string) []*tfjson.StateModule {
+		return []*tfjson.StateModule{{
+			Resources: []*tfjson.StateResource{
+				{
+					Address:         "null_resource.dev",
+					Type:            "null_resource",
+					Name:            "dev",
+					Mode:            tfjson.ManagedResourceMode,
+					AttributeValues: map[string]interface{}{},
+				},
+				{
+					Address: "coder_agent.dev",
+					Type:    "coder_agent",
+					Name:    "dev",
+					Mode:    tfjson.ManagedResourceMode,
+					AttributeValues: map[string]interface{}{
+						"os":   "linux",
+						"arch": "amd64",
+					},
+				},
+				{
+					Address: "coder_script.clone",
+					Type:    "coder_script",
+					Name:    "clone",
+					Mode:    tfjson.ManagedResourceMode,
+					AttributeValues: map[string]interface{}{
+						"id":           "clone-id",
+						"display_name": "Clone",
+						"script":       "echo clone",
+						"run_on_start": true,
+					},
+				},
+				{
+					Address: "coder_script.install",
+					Type:    "coder_script",
+					Name:    "install",
+					Mode:    tfjson.ManagedResourceMode,
+					AttributeValues: map[string]interface{}{
+						"id":           "install-id",
+						"display_name": "Install",
+						"script":       "echo install",
+						"run_on_start": true,
+					},
+				},
+				{
+					Address:         "coder_script_order.startup",
+					Type:            "coder_script_order",
+					Name:            "startup",
+					Mode:            tfjson.ManagedResourceMode,
+					AttributeValues: scriptOrderRule(orderState),
+				},
+			},
+		}}
+	}
+
+	findScript := func(t *testing.T, state *terraform.State, address string) *proto.Script {
+		t.Helper()
+		for _, resource := range state.Resources {
+			for _, agent := range resource.Agents {
+				for _, script := range agent.Scripts {
+					if script.ResourceAddress == address {
+						return script
+					}
+				}
+			}
+		}
+		require.Failf(t, "script not found", "address %q", address)
+		return nil
+	}
+
+	t.Run("CompletesDefault", func(t *testing.T) {
+		t.Parallel()
+		ctx, logger := ctxAndLogger(t)
+
+		state, err := terraform.ConvertState(ctx, module("completes"), graph, logger)
+		require.NoError(t, err)
+
+		install := findScript(t, state, "coder_script.install")
+		require.Len(t, install.Dependencies, 1)
+		require.Equal(t, "coder_script.clone", install.Dependencies[0].ResourceAddress)
+		require.Equal(t, "completed", install.Dependencies[0].RequiredStatus)
+
+		// The dependency script itself declares no ordering.
+		clone := findScript(t, state, "coder_script.clone")
+		require.Empty(t, clone.Dependencies)
+	})
+
+	t.Run("Starts", func(t *testing.T) {
+		t.Parallel()
+		ctx, logger := ctxAndLogger(t)
+
+		state, err := terraform.ConvertState(ctx, module("starts"), graph, logger)
+		require.NoError(t, err)
+
+		install := findScript(t, state, "coder_script.install")
+		require.Len(t, install.Dependencies, 1)
+		require.Equal(t, "started", install.Dependencies[0].RequiredStatus)
+	})
+
+	t.Run("InvalidState", func(t *testing.T) {
+		t.Parallel()
+		ctx, logger := ctxAndLogger(t)
+
+		_, err := terraform.ConvertState(ctx, module("bogus"), graph, logger)
+		require.Error(t, err)
+	})
+
+	t.Run("UnknownReference", func(t *testing.T) {
+		t.Parallel()
+		ctx, logger := ctxAndLogger(t)
+
+		mods := module("completes")
+		// Point "after" at an id that no coder_script declares.
+		mods[0].Resources[4].AttributeValues = map[string]interface{}{
+			"rule": []interface{}{
+				map[string]interface{}{
+					"run":   []interface{}{"install-id"},
+					"after": []interface{}{"missing-id"},
+					"state": "completes",
+				},
+			},
+		}
+		_, err := terraform.ConvertState(ctx, mods, graph, logger)
+		require.Error(t, err)
+	})
+}
+
 //nolint:tparallel
 func TestAppSlugValidation(t *testing.T) {
 	t.Parallel()

@@ -9680,6 +9680,12 @@ Only certain features set these fields: - FeatureManagedAgentLimit|
             "scripts": [
               {
                 "cron": "string",
+                "dependencies": [
+                  {
+                    "required_status": "string",
+                    "resource_address": "string"
+                  }
+                ],
                 "display_name": "string",
                 "exit_code": 0,
                 "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
@@ -11033,6 +11039,12 @@ Only certain features set these fields: - FeatureManagedAgentLimit|
             "scripts": [
               {
                 "cron": "string",
+                "dependencies": [
+                  {
+                    "required_status": "string",
+                    "resource_address": "string"
+                  }
+                ],
                 "display_name": "string",
                 "exit_code": 0,
                 "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
@@ -14663,6 +14675,12 @@ If the schedule is empty, the user will be updated to use the default schedule.|
             "scripts": [
               {
                 "cron": "string",
+                "dependencies": [
+                  {
+                    "required_status": "string",
+                    "resource_address": "string"
+                  }
+                ],
                 "display_name": "string",
                 "exit_code": 0,
                 "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
@@ -14949,6 +14967,12 @@ If the schedule is empty, the user will be updated to use the default schedule.|
   "scripts": [
     {
       "cron": "string",
+      "dependencies": [
+        {
+          "required_status": "string",
+          "resource_address": "string"
+        }
+      ],
       "display_name": "string",
       "exit_code": 0,
       "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
@@ -15522,6 +15546,12 @@ If the schedule is empty, the user will be updated to use the default schedule.|
 ```json
 {
   "cron": "string",
+  "dependencies": [
+    {
+      "required_status": "string",
+      "resource_address": "string"
+    }
+  ],
   "display_name": "string",
   "exit_code": 0,
   "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
@@ -15539,21 +15569,38 @@ If the schedule is empty, the user will be updated to use the default schedule.|
 
 ### Properties
 
-| Name                 | Type                                                                       | Required | Restrictions | Description |
-|----------------------|----------------------------------------------------------------------------|----------|--------------|-------------|
-| `cron`               | string                                                                     | false    |              |             |
-| `display_name`       | string                                                                     | false    |              |             |
-| `exit_code`          | integer                                                                    | false    |              |             |
-| `id`                 | string                                                                     | false    |              |             |
-| `log_path`           | string                                                                     | false    |              |             |
-| `log_source_id`      | string                                                                     | false    |              |             |
-| `resource_address`   | string                                                                     | false    |              |             |
-| `run_on_start`       | boolean                                                                    | false    |              |             |
-| `run_on_stop`        | boolean                                                                    | false    |              |             |
-| `script`             | string                                                                     | false    |              |             |
-| `start_blocks_login` | boolean                                                                    | false    |              |             |
-| `status`             | [codersdk.WorkspaceAgentScriptStatus](#codersdkworkspaceagentscriptstatus) | false    |              |             |
-| `timeout`            | integer                                                                    | false    |              |             |
+| Name                 | Type                                                                                        | Required | Restrictions | Description |
+|----------------------|---------------------------------------------------------------------------------------------|----------|--------------|-------------|
+| `cron`               | string                                                                                      | false    |              |             |
+| `dependencies`       | array of [codersdk.WorkspaceAgentScriptDependency](#codersdkworkspaceagentscriptdependency) | false    |              |             |
+| `display_name`       | string                                                                                      | false    |              |             |
+| `exit_code`          | integer                                                                                     | false    |              |             |
+| `id`                 | string                                                                                      | false    |              |             |
+| `log_path`           | string                                                                                      | false    |              |             |
+| `log_source_id`      | string                                                                                      | false    |              |             |
+| `resource_address`   | string                                                                                      | false    |              |             |
+| `run_on_start`       | boolean                                                                                     | false    |              |             |
+| `run_on_stop`        | boolean                                                                                     | false    |              |             |
+| `script`             | string                                                                                      | false    |              |             |
+| `start_blocks_login` | boolean                                                                                     | false    |              |             |
+| `status`             | [codersdk.WorkspaceAgentScriptStatus](#codersdkworkspaceagentscriptstatus)                  | false    |              |             |
+| `timeout`            | integer                                                                                     | false    |              |             |
+
+## codersdk.WorkspaceAgentScriptDependency
+
+```json
+{
+  "required_status": "string",
+  "resource_address": "string"
+}
+```
+
+### Properties
+
+| Name               | Type   | Required | Restrictions | Description |
+|--------------------|--------|----------|--------------|-------------|
+| `required_status`  | string | false    |              |             |
+| `resource_address` | string | false    |              |             |
 
 ## codersdk.WorkspaceAgentScriptStatus
 
@@ -15912,6 +15959,12 @@ If the schedule is empty, the user will be updated to use the default schedule.|
           "scripts": [
             {
               "cron": "string",
+              "dependencies": [
+                {
+                  "required_status": "string",
+                  "resource_address": "string"
+                }
+              ],
               "display_name": "string",
               "exit_code": 0,
               "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
@@ -16383,6 +16436,12 @@ If the schedule is empty, the user will be updated to use the default schedule.|
       "scripts": [
         {
           "cron": "string",
+          "dependencies": [
+            {
+              "required_status": "string",
+              "resource_address": "string"
+            }
+          ],
           "display_name": "string",
           "exit_code": 0,
           "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
@@ -16734,6 +16793,7 @@ If the schedule is empty, the user will be updated to use the default schedule.|
                 "scripts": [
                   {
                     "cron": "string",
+                    "dependencies": [],
                     "display_name": "string",
                     "exit_code": 0,
                     "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",

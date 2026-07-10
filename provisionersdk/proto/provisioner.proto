@@ -231,6 +231,13 @@ message Env {
   string merge_strategy = 3;
 }
 
+// ScriptDependency declares that a script must wait for another script
+// (identified by its Terraform resource address) to reach required_status.
+message ScriptDependency {
+  string resource_address = 1;
+  string required_status = 2;
+}
+
 // Script represents a script to be run on the workspace.
 message Script {
   string display_name = 1;
@@ -243,6 +250,7 @@ message Script {
   int32 timeout_seconds = 8;
   string log_path = 9;
   string resource_address = 10;
+  repeated ScriptDependency dependencies = 11;
 }
 
 message Devcontainer {

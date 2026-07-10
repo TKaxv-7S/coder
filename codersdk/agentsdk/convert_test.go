@@ -117,6 +117,11 @@ func TestManifest(t *testing.T) {
 				StartBlocksLogin: true,
 				Timeout:          time.Second,
 				DisplayName:      "foo",
+				ResourceAddress:  "coder_script.foo",
+				Dependencies: []codersdk.WorkspaceAgentScriptDependency{
+					{ResourceAddress: "coder_script.bar", RequiredStatus: "completed"},
+					{ResourceAddress: "coder_script.baz", RequiredStatus: "started"},
+				},
 			},
 			{
 				ID:               uuid.New(),

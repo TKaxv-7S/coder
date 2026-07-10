@@ -26894,6 +26894,12 @@ const docTemplate = `{
                 "cron": {
                     "type": "string"
                 },
+                "dependencies": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/codersdk.WorkspaceAgentScriptDependency"
+                    }
+                },
                 "display_name": {
                     "type": "string"
                 },
@@ -26931,6 +26937,17 @@ const docTemplate = `{
                 },
                 "timeout": {
                     "type": "integer"
+                }
+            }
+        },
+        "codersdk.WorkspaceAgentScriptDependency": {
+            "type": "object",
+            "properties": {
+                "required_status": {
+                    "type": "string"
+                },
+                "resource_address": {
+                    "type": "string"
                 }
             }
         },

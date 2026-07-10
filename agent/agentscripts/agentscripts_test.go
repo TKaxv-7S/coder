@@ -479,3 +479,141 @@ func TestScriptUnitsLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, unit.StatusComplete, u.Status())
 }
+
+func TestScriptUnitDependenciesAddedFromManifest(t *testing.T) {
+	t.Parallel()
+
+	runner, mgr := setupWithUnitManager(t, func(_ uuid.UUID) agentscripts.ScriptLogger {
+		return noopScriptLogger{}
+	})
+	defer runner.Close()
+
+	scripts := []codersdk.WorkspaceAgentScript{
+		{
+			ID:              uuid.New(),
+			LogSourceID:     uuid.New(),
+			ResourceAddress: "coder_script.clone",
+			Script:          "echo clone",
+			RunOnStart:      true,
+		},
+		{
+			ID:              uuid.New(),
+			LogSourceID:     uuid.New(),
+			ResourceAddress: "coder_script.install",
+			Script:          "echo install",
+			RunOnStart:      true,
+			Dependencies: []codersdk.WorkspaceAgentScriptDependency{
+				{ResourceAddress: "coder_script.clone", RequiredStatus: string(unit.StatusComplete)},
+			},
+		},
+	}
+
+	aAPI := agenttest.NewFakeAgentAPI(t, testutil.Logger(t), nil, nil)
+	require.NoError(t, runner.Init(scripts, aAPI.ScriptCompleted))
+
+	deps, err := mgr.GetAllDependencies(unit.ID("coder_script.install"))
+	require.NoError(t, err)
+	require.Len(t, deps, 1)
+	require.Equal(t, unit.ID("coder_script.clone"), deps[0].DependsOn)
+	require.Equal(t, unit.StatusComplete, deps[0].RequiredStatus)
+
+	// The dependency script itself declares no ordering.
+	cloneDeps, err := mgr.GetAllDependencies(unit.ID("coder_script.clone"))
+	require.NoError(t, err)
+	require.Empty(t, cloneDeps)
+}
+
+func TestScriptUnitDependencyGating(t *testing.T) {
+	t.Parallel()
+
+	ctx := testutil.Context(t, testutil.WaitLong)
+	runner, mgr := setupWithUnitManager(t, func(_ uuid.UUID) agentscripts.ScriptLogger {
+		return noopScriptLogger{}
+	})
+	defer runner.Close()
+
+	// gate is an external unit the script depends on. Registering it lets the
+	// test control when the dependency becomes satisfied.
+	const gate unit.ID = "external.gate"
+	require.NoError(t, mgr.Register(gate))
+
+	const scriptName = "coder_script.install"
+	scripts := []codersdk.WorkspaceAgentScript{
+		{
+			ID:              uuid.New(),
+			LogSourceID:     uuid.New(),
+			ResourceAddress: scriptName,
+			Script:          "echo gated",
+			RunOnStart:      true,
+			Dependencies: []codersdk.WorkspaceAgentScriptDependency{
+				{ResourceAddress: string(gate), RequiredStatus: string(unit.StatusComplete)},
+			},
+		},
+	}
+
+	aAPI := agenttest.NewFakeAgentAPI(t, testutil.Logger(t), nil, nil)
+	require.NoError(t, runner.Init(scripts, aAPI.ScriptCompleted))
+
+	done := testutil.Go(t, func() {
+		assert.NoError(t, runner.Execute(ctx, agentscripts.ExecuteStartScripts))
+	})
+
+	// The script must not run while its dependency is unsatisfied. Its unit
+	// stays pending because run() blocks before marking it started.
+	select {
+	case <-done:
+		t.Fatal("script executed before its dependency was satisfied")
+	case <-time.After(testutil.IntervalMedium):
+	}
+	u, err := mgr.Unit(unit.ID(scriptName))
+	require.NoError(t, err)
+	require.Equal(t, unit.StatusPending, u.Status())
+
+	// Satisfy the dependency; the script should now run to completion.
+	require.NoError(t, mgr.UpdateStatus(gate, unit.StatusComplete))
+
+	_, ok := <-done
+	require.False(t, ok, "execute goroutine should have finished")
+
+	u, err = mgr.Unit(unit.ID(scriptName))
+	require.NoError(t, err)
+	require.Equal(t, unit.StatusComplete, u.Status())
+}
+
+func TestScriptUnitDependencyTimeoutFailOpen(t *testing.T) {
+	t.Parallel()
+
+	ctx := testutil.Context(t, testutil.WaitLong)
+	runner, mgr := setupWithUnitManager(t, func(_ uuid.UUID) agentscripts.ScriptLogger {
+		return noopScriptLogger{}
+	})
+	defer runner.Close()
+	// Keep the wait short so the fail-open path is exercised quickly. The
+	// dependency target is never registered, so it can never be satisfied.
+	runner.DependencyWaitTimeout = testutil.IntervalMedium
+
+	const scriptName = "coder_script.install"
+	scripts := []codersdk.WorkspaceAgentScript{
+		{
+			ID:              uuid.New(),
+			LogSourceID:     uuid.New(),
+			ResourceAddress: scriptName,
+			Script:          "echo failopen",
+			RunOnStart:      true,
+			Dependencies: []codersdk.WorkspaceAgentScriptDependency{
+				{ResourceAddress: "external.never", RequiredStatus: string(unit.StatusComplete)},
+			},
+		},
+	}
+
+	aAPI := agenttest.NewFakeAgentAPI(t, testutil.Logger(t), nil, nil)
+	require.NoError(t, runner.Init(scripts, aAPI.ScriptCompleted))
+
+	// Despite the never-satisfied dependency, the script runs after the
+	// timeout elapses (fail-open) and completes without error.
+	require.NoError(t, runner.Execute(ctx, agentscripts.ExecuteStartScripts))
+
+	u, err := mgr.Unit(unit.ID(scriptName))
+	require.NoError(t, err)
+	require.Equal(t, unit.StatusComplete, u.Status())
+}

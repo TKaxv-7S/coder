@@ -4326,7 +4326,9 @@ func TestInsertWorkspaceResource(t *testing.T) {
 								{Slug: "code-server", DisplayName: "VS Code", Url: "http://localhost:8080"},
 							},
 							Scripts: []*sdkproto.Script{
-								{DisplayName: "Startup", Script: "echo start", RunOnStart: true},
+								{DisplayName: "Startup", Script: "echo start", RunOnStart: true, Dependencies: []*sdkproto.ScriptDependency{
+									{ResourceAddress: "coder_script.clone", RequiredStatus: "completed"},
+								}},
 							},
 							Envs: []*sdkproto.Env{
 								{Name: "EDITOR", Value: "vim"},
@@ -4357,6 +4359,7 @@ func TestInsertWorkspaceResource(t *testing.T) {
 					require.NoError(t, err)
 					require.Len(t, scripts, 1)
 					assert.Equal(t, "Startup", scripts[0].DisplayName)
+					assert.JSONEq(t, `[{"resource_address":"coder_script.clone","required_status":"completed"}]`, string(scripts[0].Dependencies))
 
 					var envVars map[string]string
 					err = json.Unmarshal(subAgent.EnvironmentVariables.RawMessage, &envVars)

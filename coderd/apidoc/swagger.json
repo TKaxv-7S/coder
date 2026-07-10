@@ -24781,6 +24781,12 @@
 				"cron": {
 					"type": "string"
 				},
+				"dependencies": {
+					"type": "array",
+					"items": {
+						"$ref": "#/definitions/codersdk.WorkspaceAgentScriptDependency"
+					}
+				},
 				"display_name": {
 					"type": "string"
 				},
@@ -24818,6 +24824,17 @@
 				},
 				"timeout": {
 					"type": "integer"
+				}
+			}
+		},
+		"codersdk.WorkspaceAgentScriptDependency": {
+			"type": "object",
+			"properties": {
+				"required_status": {
+					"type": "string"
+				},
+				"resource_address": {
+					"type": "string"
 				}
 			}
 		},

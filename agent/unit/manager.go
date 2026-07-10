@@ -1,6 +1,7 @@
 package unit
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -97,6 +98,11 @@ type Manager struct {
 	// seq order equals time order.
 	events []Event
 	seq    uint64
+
+	// readyBroadcast is closed and replaced whenever unit readiness may
+	// have changed, waking any WaitUntilReady callers so they can
+	// re-evaluate. Protected by mu.
+	readyBroadcast chan struct{}
 }
 
 // Option configures a Manager.
@@ -112,9 +118,10 @@ func WithClock(clock quartz.Clock) Option {
 // NewManager creates a new Manager instance.
 func NewManager(opts ...Option) *Manager {
 	m := &Manager{
-		graph: &Graph[Status, ID]{},
-		units: make(map[ID]Unit),
-		clock: quartz.NewReal(),
+		graph:          &Graph[Status, ID]{},
+		units:          make(map[ID]Unit),
+		clock:          quartz.NewReal(),
+		readyBroadcast: make(chan struct{}),
 	}
 	for _, opt := range opts {
 		opt(m)
@@ -308,6 +315,42 @@ func (m *Manager) recalculateReadinessUnsafe(unit ID) {
 
 	u.ready = allSatisfied
 	m.units[unit] = u
+
+	// Wake any WaitUntilReady callers so they can re-check their unit.
+	m.broadcastReadinessUnsafe()
+}
+
+// broadcastReadinessUnsafe wakes all WaitUntilReady callers. The caller must
+// hold the write lock.
+func (m *Manager) broadcastReadinessUnsafe() {
+	close(m.readyBroadcast)
+	m.readyBroadcast = make(chan struct{})
+}
+
+// WaitUntilReady blocks until the unit's dependencies are all satisfied, or
+// until ctx is done. It returns ErrUnitNotFound if the unit is not registered.
+// A unit with no dependencies is ready immediately.
+func (m *Manager) WaitUntilReady(ctx context.Context, id ID) error {
+	for {
+		m.mu.RLock()
+		u, ok := m.units[id]
+		wait := m.readyBroadcast
+		m.mu.RUnlock()
+
+		if !ok {
+			return xerrors.Errorf("waiting for unit %q: %w", id, ErrUnitNotFound)
+		}
+		if u.ready {
+			return nil
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-wait:
+			// Readiness may have changed; loop and re-check.
+		}
+	}
 }
 
 // GetGraph returns the underlying graph for visualization and debugging.

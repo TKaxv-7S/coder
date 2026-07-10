@@ -3,6 +3,7 @@ package agentapi
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"net/url"
 	"strings"
@@ -129,6 +130,11 @@ func (a *ManifestAPI) GetManifest(ctx context.Context, _ *agentproto.GetManifest
 		parentID = workspaceAgent.ParentID.UUID[:]
 	}
 
+	scriptsProto, err := dbAgentScriptsToProto(scripts)
+	if err != nil {
+		return nil, xerrors.Errorf("converting workspace agent scripts: %w", err)
+	}
+
 	return &agentproto.Manifest{
 		AgentId:                  workspaceAgent.ID[:],
 		AgentName:                workspaceAgent.Name,
@@ -145,7 +151,7 @@ func (a *ManifestAPI) GetManifest(ctx context.Context, _ *agentproto.GetManifest
 		ParentId:                 parentID,
 
 		DerpMap:       tailnet.DERPMapToProto(a.DerpMapFn()),
-		Scripts:       dbAgentScriptsToProto(scripts),
+		Scripts:       scriptsProto,
 		Apps:          apps,
 		Metadata:      dbAgentMetadataToProtoDescription(metadata),
 		Devcontainers: dbAgentDevcontainersToProto(devcontainers),
@@ -184,15 +190,23 @@ func dbAgentMetadatumToProtoDescription(metadatum database.WorkspaceAgentMetadat
 	}
 }
 
-func dbAgentScriptsToProto(scripts []database.GetWorkspaceAgentScriptsByAgentIDsRow) []*agentproto.WorkspaceAgentScript {
+func dbAgentScriptsToProto(scripts []database.GetWorkspaceAgentScriptsByAgentIDsRow) ([]*agentproto.WorkspaceAgentScript, error) {
 	ret := make([]*agentproto.WorkspaceAgentScript, len(scripts))
 	for i, script := range scripts {
-		ret[i] = dbAgentScriptToProto(script)
+		p, err := dbAgentScriptToProto(script)
+		if err != nil {
+			return nil, xerrors.Errorf("script %q: %w", script.ID, err)
+		}
+		ret[i] = p
 	}
-	return ret
+	return ret, nil
 }
 
-func dbAgentScriptToProto(script database.GetWorkspaceAgentScriptsByAgentIDsRow) *agentproto.WorkspaceAgentScript {
+func dbAgentScriptToProto(script database.GetWorkspaceAgentScriptsByAgentIDsRow) (*agentproto.WorkspaceAgentScript, error) {
+	deps, err := dbAgentScriptDependenciesToProto(script.Dependencies)
+	if err != nil {
+		return nil, xerrors.Errorf("parse dependencies: %w", err)
+	}
 	return &agentproto.WorkspaceAgentScript{
 		Id:               script.ID[:],
 		LogSourceId:      script.LogSourceID[:],
@@ -205,7 +219,32 @@ func dbAgentScriptToProto(script database.GetWorkspaceAgentScriptsByAgentIDsRow)
 		Timeout:          durationpb.New(time.Duration(script.TimeoutSeconds) * time.Second),
 		DisplayName:      script.DisplayName,
 		ResourceAddress:  script.ResourceAddress,
+		Dependencies:     deps,
+	}, nil
+}
+
+// dbAgentScriptDependenciesToProto unmarshals the JSON dependencies column of a
+// workspace agent script into its proto representation. An empty or null column
+// yields no dependencies.
+func dbAgentScriptDependenciesToProto(raw []byte) ([]*agentproto.WorkspaceAgentScriptDependency, error) {
+	if len(raw) == 0 {
+		return nil, nil
 	}
+	var deps []codersdk.WorkspaceAgentScriptDependency
+	if err := json.Unmarshal(raw, &deps); err != nil {
+		return nil, err
+	}
+	if len(deps) == 0 {
+		return nil, nil
+	}
+	ret := make([]*agentproto.WorkspaceAgentScriptDependency, len(deps))
+	for i, dep := range deps {
+		ret[i] = &agentproto.WorkspaceAgentScriptDependency{
+			ResourceAddress: dep.ResourceAddress,
+			RequiredStatus:  dep.RequiredStatus,
+		}
+	}
+	return ret, nil
 }
 
 func dbAppsToProto(dbApps []database.WorkspaceApp, agent database.WorkspaceAgent, ownerName string, workspace database.Workspace, appHostname string) ([]*agentproto.WorkspaceApp, error) {

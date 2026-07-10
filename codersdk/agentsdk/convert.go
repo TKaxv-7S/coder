@@ -205,7 +205,24 @@ func AgentScriptFromProto(protoScript *proto.WorkspaceAgentScript) (codersdk.Wor
 		Timeout:          protoScript.Timeout.AsDuration(),
 		DisplayName:      protoScript.DisplayName,
 		ResourceAddress:  protoScript.ResourceAddress,
+		Dependencies:     AgentScriptDependenciesFromProto(protoScript.Dependencies),
 	}, nil
+}
+
+// AgentScriptDependenciesFromProto converts proto script dependencies into
+// their codersdk representation.
+func AgentScriptDependenciesFromProto(deps []*proto.WorkspaceAgentScriptDependency) []codersdk.WorkspaceAgentScriptDependency {
+	if len(deps) == 0 {
+		return nil
+	}
+	ret := make([]codersdk.WorkspaceAgentScriptDependency, len(deps))
+	for i, dep := range deps {
+		ret[i] = codersdk.WorkspaceAgentScriptDependency{
+			ResourceAddress: dep.GetResourceAddress(),
+			RequiredStatus:  dep.GetRequiredStatus(),
+		}
+	}
+	return ret
 }
 
 func ProtoFromScript(s codersdk.WorkspaceAgentScript) *proto.WorkspaceAgentScript {
@@ -221,7 +238,24 @@ func ProtoFromScript(s codersdk.WorkspaceAgentScript) *proto.WorkspaceAgentScrip
 		Timeout:          durationpb.New(s.Timeout),
 		DisplayName:      s.DisplayName,
 		ResourceAddress:  s.ResourceAddress,
+		Dependencies:     ProtoFromScriptDependencies(s.Dependencies),
 	}
+}
+
+// ProtoFromScriptDependencies converts codersdk script dependencies into their
+// proto representation.
+func ProtoFromScriptDependencies(deps []codersdk.WorkspaceAgentScriptDependency) []*proto.WorkspaceAgentScriptDependency {
+	if len(deps) == 0 {
+		return nil
+	}
+	ret := make([]*proto.WorkspaceAgentScriptDependency, len(deps))
+	for i, dep := range deps {
+		ret[i] = &proto.WorkspaceAgentScriptDependency{
+			ResourceAddress: dep.ResourceAddress,
+			RequiredStatus:  dep.RequiredStatus,
+		}
+	}
+	return ret
 }
 
 func AppsFromProto(protoApps []*proto.WorkspaceApp) ([]codersdk.WorkspaceApp, error) {
