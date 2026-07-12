@@ -16709,7 +16709,7 @@ const docTemplate = `{
                     "$ref": "#/definitions/codersdk.ChatClientType"
                 },
                 "context": {
-                    "description": "Context reports the chat's pinned workspace-context state and\nwhether it has drifted from the agent's latest pushed snapshot.\nNil when the chat has no pinned context yet.",
+                    "description": "Context reports the chat's pinned workspace-context state and\nwhether it has drifted from the agent's latest pushed snapshot.\nPresent for every workspace-bound chat; nil for chats with no\nworkspace and no context remnants.",
                     "allOf": [
                         {
                             "$ref": "#/definitions/codersdk.ChatContext"
@@ -16889,6 +16889,14 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/codersdk.ChatContextResource"
                     }
+                },
+                "state": {
+                    "description": "State reports where the chat stands in the context-reporting\nlifecycle: waiting for the agent's first report or ready (pinned).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/codersdk.ChatContextState"
+                        }
+                    ]
                 }
             }
         },
@@ -16964,6 +16972,17 @@ const docTemplate = `{
                 "ChatContextResourceStatusUnreadable",
                 "ChatContextResourceStatusInvalid",
                 "ChatContextResourceStatusExcluded"
+            ]
+        },
+        "codersdk.ChatContextState": {
+            "type": "string",
+            "enum": [
+                "waiting",
+                "ready"
+            ],
+            "x-enum-varnames": [
+                "ChatContextStateWaiting",
+                "ChatContextStateReady"
             ]
         },
         "codersdk.ChatContextTool": {
@@ -17938,6 +17957,7 @@ const docTemplate = `{
                 "deleted",
                 "diff_status_change",
                 "action_required",
+                "context_ready",
                 "context_dirty"
             ],
             "x-enum-varnames": [
@@ -17948,6 +17968,7 @@ const docTemplate = `{
                 "ChatWatchEventKindDeleted",
                 "ChatWatchEventKindDiffStatusChange",
                 "ChatWatchEventKindActionRequired",
+                "ChatWatchEventKindContextReady",
                 "ChatWatchEventKindContextDirty"
             ]
         },

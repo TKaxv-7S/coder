@@ -223,25 +223,21 @@ func (server *Server) prepareGeneration(
 	promptRows = server.sanitizeForeignProviderExecutedToolRows(ctx, logger, promptRows, modelConfig.ID)
 
 	if chat.WorkspaceID.Valid {
-		// Resolve the workspace agent so the chat row's AgentID and
-		// BuildID bindings are up to date before the chatworker
-		// decision helper inspects them. ensureWorkspaceAgent does a
-		// DB lookup and lazily calls persistBuildAgentBinding when
-		// the bound agent has changed, so this is a cheap metadata
-		// refresh, not a workspace dial. It must not insert chat
-		// history; only metadata is mutated here.
-		agent, _ := workspaceCtx.getWorkspaceAgent(ctx)
-
-		// API-created chats bind their agent lazily here, after
-		// hydrateChatContextOnCreate ran with no agent. Pin the chat to the
-		// bound agent's pushed snapshot now if it is still unpinned, so the
-		// first turn reads workspace context instead of waiting for the
-		// agent's next push. Idempotent and snapshot-gated; runs before the
-		// pinned context is read below.
-		server.ensureChatContextPinnedOnFirstTurn(ctx, workspaceCtx.currentChatSnapshot())
+		// A workspace turn must not run before the chat's agent has
+		// reported its context snapshot. awaitChatContextReported resolves
+		// the agent (rebinding stale bindings to the latest start build,
+		// which also re-pins the chat's context), proceeds immediately when
+		// the chat is already pinned, and otherwise blocks until the bound
+		// agent has a snapshot, pinning the chat to it before returning.
+		// Terminal gate failures surface as the chat's visible error state.
+		agent, gateErr := server.awaitChatContextReported(ctx, &workspaceCtx, logger)
+		if gateErr != nil {
+			cleanup()
+			return generationPrepared{}, gateErr
+		}
 
 		var resolveErr error
-		instruction, workspaceSkills, resolveErr = server.resolveTurnWorkspaceContext(ctx, chat, agent)
+		instruction, workspaceSkills, resolveErr = server.resolveTurnWorkspaceContext(ctx, workspaceCtx.currentChatSnapshot(), agent)
 		if resolveErr != nil {
 			cleanup()
 			return generationPrepared{}, resolveErr

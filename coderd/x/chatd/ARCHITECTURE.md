@@ -825,6 +825,15 @@ The generation goroutine supports:
 - turn limit after a user message (the LLM shouldn't be able to spin forever in loop)
 - and other things
 
+##### Context report gate
+
+A workspace-bound turn treats the agent's context report as a hard precondition. During generation preparation, before the pinned workspace context is read:
+
+- The chat's agent binding is resolved and, when the workspace has a newer start-transition build than the one the chat is bound to, rebound to the latest build's selected agent. Rebinding re-pins the chat's context (clearing it when the new agent has not pushed a snapshot yet). When the latest build is a stop or delete transition, the existing binding and pinned context are kept.
+- A chat whose context is already pinned proceeds immediately; agent resolution errors are swallowed on that path so pinned chats on stopped (zero-agent) workspaces keep working from their pinned context.
+- An unpinned chat waits on a 1-second poll loop, re-resolving the agent and checking for a pushed snapshot each tick. A push that arrives mid-wait is picked up on the next tick; the gate then pins the chat to it and the turn proceeds with that context. The wait is bounded by a 15-minute ceiling.
+- The gate fails fast, without burning the ceiling, when the workspace's latest build is not a start transition or when the bound agent connected with an Agent API below 2.10 (the context-push minimum). Ceiling expiry and fast-fail conditions are terminal: the prepare phase does not retry them, and the message lands in the chat's persisted `last_error` as the visible error state. Context cancellation propagates unchanged so interrupts keep working during the wait.
+
 ##### Reasoning effort
 
 Model configs may carry a `reasoning_effort` config (`{default, max}`) inside `chat_model_configs.options`. Users select a per-turn effort when sending or editing a message; the value is stored on `chat_messages.reasoning_effort` and on `chat_queued_messages.reasoning_effort` for queued messages. Queued messages carry the value through promotion, and `chats.last_reasoning_effort` tracks the most recent message that set one, mirroring `last_model_config_id`.

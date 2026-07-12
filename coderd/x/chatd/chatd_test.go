@@ -45,6 +45,7 @@ import (
 	"github.com/coder/coder/v2/coderd/database/dbfake"
 	"github.com/coder/coder/v2/coderd/database/dbgen"
 	"github.com/coder/coder/v2/coderd/database/dbtestutil"
+	"github.com/coder/coder/v2/coderd/database/dbtime"
 	dbpubsub "github.com/coder/coder/v2/coderd/database/pubsub"
 	"github.com/coder/coder/v2/coderd/util/ptr"
 	"github.com/coder/coder/v2/coderd/util/slice"
@@ -4862,7 +4863,15 @@ func TestCreateWorkspaceTool_EndToEnd(t *testing.T) {
 	require.True(t, foundToolResultInSecondCall, "expected second streamed model call to include create_workspace tool output")
 }
 
-func TestStartWorkspaceTool_EndToEnd(t *testing.T) {
+// TestStoppedWorkspaceUnpinnedChatSurfacesContextGateError covers the
+// context-report gate end to end through the chat worker: a chat bound to a
+// stopped workspace that never reported context cannot run a turn, and the
+// gate's actionable error surfaces as the chat's visible error state instead
+// of an opaque retry loop. Before the gate, this flow ran the turn and let
+// the model call start_workspace; the started-workspace requirement now
+// front-runs the model call, and the start_workspace tool behavior itself is
+// covered by chattool's tests.
+func TestStoppedWorkspaceUnpinnedChatSurfacesContextGateError(t *testing.T) {
 	t.Parallel()
 
 	ctx := testutil.Context(t, testutil.WaitSuperLong)
@@ -4882,11 +4891,8 @@ func TestStartWorkspaceTool_EndToEnd(t *testing.T) {
 	coderdtest.AwaitTemplateVersionJobCompleted(t, client, version.ID)
 	template := coderdtest.CreateTemplate(t, client, user.OrganizationID, version.ID)
 
-	// Create a workspace, then stop it so start_workspace has
-	// something to start. We intentionally skip starting a test
-	// agent. The echo provisioner creates new agent rows for each
-	// build, so an agent started for build 1 cannot serve build 3.
-	// The tool handles the no-agent case gracefully.
+	// Create a workspace, then stop it. No agent ever connects or pushes
+	// context, so a chat bound to it has no pinned context to run from.
 	workspace := coderdtest.CreateWorkspace(t, client, template.ID)
 	coderdtest.AwaitWorkspaceBuildJobCompleted(t, client, workspace.LatestBuild.ID)
 	workspace = coderdtest.MustTransitionWorkspace(
@@ -4894,26 +4900,12 @@ func TestStartWorkspaceTool_EndToEnd(t *testing.T) {
 		codersdk.WorkspaceTransitionStart, codersdk.WorkspaceTransitionStop,
 	)
 
-	var streamedCallCount atomic.Int32
-	var streamedCallsMu sync.Mutex
-	streamedCalls := make([][]chattest.OpenAIMessage, 0, 2)
-
 	openAIURL := chattest.NewOpenAI(t, func(req *chattest.OpenAIRequest) chattest.OpenAIResponse {
 		if !req.Stream {
 			return chattest.OpenAINonStreamingResponse("Start workspace test")
 		}
-
-		streamedCallsMu.Lock()
-		streamedCalls = append(streamedCalls, append([]chattest.OpenAIMessage(nil), req.Messages...))
-		streamedCallsMu.Unlock()
-
-		if streamedCallCount.Add(1) == 1 {
-			return chattest.OpenAIStreamingResponse(
-				chattest.OpenAIToolCallChunk("start_workspace", "{}"),
-			)
-		}
 		return chattest.OpenAIStreamingResponse(
-			chattest.OpenAITextChunks("Workspace started and ready.")...,
+			chattest.OpenAITextChunks("This turn must not run.")...,
 		)
 	})
 
@@ -4942,69 +4934,11 @@ func TestStartWorkspaceTool_EndToEnd(t *testing.T) {
 		return got.Status == codersdk.ChatStatusWaiting || got.Status == codersdk.ChatStatusError
 	}, testutil.WaitSuperLong, testutil.IntervalFast)
 
-	if chatResult.Status == codersdk.ChatStatusError {
-		lastError := ""
-		if chatResult.LastError != nil {
-			lastError = chatResult.LastError.Message
-		}
-		require.FailNowf(t, "chat run failed", "last_error=%q", lastError)
-	}
-
-	// Verify the workspace was started.
-	require.NotNil(t, chatResult.WorkspaceID)
-	updatedWorkspace, err := client.Workspace(ctx, workspace.ID)
-	require.NoError(t, err)
-	require.Equal(t, codersdk.WorkspaceTransitionStart, updatedWorkspace.LatestBuild.Transition)
-
-	chatMsgs, err := expClient.GetChatMessages(ctx, chat.ID, nil)
-	require.NoError(t, err)
-
-	// Verify start_workspace tool result exists in the chat messages.
-	var foundStartWorkspaceResult bool
-	for _, message := range chatMsgs.Messages {
-		if message.Role != codersdk.ChatMessageRoleTool {
-			continue
-		}
-		for _, part := range message.Content {
-			if part.Type != codersdk.ChatMessagePartTypeToolResult || part.ToolName != "start_workspace" {
-				continue
-			}
-			var result map[string]any
-			require.NoError(t, json.Unmarshal(part.Result, &result))
-			started, ok := result["started"].(bool)
-			require.True(t, ok)
-			require.True(t, started)
-			foundStartWorkspaceResult = true
-		}
-	}
-	require.True(t, foundStartWorkspaceResult, "expected start_workspace tool result message")
-
-	// Verify the LLM received the tool result in its second call.
-	require.GreaterOrEqual(t, streamedCallCount.Load(), int32(2))
-	streamedCallsMu.Lock()
-	recordedStreamCalls := append([][]chattest.OpenAIMessage(nil), streamedCalls...)
-	streamedCallsMu.Unlock()
-	require.GreaterOrEqual(t, len(recordedStreamCalls), 2)
-
-	var foundToolResultInSecondCall bool
-	for _, message := range recordedStreamCalls[1] {
-		if message.Role != "tool" {
-			continue
-		}
-		if !json.Valid([]byte(message.Content)) {
-			continue
-		}
-		var result map[string]any
-		if err := json.Unmarshal([]byte(message.Content), &result); err != nil {
-			continue
-		}
-		started, ok := result["started"].(bool)
-		if ok && started {
-			foundToolResultInSecondCall = true
-			break
-		}
-	}
-	require.True(t, foundToolResultInSecondCall, "expected second streamed model call to include start_workspace tool output")
+	require.Equal(t, codersdk.ChatStatusError, chatResult.Status,
+		"an unpinned chat on a stopped workspace must fail the turn visibly")
+	require.NotNil(t, chatResult.LastError)
+	require.Contains(t, chatResult.LastError.Message,
+		"workspace must be started to report chat context")
 }
 
 func TestStoppedWorkspaceWithPersistedAgentBindingDoesNotBlockChat(t *testing.T) {
@@ -5071,6 +5005,17 @@ func TestStoppedWorkspaceWithPersistedAgentBindingDoesNotBlockChat(t *testing.T)
 		ID:      chat.ID,
 		BuildID: uuid.NullUUID{UUID: build.ID, Valid: true},
 		AgentID: uuid.NullUUID{UUID: dbAgent.ID, Valid: true},
+	})
+	require.NoError(t, err)
+
+	// The agent reported context while the workspace ran, pinning the chat.
+	// The context-report gate only lets a pinned chat run once the workspace
+	// is stopped below, matching the production sequence this test models.
+	snapshot, err := db.GetLatestWorkspaceAgentContextSnapshot(ctx, dbAgent.ID)
+	require.NoError(t, err)
+	_, err = db.HydrateAgentChatsContext(ctx, database.HydrateAgentChatsContextParams{
+		AgentID:       dbAgent.ID,
+		AggregateHash: snapshot.AggregateHash,
 	})
 	require.NoError(t, err)
 
@@ -8696,7 +8641,18 @@ func seedWorkspaceWithAgent(
 		Version:           "v1.0.0",
 		ExpandedDirectory: "/home/coder/project",
 	}))
-	dbAgent, err := db.GetWorkspaceAgentByID(context.Background(), dbAgent.ID)
+	// The context-report gate blocks workspace turns until the agent has
+	// pushed a context snapshot. Seed an empty snapshot so turns proceed
+	// as they did before the gate; row existence alone marks the agent as
+	// having reported, and an empty snapshot contributes no prompt context.
+	_, err := db.UpsertWorkspaceAgentContextSnapshot(context.Background(), database.UpsertWorkspaceAgentContextSnapshotParams{
+		WorkspaceAgentID: dbAgent.ID,
+		Version:          1,
+		AggregateHash:    []byte{0x01},
+		ReceivedAt:       dbtime.Now(),
+	})
+	require.NoError(t, err)
+	dbAgent, err = db.GetWorkspaceAgentByID(context.Background(), dbAgent.ID)
 	require.NoError(t, err)
 	return ws, dbAgent
 }

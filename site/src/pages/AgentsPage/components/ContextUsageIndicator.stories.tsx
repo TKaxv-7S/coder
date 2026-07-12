@@ -3,6 +3,7 @@ import { expect, fn, userEvent, waitFor, within } from "storybook/test";
 import {
 	MockChatContextClean,
 	MockChatContextDirty,
+	MockChatContextWaiting,
 } from "#/testHelpers/chatEntities";
 import { ContextUsageIndicator } from "./ContextUsageIndicator";
 
@@ -201,6 +202,31 @@ export const Dirty: Story = {
 			body.getByRole("button", { name: "Refresh context" }),
 		);
 		expect(args.onRefreshContext).toHaveBeenCalledTimes(1);
+	},
+};
+
+// Waiting pin: the chat is workspace-bound but the agent has not reported a
+// context snapshot yet, so the indicator shows a subtle spinner and the
+// popover explains the wait. No refresh affordance: there is nothing to
+// re-pin yet.
+export const Waiting: Story = {
+	args: {
+		usage: {
+			context: MockChatContextWaiting,
+		},
+	},
+	play: async ({ canvasElement }) => {
+		const button = within(canvasElement).getByRole("button");
+		expect(button.getAttribute("aria-label") ?? "").toContain(
+			"Waiting for workspace context",
+		);
+
+		await userEvent.hover(button);
+		const body = within(document.body);
+		await waitFor(() =>
+			expect(body.getByText("Waiting for workspace context")).toBeVisible(),
+		);
+		expect(body.queryByRole("button", { name: "Refresh context" })).toBeNull();
 	},
 };
 

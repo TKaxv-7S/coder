@@ -5,11 +5,14 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
 	"cdr.dev/slog/v3/sloggers/slogtest"
 	"github.com/coder/coder/v2/coderd/database"
 	"github.com/coder/coder/v2/coderd/database/dbmock"
+	"github.com/coder/coder/v2/coderd/database/dbtime"
+	"github.com/coder/coder/v2/codersdk"
 	"github.com/coder/coder/v2/testutil"
 )
 
@@ -46,7 +49,7 @@ func TestHydrateChatContextOnCreate(t *testing.T) {
 			AgentID:       agentID,
 			AggregateHash: snapshot.AggregateHash,
 			ContextError:  snapshot.SnapshotError,
-		}).Return(nil)
+		}).Return([]uuid.UUID{chat.ID}, nil)
 
 		server.hydrateChatContextOnCreate(ctx, chat)
 	})
@@ -118,7 +121,7 @@ func TestEnsureChatContextPinnedOnFirstTurn(t *testing.T) {
 			AgentID:       agentID,
 			AggregateHash: snapshot.AggregateHash,
 			ContextError:  snapshot.SnapshotError,
-		}).Return(nil)
+		}).Return([]uuid.UUID{chat.ID}, nil)
 
 		server.ensureChatContextPinnedOnFirstTurn(ctx, chat)
 	})
@@ -150,4 +153,55 @@ func TestEnsureChatContextPinnedOnFirstTurn(t *testing.T) {
 
 		server.ensureChatContextPinnedOnFirstTurn(ctx, database.Chat{ID: uuid.New()})
 	})
+}
+
+// TestHydrateAndMarkChatsDirtyPublishesEvents proves the push-path fan-out
+// against a real database: the returned post-commit callback publishes
+// context_ready for first hydrations (NULL-hash chats stamped by the push)
+// and context_dirty for already-pinned chats whose hash drifted.
+func TestHydrateAndMarkChatsDirtyPublishesEvents(t *testing.T) {
+	t.Parallel()
+	fix := newRebindFixture(t)
+	server := &Server{db: fix.db, pubsub: fix.ps, logger: slogtest.Make(t, nil)}
+
+	// A never-hydrated chat (NULL hash) and an already-pinned chat whose
+	// hash will drift on the push below.
+	waitingChat := gateChat(t, fix, fix.agentA, fix.buildID)
+	require.Nil(t, waitingChat.ContextAggregateHash)
+	pinnedChat := gateChat(t, fix, fix.agentA, fix.buildID)
+	require.NoError(t, fix.db.SetChatContextSnapshot(fix.ctx, database.SetChatContextSnapshotParams{
+		ID:            pinnedChat.ID,
+		AggregateHash: []byte{0x01},
+	}))
+
+	events := subscribeChatWatchEvents(t, fix)
+
+	hashNew := []byte{0x77, 0x78}
+	var publish func()
+	err := fix.db.InTx(func(tx database.Store) error {
+		var err error
+		publish, err = server.HydrateAndMarkChatsDirty(
+			fix.ctx, tx, fix.agentA, hashNew, "", dbtime.Now())
+		return err
+	}, nil)
+	require.NoError(t, err)
+	require.NotNil(t, publish)
+	publish()
+
+	// One ready event for the hydrated chat and one dirty event for the
+	// drifted chat; delivery order is not guaranteed, so key by chat.
+	kindsByChat := map[uuid.UUID]codersdk.ChatWatchEventKind{}
+	for range 2 {
+		event := testutil.RequireReceive(fix.ctx, t, events)
+		kindsByChat[event.Chat.ID] = event.Kind
+		if event.Chat.ID == waitingChat.ID {
+			require.NotNil(t, event.Chat.Context)
+			require.Equal(t, codersdk.ChatContextStateReady, event.Chat.Context.State,
+				"the ready payload reports the pinned state")
+		}
+	}
+	require.Equal(t, map[uuid.UUID]codersdk.ChatWatchEventKind{
+		waitingChat.ID: codersdk.ChatWatchEventKindContextReady,
+		pinnedChat.ID:  codersdk.ChatWatchEventKindContextDirty,
+	}, kindsByChat)
 }

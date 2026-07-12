@@ -141,7 +141,8 @@ type Chat struct {
 	HasUnread bool `json:"has_unread"`
 	// Context reports the chat's pinned workspace-context state and
 	// whether it has drifted from the agent's latest pushed snapshot.
-	// Nil when the chat has no pinned context yet.
+	// Present for every workspace-bound chat; nil for chats with no
+	// workspace and no context remnants.
 	Context    *ChatContext   `json:"context,omitempty"`
 	Warnings   []string       `json:"warnings,omitempty"`
 	ClientType ChatClientType `json:"client_type"`
@@ -153,10 +154,26 @@ type Chat struct {
 	Children []Chat `json:"children"`
 }
 
+// ChatContextState describes where a chat stands in the workspace-context
+// reporting lifecycle.
+type ChatContextState string
+
+const (
+	// ChatContextStateWaiting means the chat is workspace-bound but not
+	// yet pinned to a reported snapshot; turns gate on the report.
+	ChatContextStateWaiting ChatContextState = "waiting"
+	// ChatContextStateReady means the chat is pinned to a reported
+	// snapshot.
+	ChatContextStateReady ChatContextState = "ready"
+)
+
 // ChatContext reports a chat's pinned workspace context and whether it has
 // drifted from the agent's latest pushed snapshot. The chat stays usable
 // when dirty; refreshing re-pins it to the latest snapshot.
 type ChatContext struct {
+	// State reports where the chat stands in the context-reporting
+	// lifecycle: waiting for the agent's first report or ready (pinned).
+	State ChatContextState `json:"state,omitempty"`
 	// Dirty is true when the agent's latest snapshot hash differs from the
 	// chat's pinned hash.
 	Dirty bool `json:"dirty"`
@@ -1817,6 +1834,10 @@ const (
 	ChatWatchEventKindDeleted          ChatWatchEventKind = "deleted"
 	ChatWatchEventKindDiffStatusChange ChatWatchEventKind = "diff_status_change"
 	ChatWatchEventKindActionRequired   ChatWatchEventKind = "action_required"
+	// ChatWatchEventKindContextReady signals that the chat was first
+	// hydrated or re-pinned from a reported snapshot, so watchers can
+	// refresh the chat's context state without refetching.
+	ChatWatchEventKindContextReady ChatWatchEventKind = "context_ready"
 	// ChatWatchEventKindContextDirty signals that the chat's pinned
 	// workspace context drifted from the agent's latest pushed snapshot.
 	// The chat stays usable; a refresh re-pins it to the latest snapshot.

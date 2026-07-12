@@ -238,6 +238,9 @@ export const ContextUsageIndicator: FC<{
 
 	const context = usage?.context;
 	const isDirty = context?.dirty ?? false;
+	// A waiting chat is workspace-bound but not yet pinned to a reported
+	// snapshot; turns gate on the agent's first context report.
+	const isWaiting = context?.state === "waiting";
 	const contextError = context?.error ?? "";
 	const hasContextError = contextError !== "";
 	const pinnedResources = context?.resources;
@@ -327,14 +330,23 @@ export const ContextUsageIndicator: FC<{
 	const fileGroups = groupByDirectory(fileItems);
 	const skillGroups = groupByDirectory(skillItems);
 
-	const ariaLabel = hasPercent
-		? `Context usage ${percentLabel}. ${formatTokenCount(usedTokens)} of ${formatTokenCount(contextLimitTokens)} tokens used.${isDirty ? " Context changed." : ""}`
+	const ariaStateSuffix = isWaiting
+		? " Waiting for workspace context."
 		: isDirty
-			? "Context usage. Context changed."
-			: "Context usage";
+			? " Context changed."
+			: "";
+	const ariaLabel = hasPercent
+		? `Context usage ${percentLabel}. ${formatTokenCount(usedTokens)} of ${formatTokenCount(contextLimitTokens)} tokens used.${ariaStateSuffix}`
+		: `Context usage${ariaStateSuffix ? `.${ariaStateSuffix}` : ""}`;
 
 	const panelContent = (
 		<div className="text-xs text-content-primary">
+			{isWaiting && (
+				<div className="mb-2 flex items-center gap-1.5 text-content-secondary">
+					<Spinner loading size="sm" className="size-3 shrink-0" />
+					<span>Waiting for workspace context</span>
+				</div>
+			)}
 			{hasPercent
 				? `${percentLabel} - ${formatTokenCountCompact(usedTokens)} / ${formatTokenCountCompact(contextLimitTokens)} context used`
 				: "Context usage unavailable"}
@@ -570,6 +582,14 @@ export const ContextUsageIndicator: FC<{
 				progressClassName="stroke-current"
 				className={cn("size-icon-sm", toneClassName)}
 			/>
+			{isWaiting && (
+				<Spinner
+					loading
+					size="sm"
+					aria-hidden
+					className="absolute -right-0.5 -top-0.5 size-3 text-content-secondary"
+				/>
+			)}
 			{(isDirty || hasContextError) && (
 				<TriangleAlertIcon
 					aria-hidden

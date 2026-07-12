@@ -31,11 +31,11 @@ func latestAgentSnapshot(ctx context.Context, db database.Store, agentID uuid.UU
 
 // HydrateAndMarkChatsDirty implements agentapi.ContextDirtyMarker. It runs
 // inside the PushContextState transaction: it stamps the pushed snapshot hash
-// on chats for the agent that have not been hydrated yet (no dirty event),
-// then flips already-pinned chats whose hash differs to dirty. It returns a
-// callback that publishes the dirty watch events; the caller invokes it only
-// after the transaction commits, and the callback is a no-op when nothing
-// transitioned to dirty.
+// on chats for the agent that have not been hydrated yet, then flips
+// already-pinned chats whose hash differs to dirty. It returns a callback
+// that publishes the watch events (context_ready for first hydrations,
+// context_dirty for drifted chats); the caller invokes it only after the
+// transaction commits, and the callback is a no-op when nothing transitioned.
 //
 // The pinned hash on dirtied chats is intentionally left unchanged; the
 // refresh endpoint re-pins it.
@@ -44,13 +44,15 @@ func (p *Server) HydrateAndMarkChatsDirty(ctx context.Context, tx database.Store
 	ctx = dbauthz.AsChatd(ctx)
 
 	// Chats created before the agent's first push land with a NULL pinned
-	// hash. Stamp them now so they start clean; this is their first
-	// hydration, so no dirty event is emitted.
-	if err := tx.HydrateAgentChatsContext(ctx, database.HydrateAgentChatsContextParams{
+	// hash. Stamp them now so they start clean; this first hydration emits
+	// a ready event (not a dirty one) so watchers flip out of the waiting
+	// state.
+	hydrated, err := tx.HydrateAgentChatsContext(ctx, database.HydrateAgentChatsContextParams{
 		AgentID:       agentID,
 		AggregateHash: aggregateHash,
 		ContextError:  snapshotError,
-	}); err != nil {
+	})
+	if err != nil {
 		return nil, xerrors.Errorf("hydrate agent chats context: %w", err)
 	}
 
@@ -62,15 +64,24 @@ func (p *Server) HydrateAndMarkChatsDirty(ctx context.Context, tx database.Store
 	if err != nil {
 		return nil, xerrors.Errorf("mark chats context dirty: %w", err)
 	}
-	if len(dirtied) == 0 {
+	if len(hydrated) == 0 && len(dirtied) == 0 {
 		return func() {}, nil
 	}
 
-	// Read the dirtied chats inside the transaction and capture their rows so
-	// the post-commit callback needs no database access: the published payload
-	// reflects the just-committed dirty state (no re-read a concurrent refresh
-	// could race), and the callback does not depend on the request-scoped
-	// context surviving past commit. Only the transitioned chats are read.
+	// Read the transitioned chats inside the transaction and capture their
+	// rows so the post-commit callback needs no database access: the
+	// published payload reflects the just-committed state (no re-read a
+	// concurrent refresh could race), and the callback does not depend on
+	// the request-scoped context surviving past commit. Only the
+	// transitioned chats are read.
+	readyChats := make([]database.Chat, 0, len(hydrated))
+	for _, id := range hydrated {
+		chat, err := tx.GetChatByID(ctx, id)
+		if err != nil {
+			return nil, xerrors.Errorf("get hydrated chat %s: %w", id, err)
+		}
+		readyChats = append(readyChats, chat)
+	}
 	dirtyChats := make([]database.Chat, 0, len(dirtied))
 	for _, d := range dirtied {
 		chat, err := tx.GetChatByID(ctx, d.ID)
@@ -81,6 +92,7 @@ func (p *Server) HydrateAndMarkChatsDirty(ctx context.Context, tx database.Store
 	}
 
 	return func() {
+		p.publishChatPubsubEvents(readyChats, codersdk.ChatWatchEventKindContextReady)
 		p.publishChatPubsubEvents(dirtyChats, codersdk.ChatWatchEventKindContextDirty)
 	}, nil
 }
@@ -104,11 +116,12 @@ func (p *Server) hydrateAgentChatsFromSnapshot(ctx context.Context, agentID uuid
 		if !ok {
 			return nil
 		}
-		return tx.HydrateAgentChatsContext(ctx, database.HydrateAgentChatsContextParams{
+		_, err = tx.HydrateAgentChatsContext(ctx, database.HydrateAgentChatsContextParams{
 			AgentID:       agentID,
 			AggregateHash: aggregateHash,
 			ContextError:  snapshotError,
 		})
+		return err
 	})
 }
 

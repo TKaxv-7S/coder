@@ -18,6 +18,7 @@ import (
 	"github.com/coder/coder/v2/coderd/database/dbmock"
 	"github.com/coder/coder/v2/coderd/database/dbtestutil"
 	"github.com/coder/coder/v2/coderd/database/dbtime"
+	"github.com/coder/coder/v2/coderd/database/pubsub"
 	"github.com/coder/coder/v2/testutil"
 )
 
@@ -48,10 +49,11 @@ func TestPersistBuildAgentBindingRepinsContext(t *testing.T) {
 		// Pin the chat to agent A through the production hydrate path so it
 		// starts with A's hash and A's resources, exactly as an agent push
 		// would leave it.
-		require.NoError(t, fix.db.HydrateAgentChatsContext(fix.ctx, database.HydrateAgentChatsContextParams{
+		_, hydrateErr := fix.db.HydrateAgentChatsContext(fix.ctx, database.HydrateAgentChatsContextParams{
 			AgentID:       fix.agentA,
 			AggregateHash: fix.hashA,
-		}))
+		})
+		require.NoError(t, hydrateErr)
 		preRes, err := fix.db.ListChatContextResourcesByChatID(fix.ctx, chat.ID)
 		require.NoError(t, err)
 		require.Len(t, preRes, 1)
@@ -121,10 +123,11 @@ func TestPersistBuildAgentBindingRepinsContext(t *testing.T) {
 			AgentID:           uuid.NullUUID{UUID: fix.agentA, Valid: true},
 			Status:            database.ChatStatusWaiting,
 		})
-		require.NoError(t, fix.db.HydrateAgentChatsContext(fix.ctx, database.HydrateAgentChatsContextParams{
+		_, hydrateErr := fix.db.HydrateAgentChatsContext(fix.ctx, database.HydrateAgentChatsContextParams{
 			AgentID:       fix.agentA,
 			AggregateHash: fix.hashA,
-		}))
+		})
+		require.NoError(t, hydrateErr)
 		preRes, err := fix.db.ListChatContextResourcesByChatID(fix.ctx, chat.ID)
 		require.NoError(t, err)
 		require.Len(t, preRes, 1, "chat starts pinned to agent A")
@@ -194,6 +197,7 @@ func TestPersistBuildAgentBindingRepinsContext(t *testing.T) {
 
 type rebindFixture struct {
 	db          database.Store
+	ps          pubsub.Pubsub
 	ctx         context.Context
 	org         database.Organization
 	user        database.User
@@ -217,7 +221,7 @@ type rebindFixture struct {
 // rebind guard keys on the agent, not the build.
 func newRebindFixture(t *testing.T) rebindFixture {
 	t.Helper()
-	db, _ := dbtestutil.NewDB(t)
+	db, ps := dbtestutil.NewDB(t)
 	ctx := testutil.Context(t, testutil.WaitLong)
 
 	user := dbgen.User(t, db, database.User{})
@@ -258,6 +262,7 @@ func newRebindFixture(t *testing.T) rebindFixture {
 
 	fix := rebindFixture{
 		db:          db,
+		ps:          ps,
 		ctx:         ctx,
 		org:         org,
 		user:        user,

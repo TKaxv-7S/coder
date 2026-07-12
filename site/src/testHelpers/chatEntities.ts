@@ -79,14 +79,23 @@ const MockChatContextResources: ChatContextResource[] = [
 ];
 
 export const MockChatContextClean: ChatContext = {
+	state: "ready",
 	dirty: false,
 	resources: MockChatContextResources,
 };
 
 export const MockChatContextDirty: ChatContext = {
+	state: "ready",
 	dirty: true,
 	dirty_since: "2024-01-02T00:00:00Z",
 	resources: MockChatContextResources,
+};
+
+// A workspace-bound chat that has not been pinned to a reported snapshot
+// yet; turns gate on the agent's first context report.
+export const MockChatContextWaiting: ChatContext = {
+	state: "waiting",
+	dirty: false,
 };
 
 export const MockMCPServerConfig: MCPServerConfig = {

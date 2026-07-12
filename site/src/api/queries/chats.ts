@@ -422,6 +422,7 @@ export const mergeWatchedChatSummary = (
 	const isSummaryEvent = eventKind === "summary_change";
 	const isDiffStatusEvent = eventKind === "diff_status_change";
 	const isContextDirtyEvent = eventKind === "context_dirty";
+	const isContextReadyEvent = eventKind === "context_ready";
 	const updatedAtComparison = compareUpdatedAtInstants(
 		cachedChat.updated_at,
 		watchedChat.updated_at,
@@ -437,13 +438,14 @@ export const mergeWatchedChatSummary = (
 	const nextDiffStatus = isDiffStatusEvent
 		? watchedChat.diff_status
 		: cachedChat.diff_status;
-	// Context drift is tracked outside chats.updated_at (it is driven by
-	// agent context pushes), so apply context_dirty payloads regardless of
-	// the summary timestamp. Merge rather than replace so the pinned
-	// resources a single-chat GET populated are preserved while the dirty
-	// flags update; the open chat refetches the full detail.
+	// Context drift and readiness are tracked outside chats.updated_at
+	// (they are driven by agent context pushes), so apply context_dirty
+	// and context_ready payloads regardless of the summary timestamp.
+	// Merge rather than replace so the pinned resources a single-chat GET
+	// populated are preserved while the state flags update; the open chat
+	// refetches the full detail.
 	const nextContext =
-		isContextDirtyEvent && watchedChat.context
+		(isContextDirtyEvent || isContextReadyEvent) && watchedChat.context
 			? { ...cachedChat.context, ...watchedChat.context }
 			: cachedChat.context;
 	const nextWorkspaceId = isFreshEnough

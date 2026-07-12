@@ -1634,7 +1634,8 @@ export interface Chat {
 	/**
 	 * Context reports the chat's pinned workspace-context state and
 	 * whether it has drifted from the agent's latest pushed snapshot.
-	 * Nil when the chat has no pinned context yet.
+	 * Present for every workspace-bound chat; nil for chats with no
+	 * workspace and no context remnants.
 	 */
 	readonly context?: ChatContext;
 	readonly warnings?: readonly string[];
@@ -1732,6 +1733,11 @@ export interface ChatConfig {
  * when dirty; refreshing re-pins it to the latest snapshot.
  */
 export interface ChatContext {
+	/**
+	 * State reports where the chat stands in the context-reporting
+	 * lifecycle: waiting for the agent's first report or ready (pinned).
+	 */
+	readonly state?: ChatContextState;
 	/**
 	 * Dirty is true when the agent's latest snapshot hash differs from the
 	 * chat's pinned hash.
@@ -1848,6 +1854,11 @@ export const ChatContextResourceStatuses: ChatContextResourceStatus[] = [
 	"oversize",
 	"unreadable",
 ];
+
+// From codersdk/chats.go
+export type ChatContextState = "ready" | "waiting";
+
+export const ChatContextStates: ChatContextState[] = ["ready", "waiting"];
 
 // From codersdk/chats.go
 /**
@@ -3362,6 +3373,7 @@ export interface ChatWatchEvent {
 export type ChatWatchEventKind =
 	| "action_required"
 	| "context_dirty"
+	| "context_ready"
 	| "created"
 	| "deleted"
 	| "diff_status_change"
@@ -3372,6 +3384,7 @@ export type ChatWatchEventKind =
 export const ChatWatchEventKinds: ChatWatchEventKind[] = [
 	"action_required",
 	"context_dirty",
+	"context_ready",
 	"created",
 	"deleted",
 	"diff_status_change",

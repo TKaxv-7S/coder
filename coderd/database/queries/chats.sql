@@ -1419,15 +1419,17 @@ SET
     context_dirty_since = NULL
 WHERE id = @id::uuid;
 
--- name: HydrateAgentChatsContext :exec
+-- name: HydrateAgentChatsContext :many
 -- Stamps the pinned hash and error on every not-yet-hydrated chat for
 -- an agent (context_aggregate_hash IS NULL) and copies the agent's
 -- current context resources onto those chats in the same statement, so
 -- a chat's pinned hash and pinned bodies are always written together.
 -- Runs as a side effect of an agent push and of chat-create hydration,
 -- so chats created before the agent was ready pick up the snapshot
--- without a dirty event. The ON CONFLICT upsert is defensive: a
--- not-yet-hydrated chat has no pinned rows, so it normally inserts.
+-- without a dirty event. Returns the hydrated chat IDs so the caller
+-- can emit context_ready watch events after the transaction commits.
+-- The ON CONFLICT upsert is defensive: a not-yet-hydrated chat has no
+-- pinned rows, so it normally inserts.
 -- Does not bump chats.updated_at; the resource upsert's ON CONFLICT branch
 -- sets chat_context_resources.updated_at on the rows it rewrites.
 WITH hydrated AS (
@@ -1439,25 +1441,28 @@ WITH hydrated AS (
         AND archived = false
         AND context_aggregate_hash IS NULL
     RETURNING id
+),
+copied AS (
+    INSERT INTO chat_context_resources (
+        chat_id, source, body_kind, body, content_hash, size_bytes, status, error, source_path
+    )
+    SELECT
+        hydrated.id, r.source, r.body_kind, r.body, r.content_hash,
+        r.size_bytes, r.status, r.error, r.source_path
+    FROM hydrated
+    CROSS JOIN workspace_agent_context_resources r
+    WHERE r.workspace_agent_id = @agent_id::uuid
+    ON CONFLICT (chat_id, source) DO UPDATE SET
+        body_kind = EXCLUDED.body_kind,
+        body = EXCLUDED.body,
+        content_hash = EXCLUDED.content_hash,
+        size_bytes = EXCLUDED.size_bytes,
+        status = EXCLUDED.status,
+        error = EXCLUDED.error,
+        source_path = EXCLUDED.source_path,
+        updated_at = now()
 )
-INSERT INTO chat_context_resources (
-    chat_id, source, body_kind, body, content_hash, size_bytes, status, error, source_path
-)
-SELECT
-    hydrated.id, r.source, r.body_kind, r.body, r.content_hash,
-    r.size_bytes, r.status, r.error, r.source_path
-FROM hydrated
-CROSS JOIN workspace_agent_context_resources r
-WHERE r.workspace_agent_id = @agent_id::uuid
-ON CONFLICT (chat_id, source) DO UPDATE SET
-    body_kind = EXCLUDED.body_kind,
-    body = EXCLUDED.body,
-    content_hash = EXCLUDED.content_hash,
-    size_bytes = EXCLUDED.size_bytes,
-    status = EXCLUDED.status,
-    error = EXCLUDED.error,
-    source_path = EXCLUDED.source_path,
-    updated_at = now();
+SELECT hydrated.id FROM hydrated;
 
 -- name: MarkChatsContextDirtyByAgent :many
 -- Flips active, already-hydrated chats for an agent to dirty when the
