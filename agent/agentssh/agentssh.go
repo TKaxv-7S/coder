@@ -32,6 +32,7 @@ import (
 	"github.com/coder/coder/v2/agent/agentrsa"
 	"github.com/coder/coder/v2/agent/usershell"
 	"github.com/coder/coder/v2/coderd/idemetadata"
+	"github.com/coder/coder/v2/coderd/util/syncmap"
 	"github.com/coder/coder/v2/codersdk"
 	"github.com/coder/coder/v2/pty"
 )
@@ -72,17 +73,16 @@ const (
 	ContainerUserEnvironmentVariable = "CODER_CONTAINER_USER"
 )
 
-// MagicSessionType enums.
+// Well-known magic session types, defined in terms of the canonical app
+// names so the agent and server vocabularies cannot drift.
 const (
-	// MagicSessionTypeUnknown means the session type could not be determined.
-	MagicSessionTypeUnknown MagicSessionType = "unknown"
 	// MagicSessionTypeSSH is the default session type.
-	MagicSessionTypeSSH MagicSessionType = "ssh"
+	MagicSessionTypeSSH MagicSessionType = idemetadata.AppNameSSH
 	// MagicSessionTypeVSCode is set in the SSH config by the VS Code extension to identify itself.
-	MagicSessionTypeVSCode MagicSessionType = "vscode"
+	MagicSessionTypeVSCode MagicSessionType = idemetadata.AppNameVSCode
 	// MagicSessionTypeJetBrains is set in the SSH config by the JetBrains
 	// extension to identify itself.
-	MagicSessionTypeJetBrains MagicSessionType = "jetbrains"
+	MagicSessionTypeJetBrains MagicSessionType = idemetadata.AppNameJetBrains
 )
 
 // BlockedFileTransferCommands contains a list of restricted file transfer commands.
@@ -156,10 +156,9 @@ type Server struct {
 
 	config *Config
 
-	// connCounts tracks active sessions per session type
-	// (map[string]*atomic.Int64). Counters are created on demand, so any
-	// session type reported by a client is counted.
-	connCounts sync.Map
+	// connCounts tracks active sessions per session type, with counters
+	// created on demand so any session type reported by a client is counted.
+	connCounts syncmap.Map[string, *atomic.Int64]
 
 	metrics *sshServerMetrics
 }
@@ -329,17 +328,21 @@ func NewServer(ctx context.Context, logger slog.Logger, prometheusRegistry *prom
 // getOrCreateConnCounter returns the active session counter for the given
 // session type, creating it on first use.
 func (s *Server) getOrCreateConnCounter(sessionType MagicSessionType) *atomic.Int64 {
+	if counter, ok := s.connCounts.Load(string(sessionType)); ok {
+		return counter
+	}
 	counter, _ := s.connCounts.LoadOrStore(string(sessionType), &atomic.Int64{})
-	//nolint:forcetypeassert // Only *atomic.Int64 values are stored.
-	return counter.(*atomic.Int64)
+	return counter
 }
 
-// ConnStats returns a snapshot of active sessions per session type.
+// ConnStats returns a snapshot of active sessions per session type,
+// omitting idle types so reports don't grow with every type ever seen.
 func (s *Server) ConnStats() map[string]int64 {
 	stats := make(map[string]int64)
-	s.connCounts.Range(func(key, value any) bool {
-		//nolint:forcetypeassert // Only string keys and *atomic.Int64 values are stored.
-		stats[key.(string)] = value.(*atomic.Int64).Load()
+	s.connCounts.Range(func(key string, value *atomic.Int64) bool {
+		if count := value.Load(); count > 0 {
+			stats[key] = count
+		}
 		return true
 	})
 	return stats
@@ -454,7 +457,7 @@ func (s *Server) sessionHandler(session ssh.Session) {
 
 	reportSession := true
 
-	if idemetadata.Lookup(string(magicType)).Family == idemetadata.FamilyJetBrains {
+	if idemetadata.Family(string(magicType)) == idemetadata.AppNameJetBrains {
 		// Do nothing here because JetBrains launches hundreds of ssh sessions.
 		// We instead track JetBrains in the single persistent tcp forwarding
 		// channel, matched by family to include IDE-specific identifiers.

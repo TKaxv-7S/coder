@@ -154,7 +154,7 @@ func (r *Reporter) ReportAgentStats(ctx context.Context, now time.Time, workspac
 	}
 
 	// workspace activity: if no sessions we do not bump activity
-	if usage && len(SessionCountsFromProto(stats)) == 0 {
+	if usage && !HasSessionCounts(stats) {
 		return nil
 	}
 

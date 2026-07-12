@@ -21,6 +21,8 @@ func TestNormalize(t *testing.T) {
 		{name: "KnownNameCaseInsensitive", input: "JetBrains", want: "jetbrains"},
 		{name: "LegacyAlias", input: "reconnecting-pty", want: "reconnecting_pty"},
 		{name: "LegacyAliasCaseInsensitive", input: "Reconnecting-PTY", want: "reconnecting_pty"},
+		{name: "HyphenatedKnownName", input: "vscode-insiders", want: "vscode_insiders"},
+		{name: "UnknownHyphenatedPreserved", input: "my-future-ide", want: "my-future-ide"},
 		{name: "UnknownPreservesCasing", input: "Cursor Nightly", want: "Cursor Nightly"},
 		{name: "UnknownPreservesUnicode", input: "エディタ", want: "エディタ"},
 		{name: "StripsNullBytes", input: "cur\x00sor", want: "cursor"},
@@ -45,26 +47,26 @@ func TestNormalize(t *testing.T) {
 	}
 }
 
-func TestLookup(t *testing.T) {
+func TestFamily(t *testing.T) {
 	t.Parallel()
 
 	for _, tc := range []struct {
-		name            string
-		input           string
-		wantFamily      string
-		wantDisplayName string
+		name  string
+		input string
+		want  string
 	}{
-		{name: "VSCode", input: "vscode", wantFamily: idemetadata.FamilyVSCode, wantDisplayName: "VS Code"},
-		{name: "VSCodeFork", input: "cursor", wantFamily: idemetadata.FamilyVSCode, wantDisplayName: "Cursor"},
-		{name: "CaseInsensitive", input: "JetBrains", wantFamily: idemetadata.FamilyJetBrains, wantDisplayName: "JetBrains"},
-		{name: "Alias", input: "reconnecting-pty", wantFamily: idemetadata.FamilyReconnectingPTY, wantDisplayName: "Web Terminal"},
-		{name: "UnknownFallsBackToRawName", input: "SomeFutureIDE", wantFamily: idemetadata.FamilyUnknown, wantDisplayName: "SomeFutureIDE"},
+		{name: "VSCode", input: "vscode", want: idemetadata.AppNameVSCode},
+		{name: "VSCodeFork", input: "cursor", want: idemetadata.AppNameVSCode},
+		{name: "VSCodeInsidersHyphenated", input: "vscode-insiders", want: idemetadata.AppNameVSCode},
+		{name: "VSCodium", input: "codium", want: idemetadata.AppNameVSCode},
+		{name: "CaseInsensitive", input: "JetBrains", want: idemetadata.AppNameJetBrains},
+		{name: "Alias", input: "reconnecting-pty", want: idemetadata.AppNameReconnectingPTY},
+		{name: "Other", input: "other", want: idemetadata.AppNameUnknown},
+		{name: "UnknownName", input: "SomeFutureIDE", want: idemetadata.AppNameUnknown},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			info := idemetadata.Lookup(tc.input)
-			require.Equal(t, tc.wantFamily, info.Family)
-			require.Equal(t, tc.wantDisplayName, info.DisplayName)
+			require.Equal(t, tc.want, idemetadata.Family(tc.input))
 		})
 	}
 }

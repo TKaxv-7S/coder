@@ -57,11 +57,11 @@ func TestConnCounts(t *testing.T) {
 		"Cursor": 2,
 	}, s.ConnStats())
 
-	// The same counter instance is reused per type.
+	// The same counter instance is reused per type, and idle types are
+	// omitted from the snapshot.
 	s.getOrCreateConnCounter(MagicSessionType("Cursor")).Add(-2)
 	require.Equal(t, map[string]int64{
 		"ssh":    1,
 		"vscode": 1,
-		"Cursor": 0,
 	}, s.ConnStats())
 }

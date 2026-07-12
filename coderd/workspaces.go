@@ -29,7 +29,6 @@ import (
 	"github.com/coder/coder/v2/coderd/httpapi"
 	"github.com/coder/coder/v2/coderd/httpapi/httperror"
 	"github.com/coder/coder/v2/coderd/httpmw"
-	"github.com/coder/coder/v2/coderd/idemetadata"
 	"github.com/coder/coder/v2/coderd/notifications"
 	"github.com/coder/coder/v2/coderd/prebuilds"
 	"github.com/coder/coder/v2/coderd/rbac"
@@ -1788,14 +1787,10 @@ func (api *API) postWorkspaceUsage(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Any app name is accepted and stored raw; well-known legacy spellings
-	// (e.g. "reconnecting-pty") are canonicalized so they aggregate with
-	// agent-reported session types.
-	appName := idemetadata.Normalize(string(req.AppName))
-
+	// Any app name is accepted; it is normalized at stats ingestion.
 	stat := &proto.Stats{
 		ConnectionCount: 1,
-		SessionCounts:   map[string]int64{appName: 1},
+		SessionCounts:   map[string]int64{string(req.AppName): 1},
 	}
 
 	agent, err := api.Database.GetWorkspaceAgentByID(ctx, req.AgentID)

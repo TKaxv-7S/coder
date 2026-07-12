@@ -103,20 +103,12 @@ WITH stats AS (
 ), session_stats AS (
     -- Session counts from the latest stats row per agent.
     SELECT
-        coalesce(SUM(sc.vscode), 0)::bigint AS session_count_vscode,
-        coalesce(SUM(sc.ssh), 0)::bigint AS session_count_ssh,
-        coalesce(SUM(sc.jetbrains), 0)::bigint AS session_count_jetbrains,
-        coalesce(SUM(sc.reconnecting_pty), 0)::bigint AS session_count_reconnecting_pty
+        coalesce(SUM(sc.count) FILTER (WHERE sc.app_name = 'vscode'), 0)::bigint AS session_count_vscode,
+        coalesce(SUM(sc.count) FILTER (WHERE sc.app_name = 'ssh'), 0)::bigint AS session_count_ssh,
+        coalesce(SUM(sc.count) FILTER (WHERE sc.app_name = 'jetbrains'), 0)::bigint AS session_count_jetbrains,
+        coalesce(SUM(sc.count) FILTER (WHERE sc.app_name = 'reconnecting_pty'), 0)::bigint AS session_count_reconnecting_pty
     FROM stats
-    LEFT JOIN LATERAL (
-        SELECT
-            coalesce(SUM(count) FILTER (WHERE app_name = 'vscode'), 0)::bigint AS vscode,
-            coalesce(SUM(count) FILTER (WHERE app_name = 'ssh'), 0)::bigint AS ssh,
-            coalesce(SUM(count) FILTER (WHERE app_name = 'jetbrains'), 0)::bigint AS jetbrains,
-            coalesce(SUM(count) FILTER (WHERE app_name = 'reconnecting_pty'), 0)::bigint AS reconnecting_pty
-        FROM workspace_agent_session_counts
-        WHERE workspace_agent_stats_id = stats.id
-    ) sc ON TRUE
+    LEFT JOIN workspace_agent_session_counts sc ON sc.workspace_agent_stats_id = stats.id
     WHERE stats.rn = 1
 )
 SELECT * FROM byte_stats, session_stats;
@@ -136,21 +128,13 @@ minute_buckets AS (
 	SELECT
 		was.agent_id,
 		date_trunc('minute', was.created_at) AS minute_bucket,
-		coalesce(SUM(sc.vscode), 0)::bigint AS session_count_vscode,
-		coalesce(SUM(sc.ssh), 0)::bigint AS session_count_ssh,
-		coalesce(SUM(sc.jetbrains), 0)::bigint AS session_count_jetbrains,
-		coalesce(SUM(sc.reconnecting_pty), 0)::bigint AS session_count_reconnecting_pty
+		coalesce(SUM(sc.count) FILTER (WHERE sc.app_name = 'vscode'), 0)::bigint AS session_count_vscode,
+		coalesce(SUM(sc.count) FILTER (WHERE sc.app_name = 'ssh'), 0)::bigint AS session_count_ssh,
+		coalesce(SUM(sc.count) FILTER (WHERE sc.app_name = 'jetbrains'), 0)::bigint AS session_count_jetbrains,
+		coalesce(SUM(sc.count) FILTER (WHERE sc.app_name = 'reconnecting_pty'), 0)::bigint AS session_count_reconnecting_pty
 	FROM
 		workspace_agent_stats was
-	LEFT JOIN LATERAL (
-		SELECT
-			coalesce(SUM(count) FILTER (WHERE app_name = 'vscode'), 0)::bigint AS vscode,
-			coalesce(SUM(count) FILTER (WHERE app_name = 'ssh'), 0)::bigint AS ssh,
-			coalesce(SUM(count) FILTER (WHERE app_name = 'jetbrains'), 0)::bigint AS jetbrains,
-			coalesce(SUM(count) FILTER (WHERE app_name = 'reconnecting_pty'), 0)::bigint AS reconnecting_pty
-		FROM workspace_agent_session_counts
-		WHERE workspace_agent_stats_id = was.id
-	) sc ON TRUE
+	LEFT JOIN workspace_agent_session_counts sc ON sc.workspace_agent_stats_id = was.id
 	WHERE
 		was.created_at >= $1
 		AND was.created_at < date_trunc('minute', now())  -- Exclude current partial minute
@@ -203,23 +187,15 @@ WITH agent_stats AS (
 ), latest_agent_stats AS (
 	SELECT
 		a.agent_id,
-		coalesce(SUM(sc.vscode), 0)::bigint AS session_count_vscode,
-		coalesce(SUM(sc.ssh), 0)::bigint AS session_count_ssh,
-		coalesce(SUM(sc.jetbrains), 0)::bigint AS session_count_jetbrains,
-		coalesce(SUM(sc.reconnecting_pty), 0)::bigint AS session_count_reconnecting_pty
+		coalesce(SUM(sc.count) FILTER (WHERE sc.app_name = 'vscode'), 0)::bigint AS session_count_vscode,
+		coalesce(SUM(sc.count) FILTER (WHERE sc.app_name = 'ssh'), 0)::bigint AS session_count_ssh,
+		coalesce(SUM(sc.count) FILTER (WHERE sc.app_name = 'jetbrains'), 0)::bigint AS session_count_jetbrains,
+		coalesce(SUM(sc.count) FILTER (WHERE sc.app_name = 'reconnecting_pty'), 0)::bigint AS session_count_reconnecting_pty
 	 FROM (
 		SELECT *, ROW_NUMBER() OVER(PARTITION BY agent_id ORDER BY created_at DESC) AS rn
 		FROM workspace_agent_stats WHERE created_at > $1
 	) AS a
-	LEFT JOIN LATERAL (
-		SELECT
-			coalesce(SUM(count) FILTER (WHERE app_name = 'vscode'), 0)::bigint AS vscode,
-			coalesce(SUM(count) FILTER (WHERE app_name = 'ssh'), 0)::bigint AS ssh,
-			coalesce(SUM(count) FILTER (WHERE app_name = 'jetbrains'), 0)::bigint AS jetbrains,
-			coalesce(SUM(count) FILTER (WHERE app_name = 'reconnecting_pty'), 0)::bigint AS reconnecting_pty
-		FROM workspace_agent_session_counts
-		WHERE workspace_agent_stats_id = a.id
-	) sc ON TRUE
+	LEFT JOIN workspace_agent_session_counts sc ON sc.workspace_agent_stats_id = a.id
 	WHERE a.rn = 1 GROUP BY a.user_id, a.agent_id, a.workspace_id, a.template_id
 )
 SELECT * FROM agent_stats JOIN latest_agent_stats ON agent_stats.agent_id = latest_agent_stats.agent_id;
@@ -245,21 +221,13 @@ minute_buckets AS (
 	SELECT
 		was.agent_id,
 		date_trunc('minute', was.created_at) AS minute_bucket,
-		coalesce(SUM(sc.vscode), 0)::bigint AS session_count_vscode,
-		coalesce(SUM(sc.ssh), 0)::bigint AS session_count_ssh,
-		coalesce(SUM(sc.jetbrains), 0)::bigint AS session_count_jetbrains,
-		coalesce(SUM(sc.reconnecting_pty), 0)::bigint AS session_count_reconnecting_pty
+		coalesce(SUM(sc.count) FILTER (WHERE sc.app_name = 'vscode'), 0)::bigint AS session_count_vscode,
+		coalesce(SUM(sc.count) FILTER (WHERE sc.app_name = 'ssh'), 0)::bigint AS session_count_ssh,
+		coalesce(SUM(sc.count) FILTER (WHERE sc.app_name = 'jetbrains'), 0)::bigint AS session_count_jetbrains,
+		coalesce(SUM(sc.count) FILTER (WHERE sc.app_name = 'reconnecting_pty'), 0)::bigint AS session_count_reconnecting_pty
 	FROM
 		workspace_agent_stats was
-	LEFT JOIN LATERAL (
-		SELECT
-			coalesce(SUM(count) FILTER (WHERE app_name = 'vscode'), 0)::bigint AS vscode,
-			coalesce(SUM(count) FILTER (WHERE app_name = 'ssh'), 0)::bigint AS ssh,
-			coalesce(SUM(count) FILTER (WHERE app_name = 'jetbrains'), 0)::bigint AS jetbrains,
-			coalesce(SUM(count) FILTER (WHERE app_name = 'reconnecting_pty'), 0)::bigint AS reconnecting_pty
-		FROM workspace_agent_session_counts
-		WHERE workspace_agent_stats_id = was.id
-	) sc ON TRUE
+	LEFT JOIN workspace_agent_session_counts sc ON sc.workspace_agent_stats_id = was.id
 	WHERE
 		was.created_at >= $1
 		AND was.created_at < date_trunc('minute', now())  -- Exclude current partial minute

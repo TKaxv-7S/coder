@@ -17,10 +17,21 @@ func TestSessionCountsFromProto(t *testing.T) {
 		t.Parallel()
 		//nolint:staticcheck // Deprecated fields are set to verify precedence.
 		st := &agentproto.Stats{
-			SessionCounts:      map[string]int64{"Cursor": 2, "ssh": 1},
+			SessionCounts:      map[string]int64{"cursor": 2, "ssh": 1},
 			SessionCountVscode: 9,
 		}
-		require.Equal(t, map[string]int64{"Cursor": 2, "ssh": 1}, workspacestats.SessionCountsFromProto(st))
+		require.Equal(t, map[string]int64{"cursor": 2, "ssh": 1}, workspacestats.SessionCountsFromProto(st))
+	})
+
+	t.Run("NormalizesAndMergesNames", func(t *testing.T) {
+		t.Parallel()
+		st := &agentproto.Stats{
+			SessionCounts: map[string]int64{"VSCode": 1, "vscode": 2, "Reconnecting-PTY": 1},
+		}
+		require.Equal(t, map[string]int64{
+			"vscode":           3,
+			"reconnecting_pty": 1,
+		}, workspacestats.SessionCountsFromProto(st))
 	})
 
 	t.Run("DropsNonPositiveEntries", func(t *testing.T) {
@@ -76,6 +87,20 @@ func TestSessionCountsFromProto(t *testing.T) {
 		t.Parallel()
 		require.Empty(t, workspacestats.SessionCountsFromProto(&agentproto.Stats{}))
 	})
+}
+
+func TestHasSessionCounts(t *testing.T) {
+	t.Parallel()
+
+	require.False(t, workspacestats.HasSessionCounts(&agentproto.Stats{}))
+	require.False(t, workspacestats.HasSessionCounts(&agentproto.Stats{
+		SessionCounts: map[string]int64{"ssh": 0},
+	}))
+	require.True(t, workspacestats.HasSessionCounts(&agentproto.Stats{
+		SessionCounts: map[string]int64{"ssh": 1},
+	}))
+	//nolint:staticcheck // Deprecated fields simulate an old agent.
+	require.True(t, workspacestats.HasSessionCounts(&agentproto.Stats{SessionCountJetbrains: 1}))
 }
 
 func TestClearSessionCounts(t *testing.T) {

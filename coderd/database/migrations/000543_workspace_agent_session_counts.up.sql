@@ -6,18 +6,21 @@ CREATE TABLE workspace_agent_session_counts (
 );
 
 COMMENT ON TABLE workspace_agent_session_counts IS 'Session counts per app for each workspace agent stats row. Rows are removed together with their parent workspace_agent_stats row.';
-COMMENT ON COLUMN workspace_agent_session_counts.app_name IS 'App identifier as reported by the client (e.g. vscode, jetbrains, ssh, reconnecting_pty). Stored raw; display names and family grouping are applied at the API boundary.';
+COMMENT ON COLUMN workspace_agent_session_counts.app_name IS 'App identifier as reported by the client (e.g. vscode, jetbrains, ssh, reconnecting_pty), canonicalized at ingestion. Family grouping is applied at read time.';
 
 -- Copy the ephemeral buffer (~1 day of rows) into the new table so that
 -- template usage rollup and deployment stats see no gap during the upgrade.
 INSERT INTO workspace_agent_session_counts (workspace_agent_stats_id, app_name, count)
-SELECT id, 'vscode', session_count_vscode FROM workspace_agent_stats WHERE session_count_vscode > 0
-UNION ALL
-SELECT id, 'jetbrains', session_count_jetbrains FROM workspace_agent_stats WHERE session_count_jetbrains > 0
-UNION ALL
-SELECT id, 'reconnecting_pty', session_count_reconnecting_pty FROM workspace_agent_stats WHERE session_count_reconnecting_pty > 0
-UNION ALL
-SELECT id, 'ssh', session_count_ssh FROM workspace_agent_stats WHERE session_count_ssh > 0;
+SELECT s.id, v.app_name, v.count
+FROM workspace_agent_stats s
+CROSS JOIN LATERAL (
+	VALUES
+		('vscode', s.session_count_vscode),
+		('jetbrains', s.session_count_jetbrains),
+		('reconnecting_pty', s.session_count_reconnecting_pty),
+		('ssh', s.session_count_ssh)
+) v(app_name, count)
+WHERE v.count > 0;
 
 DROP INDEX workspace_agent_stats_template_id_created_at_user_id_idx;
 

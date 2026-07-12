@@ -3788,7 +3788,7 @@ CREATE TABLE workspace_agent_session_counts (
 
 COMMENT ON TABLE workspace_agent_session_counts IS 'Session counts per app for each workspace agent stats row. Rows are removed together with their parent workspace_agent_stats row.';
 
-COMMENT ON COLUMN workspace_agent_session_counts.app_name IS 'App identifier as reported by the client (e.g. vscode, jetbrains, ssh, reconnecting_pty). Stored raw; display names and family grouping are applied at the API boundary.';
+COMMENT ON COLUMN workspace_agent_session_counts.app_name IS 'App identifier as reported by the client (e.g. vscode, jetbrains, ssh, reconnecting_pty), canonicalized at ingestion. Family grouping is applied at read time.';
 
 CREATE SEQUENCE workspace_agent_startup_logs_id_seq
     START WITH 1

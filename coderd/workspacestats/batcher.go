@@ -243,17 +243,8 @@ func (b *DBBatcher) flush(ctx context.Context, forced bool, reason string) {
 		b.buf.ConnectionsByProto = payload
 	}
 
-	// marshal session counts. The JSONB array is zipped with the ID array
-	// by position, so it must have one element per stats row. On mismatch,
-	// drop the session counts (parent stats still insert) rather than
-	// misattribute them.
-	if len(b.sessionCounts) != len(b.buf.ID) {
-		b.log.Error(ctx, "session counts buffer out of sync with stats buffer, dropping session counts",
-			slog.F("stats", len(b.buf.ID)),
-			slog.F("session_counts", len(b.sessionCounts)),
-		)
-		b.sessionCounts = b.sessionCounts[:0]
-	}
+	// marshal session counts; the JSONB array is zipped with the ID array
+	// by position on insert
 	sessionCountsPayload, err := json.Marshal(b.sessionCounts)
 	if err != nil {
 		b.log.Error(ctx, "unable to marshal agent session counts, dropping data", slog.Error(err))

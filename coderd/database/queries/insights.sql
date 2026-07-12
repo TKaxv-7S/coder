@@ -167,9 +167,8 @@ WITH
 			MAX(was.connection_count) > 0 AS has_connection
 		FROM
 			workspace_agent_stats was
-		-- The join supplies the session counts and filters out rows without
-		-- session activity in one hash-joinable pass; the DISTINCT/MAX
-		-- aggregates above tolerate the row fan-out.
+		-- The join filters out rows without session activity; the
+		-- DISTINCT/MAX aggregates above tolerate the row fan-out.
 		JOIN
 			workspace_agent_session_counts sc
 		ON
@@ -571,9 +570,8 @@ WITH
 			MAX(was.connection_count) > 0 AS has_connection
 		FROM
 			workspace_agent_stats was
-		-- The join supplies the session counts and filters out rows without
-		-- session activity in one hash-joinable pass; the DISTINCT/MAX
-		-- aggregates above tolerate the row fan-out.
+		-- The join filters out rows without session activity; the
+		-- DISTINCT/MAX aggregates above tolerate the row fan-out.
 		JOIN
 			workspace_agent_session_counts sc
 		ON

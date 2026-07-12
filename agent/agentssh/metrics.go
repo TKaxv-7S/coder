@@ -74,5 +74,5 @@ func newSSHServerMetrics(registerer prometheus.Registerer) *sshServerMetrics {
 func magicTypeMetricLabel(magicType MagicSessionType) string {
 	// Label by family to keep metric cardinality bounded while arbitrary
 	// session types flow through.
-	return idemetadata.Lookup(string(magicType)).Family
+	return idemetadata.Family(string(magicType))
 }

@@ -1675,8 +1675,8 @@ func TemplateVersionTerraformValues(t testing.TB, db database.Store, orig databa
 	return v
 }
 
-// WorkspaceAgentStat inserts a workspace agent stat row. Pass at most one
-// map to seed the workspace_agent_session_counts child table.
+// WorkspaceAgentStat inserts a workspace agent stat row. An optional map
+// seeds the workspace_agent_session_counts child table.
 func WorkspaceAgentStat(t testing.TB, db database.Store, orig database.WorkspaceAgentStat, sessionCounts ...map[string]int64) database.WorkspaceAgentStat {
 	if orig.ConnectionsByProto == nil {
 		orig.ConnectionsByProto = json.RawMessage([]byte("{}"))
@@ -1684,12 +1684,8 @@ func WorkspaceAgentStat(t testing.TB, db database.Store, orig database.Workspace
 	jsonProto := []byte(fmt.Sprintf("[%s]", orig.ConnectionsByProto))
 
 	counts := map[string]int64{}
-	switch len(sessionCounts) {
-	case 0:
-	case 1:
+	if len(sessionCounts) > 0 {
 		counts = sessionCounts[0]
-	default:
-		t.Fatalf("expected at most one session counts map, got %d", len(sessionCounts))
 	}
 	jsonSessionCounts, err := json.Marshal([]map[string]int64{counts})
 	require.NoError(t, err, "marshal session counts")
