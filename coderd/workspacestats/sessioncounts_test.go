@@ -1,6 +1,7 @@
 package workspacestats_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -53,6 +54,22 @@ func TestSessionCountsFromProto(t *testing.T) {
 			SessionCounts: map[string]int64{"ssh": 0, "reconnecting_pty": 0},
 		}
 		require.Empty(t, workspacestats.SessionCountsFromProto(st))
+	})
+
+	t.Run("CapsEntriesAggregatingIntoOther", func(t *testing.T) {
+		t.Parallel()
+		sessionCounts := map[string]int64{"vscode": 5}
+		for i := range 200 {
+			sessionCounts[fmt.Sprintf("zz-ide-%03d", i)] = 1
+		}
+		got := workspacestats.SessionCountsFromProto(&agentproto.Stats{SessionCounts: sessionCounts})
+		// 64 named entries (well-known first, then lexicographic) plus
+		// "other" holding the 137 overflow counts.
+		require.Len(t, got, 65)
+		require.EqualValues(t, 5, got["vscode"])
+		require.EqualValues(t, 1, got["zz-ide-000"])
+		require.EqualValues(t, 137, got["other"])
+		require.NotContains(t, got, "zz-ide-199")
 	})
 
 	t.Run("Empty", func(t *testing.T) {

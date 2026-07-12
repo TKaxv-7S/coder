@@ -15618,10 +15618,10 @@ WITH
 		SELECT
 			was.template_id,
 			was.user_id,
-			COUNT(DISTINCT CASE WHEN sc.ssh > 0 THEN date_trunc('minute', was.created_at) ELSE NULL END) AS ssh_mins,
-			COUNT(DISTINCT CASE WHEN sc.reconnecting_pty > 0 THEN date_trunc('minute', was.created_at) ELSE NULL END) AS reconnecting_pty_mins,
-			COUNT(DISTINCT CASE WHEN sc.vscode > 0 THEN date_trunc('minute', was.created_at) ELSE NULL END) AS vscode_mins,
-			COUNT(DISTINCT CASE WHEN sc.jetbrains > 0 THEN date_trunc('minute', was.created_at) ELSE NULL END) AS jetbrains_mins,
+			COUNT(DISTINCT CASE WHEN sc.app_name = 'ssh' THEN date_trunc('minute', was.created_at) ELSE NULL END) AS ssh_mins,
+			COUNT(DISTINCT CASE WHEN sc.app_name = 'reconnecting_pty' THEN date_trunc('minute', was.created_at) ELSE NULL END) AS reconnecting_pty_mins,
+			COUNT(DISTINCT CASE WHEN sc.app_name = 'vscode' THEN date_trunc('minute', was.created_at) ELSE NULL END) AS vscode_mins,
+			COUNT(DISTINCT CASE WHEN sc.app_name = 'jetbrains' THEN date_trunc('minute', was.created_at) ELSE NULL END) AS jetbrains_mins,
 			-- NOTE(mafredri): The agent stats are currently very unreliable, and
 			-- sometimes the connections are missing, even during active sessions.
 			-- Since we can't fully rely on this, we check for "any connection
@@ -15629,26 +15629,18 @@ WITH
 			MAX(was.connection_count) > 0 AS has_connection
 		FROM
 			workspace_agent_stats was
-		-- One lateral row per stats row, so the aggregates above don't fan out.
-		LEFT JOIN LATERAL (
-			SELECT
-				coalesce(SUM(count) FILTER (WHERE app_name = 'ssh'), 0)::bigint AS ssh,
-				coalesce(SUM(count) FILTER (WHERE app_name = 'reconnecting_pty'), 0)::bigint AS reconnecting_pty,
-				coalesce(SUM(count) FILTER (WHERE app_name = 'vscode'), 0)::bigint AS vscode,
-				coalesce(SUM(count) FILTER (WHERE app_name = 'jetbrains'), 0)::bigint AS jetbrains
-			FROM workspace_agent_session_counts
-			WHERE workspace_agent_stats_id = was.id
-		) sc ON TRUE
+		-- The join supplies the session counts and filters out rows without
+		-- session activity in one hash-joinable pass; the DISTINCT/MAX
+		-- aggregates above tolerate the row fan-out.
+		JOIN
+			workspace_agent_session_counts sc
+		ON
+			sc.workspace_agent_stats_id = was.id
+			AND sc.count > 0
+			AND sc.app_name IN ('ssh', 'reconnecting_pty', 'vscode', 'jetbrains')
 		WHERE
 			was.created_at >= $1::timestamptz
 			AND was.created_at < $2::timestamptz
-			-- Inclusion criteria to filter out empty results.
-			AND (
-				sc.ssh > 0
-				OR sc.reconnecting_pty > 0
-				OR sc.vscode > 0
-				OR sc.jetbrains > 0
-			)
 		GROUP BY
 			was.template_id, was.user_id
 	)
@@ -16258,23 +16250,13 @@ WITH
 			was.template_id,
 			was.user_id,
 			-- Store each unique minute bucket for later merge between datasets.
-			array_agg(
-				DISTINCT CASE
-				WHEN
-					sc.ssh > 0
-					OR sc.reconnecting_pty > 0
-					OR sc.vscode > 0
-					OR sc.jetbrains > 0
-				THEN
-					date_trunc('minute', was.created_at)
-				ELSE
-					NULL
-				END
-			) AS minute_buckets,
-			COUNT(DISTINCT CASE WHEN sc.ssh > 0 THEN date_trunc('minute', was.created_at) ELSE NULL END) AS ssh_mins,
-			COUNT(DISTINCT CASE WHEN sc.reconnecting_pty > 0 THEN date_trunc('minute', was.created_at) ELSE NULL END) AS reconnecting_pty_mins,
-			COUNT(DISTINCT CASE WHEN sc.vscode > 0 THEN date_trunc('minute', was.created_at) ELSE NULL END) AS vscode_mins,
-			COUNT(DISTINCT CASE WHEN sc.jetbrains > 0 THEN date_trunc('minute', was.created_at) ELSE NULL END) AS jetbrains_mins,
+			-- The join filters out rows without session activity, so every
+			-- remaining row contributes its minute.
+			array_agg(DISTINCT date_trunc('minute', was.created_at)) AS minute_buckets,
+			COUNT(DISTINCT CASE WHEN sc.app_name = 'ssh' THEN date_trunc('minute', was.created_at) ELSE NULL END) AS ssh_mins,
+			COUNT(DISTINCT CASE WHEN sc.app_name = 'reconnecting_pty' THEN date_trunc('minute', was.created_at) ELSE NULL END) AS reconnecting_pty_mins,
+			COUNT(DISTINCT CASE WHEN sc.app_name = 'vscode' THEN date_trunc('minute', was.created_at) ELSE NULL END) AS vscode_mins,
+			COUNT(DISTINCT CASE WHEN sc.app_name = 'jetbrains' THEN date_trunc('minute', was.created_at) ELSE NULL END) AS jetbrains_mins,
 			-- NOTE(mafredri): The agent stats are currently very unreliable, and
 			-- sometimes the connections are missing, even during active sessions.
 			-- Since we can't fully rely on this, we check for "any connection
@@ -16282,28 +16264,20 @@ WITH
 			MAX(was.connection_count) > 0 AS has_connection
 		FROM
 			workspace_agent_stats was
-		-- One lateral row per stats row, so the aggregates above don't fan out.
-		LEFT JOIN LATERAL (
-			SELECT
-				coalesce(SUM(count) FILTER (WHERE app_name = 'ssh'), 0)::bigint AS ssh,
-				coalesce(SUM(count) FILTER (WHERE app_name = 'reconnecting_pty'), 0)::bigint AS reconnecting_pty,
-				coalesce(SUM(count) FILTER (WHERE app_name = 'vscode'), 0)::bigint AS vscode,
-				coalesce(SUM(count) FILTER (WHERE app_name = 'jetbrains'), 0)::bigint AS jetbrains
-			FROM workspace_agent_session_counts
-			WHERE workspace_agent_stats_id = was.id
-		) sc ON TRUE
+		-- The join supplies the session counts and filters out rows without
+		-- session activity in one hash-joinable pass; the DISTINCT/MAX
+		-- aggregates above tolerate the row fan-out.
+		JOIN
+			workspace_agent_session_counts sc
+		ON
+			sc.workspace_agent_stats_id = was.id
+			AND sc.count > 0
+			AND sc.app_name IN ('ssh', 'reconnecting_pty', 'vscode', 'jetbrains')
 		WHERE
 			-- created_at >= @start_time::timestamptz
 			-- AND created_at < @end_time::timestamptz
 			was.created_at >= (SELECT t FROM latest_start)
 			AND was.created_at < NOW()
-			-- Inclusion criteria to filter out empty results.
-			AND (
-				sc.ssh > 0
-				OR sc.reconnecting_pty > 0
-				OR sc.vscode > 0
-				OR sc.jetbrains > 0
-			)
 		GROUP BY
 			time_bucket, was.template_id, was.user_id
 	),

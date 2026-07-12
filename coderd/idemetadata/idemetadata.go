@@ -21,6 +21,8 @@ const (
 	AppNameSSH             = "ssh"
 	AppNameReconnectingPTY = "reconnecting_pty"
 	AppNameUnknown         = "unknown"
+	// AppNameOther aggregates session counts beyond the per-report entry cap.
+	AppNameOther = "other"
 )
 
 // Families group related session types for display and for metric labels,
@@ -52,6 +54,7 @@ var known = map[string]IDEInfo{
 	AppNameSSH:             {Family: FamilySSH, DisplayName: "SSH"},
 	AppNameReconnectingPTY: {Family: FamilyReconnectingPTY, DisplayName: "Web Terminal"},
 	AppNameUnknown:         {Family: FamilyUnknown, DisplayName: "Unknown"},
+	AppNameOther:           {Family: FamilyUnknown, DisplayName: "Other"},
 }
 
 // aliases maps well-known legacy spellings (lowercase) to canonical app
