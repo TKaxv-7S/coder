@@ -425,16 +425,16 @@ func TestDRPCAgentSocketService(t *testing.T) {
 			got := make([]eventShape, 0, len(events))
 			wantSeq := uint64(1)
 			for _, ev := range events {
-				// Seq is contiguous from 1 and matches the response order.
-				require.Equal(t, wantSeq, ev.Seq)
+				// SequenceNumber is contiguous from 1 and matches the response order.
+				require.Equal(t, wantSeq, ev.SequenceNumber)
 				wantSeq++
 				require.False(t, ev.Time.IsZero())
 				got = append(got, eventShape{
 					kind:           ev.Kind,
-					unitID:         ev.Unit,
-					from:           ev.From,
-					to:             ev.To,
-					dependsOn:      ev.DependsOn,
+					unitID:         ev.UnitID,
+					from:           ev.FromStatus,
+					to:             ev.ToStatus,
+					dependsOn:      ev.DependsOnUnit,
 					requiredStatus: ev.RequiredStatus,
 				})
 			}
@@ -475,12 +475,12 @@ func TestDRPCAgentSocketService(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, status.History, 3)
 		for _, ev := range status.History {
-			require.Equal(t, unit.ID("test-unit"), ev.Unit)
+			require.Equal(t, unit.ID("test-unit"), ev.UnitID)
 			require.Equal(t, unit.EventStatusChange, ev.Kind)
 		}
-		require.Equal(t, unit.StatusPending, status.History[0].To)
-		require.Equal(t, unit.StatusStarted, status.History[1].To)
-		require.Equal(t, unit.StatusComplete, status.History[2].To)
+		require.Equal(t, unit.StatusPending, status.History[0].ToStatus)
+		require.Equal(t, unit.StatusStarted, status.History[1].ToStatus)
+		require.Equal(t, unit.StatusComplete, status.History[2].ToStatus)
 	})
 
 	t.Run("UpdateAppStatus", func(t *testing.T) {

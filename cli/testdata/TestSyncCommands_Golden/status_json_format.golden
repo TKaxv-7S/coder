@@ -12,18 +12,18 @@
   ],
   "history": [
     {
-      "seq": 1,
+      "sequence_number": 1,
       "time": "====[timestamp]=====",
       "kind": "status_change",
-      "unit": "test-unit",
-      "to": "pending"
+      "unit_id": "test-unit",
+      "to_status": "pending"
     },
     {
-      "seq": 2,
+      "sequence_number": 2,
       "time": "====[timestamp]=====",
       "kind": "dependency_added",
-      "unit": "test-unit",
-      "depends_on": "dep-unit",
+      "unit_id": "test-unit",
+      "depends_on_unit": "dep-unit",
       "required_status": "completed"
     }
   ]

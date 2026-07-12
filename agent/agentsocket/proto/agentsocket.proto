@@ -62,19 +62,19 @@ message SyncStatusResponse {
 // UnitEvent is an immutable record of a change to the dependency graph:
 // either a unit status transition or a dependency declaration.
 message UnitEvent {
-  // seq is a monotonic, agent-global sequence number. Within one agent,
-  // seq order equals time order.
-  uint64 seq = 1;
+  // sequence_number is a monotonic, agent-global sequence number. Within one
+  // agent, sequence_number order equals time order.
+  uint64 sequence_number = 1;
   google.protobuf.Timestamp time = 2;
   // kind is "status_change" or "dependency_added".
   string kind = 3;
-  string unit = 4;
-  // from and to are set for status_change events. from is empty for the
-  // initial registration event.
-  string from = 5;
-  string to = 6;
-  // depends_on and required_status are set for dependency_added events.
-  string depends_on = 7;
+  string unit_id = 4;
+  // from_status and to_status are set for status_change events. from_status is
+  // empty for the initial registration event.
+  string from_status = 5;
+  string to_status = 6;
+  // depends_on_unit and required_status are set for dependency_added events.
+  string depends_on_unit = 7;
   string required_status = 8;
 }
 

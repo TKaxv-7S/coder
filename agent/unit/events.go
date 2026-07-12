@@ -17,24 +17,24 @@ const (
 )
 
 // Event is an immutable record of a change to the dependency graph.
-// Events are appended by the Manager under its write lock, so Seq order
-// equals Time order within a single Manager.
+// Events are appended by the Manager under its write lock, so SequenceNumber
+// order equals Time order within a single Manager.
 type Event struct {
-	// Seq is a monotonic, Manager-global sequence number.
-	Seq uint64
+	// SequenceNumber is a monotonic, Manager-global sequence number.
+	SequenceNumber uint64
 	// Time is captured from the Manager's clock at the point of the
 	// change, inside the write lock. It is monotonic-clock-backed.
 	Time time.Time
 	Kind EventKind
-	// Unit is the unit the event applies to.
-	Unit ID
+	// UnitID is the unit the event applies to.
+	UnitID ID
 
-	// From and To are set for EventStatusChange. From is
+	// FromStatus and ToStatus are set for EventStatusChange. FromStatus is
 	// StatusNotRegistered for the registration event.
-	From Status
-	To   Status
+	FromStatus Status
+	ToStatus   Status
 
-	// DependsOn and RequiredStatus are set for EventDependencyAdded.
-	DependsOn      ID
+	// DependsOnUnit and RequiredStatus are set for EventDependencyAdded.
+	DependsOnUnit  ID
 	RequiredStatus Status
 }

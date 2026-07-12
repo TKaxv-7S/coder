@@ -93,10 +93,10 @@ type Manager struct {
 	clock quartz.Clock
 
 	// events is an append-only log of every successful graph mutation,
-	// ordered by seq. Timestamps are captured under the write lock, so
-	// seq order equals time order.
-	events []Event
-	seq    uint64
+	// ordered by sequence number. Timestamps are captured under the write
+	// lock, so sequence order equals time order.
+	events         []Event
+	sequenceNumber uint64
 }
 
 // Option configures a Manager.
@@ -136,13 +136,13 @@ func (m *Manager) appendEventUnsafe(ev Event) {
 	if len(m.events) >= maxEvents {
 		return
 	}
-	m.seq++
-	ev.Seq = m.seq
+	m.sequenceNumber++
+	ev.SequenceNumber = m.sequenceNumber
 	ev.Time = m.clock.Now()
 	m.events = append(m.events, ev)
 }
 
-// Events returns a copy of the full event log, ordered by Seq.
+// Events returns a copy of the full event log, ordered by SequenceNumber.
 func (m *Manager) Events() []Event {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -173,10 +173,10 @@ func (m *Manager) Register(id ID) error {
 	}
 
 	m.appendEventUnsafe(Event{
-		Kind: EventStatusChange,
-		Unit: id,
-		From: StatusNotRegistered,
-		To:   StatusPending,
+		Kind:       EventStatusChange,
+		UnitID:     id,
+		FromStatus: StatusNotRegistered,
+		ToStatus:   StatusPending,
 	})
 
 	return nil
@@ -240,8 +240,8 @@ func (m *Manager) AddDependency(unit ID, dependsOn ID, requiredStatus Status) er
 
 	m.appendEventUnsafe(Event{
 		Kind:           EventDependencyAdded,
-		Unit:           unit,
-		DependsOn:      dependsOn,
+		UnitID:         unit,
+		DependsOnUnit:  dependsOn,
 		RequiredStatus: requiredStatus,
 	})
 
@@ -273,10 +273,10 @@ func (m *Manager) UpdateStatus(unit ID, newStatus Status) error {
 	m.units[unit] = u
 
 	m.appendEventUnsafe(Event{
-		Kind: EventStatusChange,
-		Unit: unit,
-		From: oldStatus,
-		To:   newStatus,
+		Kind:       EventStatusChange,
+		UnitID:     unit,
+		FromStatus: oldStatus,
+		ToStatus:   newStatus,
 	})
 
 	// Get all units that depend on this one (reverse adjacent vertices)

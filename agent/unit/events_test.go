@@ -24,10 +24,10 @@ func TestManager_Events(t *testing.T) {
 		events := manager.Events()
 		require.Len(t, events, 1)
 		require.Equal(t, unit.EventStatusChange, events[0].Kind)
-		require.Equal(t, unitA, events[0].Unit)
-		require.Equal(t, unit.StatusNotRegistered, events[0].From)
-		require.Equal(t, unit.StatusPending, events[0].To)
-		require.Equal(t, uint64(1), events[0].Seq)
+		require.Equal(t, unitA, events[0].UnitID)
+		require.Equal(t, unit.StatusNotRegistered, events[0].FromStatus)
+		require.Equal(t, unit.StatusPending, events[0].ToStatus)
+		require.Equal(t, uint64(1), events[0].SequenceNumber)
 		require.Equal(t, clock.Now(), events[0].Time)
 	})
 
@@ -46,14 +46,14 @@ func TestManager_Events(t *testing.T) {
 		events := manager.Events()
 		require.Len(t, events, 3)
 
-		require.Equal(t, unit.StatusPending, events[1].From)
-		require.Equal(t, unit.StatusStarted, events[1].To)
-		require.Equal(t, unit.StatusStarted, events[2].From)
-		require.Equal(t, unit.StatusComplete, events[2].To)
+		require.Equal(t, unit.StatusPending, events[1].FromStatus)
+		require.Equal(t, unit.StatusStarted, events[1].ToStatus)
+		require.Equal(t, unit.StatusStarted, events[2].FromStatus)
+		require.Equal(t, unit.StatusComplete, events[2].ToStatus)
 
-		// Seq is strictly increasing and matches time order.
-		require.Equal(t, uint64(2), events[1].Seq)
-		require.Equal(t, uint64(3), events[2].Seq)
+		// SequenceNumber is strictly increasing and matches time order.
+		require.Equal(t, uint64(2), events[1].SequenceNumber)
+		require.Equal(t, uint64(3), events[2].SequenceNumber)
 		require.True(t, events[1].Time.Before(events[2].Time))
 	})
 
@@ -91,8 +91,8 @@ func TestManager_Events(t *testing.T) {
 		events := manager.Events()
 		require.Len(t, events, 2)
 		require.Equal(t, unit.EventDependencyAdded, events[1].Kind)
-		require.Equal(t, unitA, events[1].Unit)
-		require.Equal(t, unitB, events[1].DependsOn)
+		require.Equal(t, unitA, events[1].UnitID)
+		require.Equal(t, unitB, events[1].DependsOnUnit)
 		require.Equal(t, unit.StatusComplete, events[1].RequiredStatus)
 	})
 
@@ -139,7 +139,7 @@ func TestManager_Events(t *testing.T) {
 		require.Len(t, events, 6)
 		want := uint64(1)
 		for i, ev := range events {
-			require.Equal(t, want, ev.Seq)
+			require.Equal(t, want, ev.SequenceNumber)
 			want++
 			if i > 0 {
 				require.True(t, events[i-1].Time.Before(ev.Time))
@@ -155,9 +155,9 @@ func TestManager_Events(t *testing.T) {
 		require.NoError(t, manager.Register(unitA))
 
 		events := manager.Events()
-		events[0].Unit = unitB
+		events[0].UnitID = unitB
 
-		require.Equal(t, unitA, manager.Events()[0].Unit)
+		require.Equal(t, unitA, manager.Events()[0].UnitID)
 	})
 
 	t.Run("DefaultClock", func(t *testing.T) {

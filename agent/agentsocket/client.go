@@ -166,13 +166,13 @@ func (c *Client) SyncTimeline(ctx context.Context) ([]UnitEvent, error) {
 
 func unitEventFromProto(ev *proto.UnitEvent) UnitEvent {
 	return UnitEvent{
-		Seq:            ev.GetSeq(),
+		SequenceNumber: ev.GetSequenceNumber(),
 		Time:           ev.GetTime().AsTime(),
 		Kind:           unit.EventKind(ev.GetKind()),
-		Unit:           unit.ID(ev.GetUnit()),
-		From:           unit.Status(ev.GetFrom()),
-		To:             unit.Status(ev.GetTo()),
-		DependsOn:      unit.ID(ev.GetDependsOn()),
+		UnitID:         unit.ID(ev.GetUnitId()),
+		FromStatus:     unit.Status(ev.GetFromStatus()),
+		ToStatus:       unit.Status(ev.GetToStatus()),
+		DependsOnUnit:  unit.ID(ev.GetDependsOnUnit()),
 		RequiredStatus: unit.Status(ev.GetRequiredStatus()),
 	}
 }
@@ -314,13 +314,13 @@ type DependencyInfo struct {
 // UnitEvent is an immutable record of a change to the dependency graph:
 // either a unit status transition or a dependency declaration.
 type UnitEvent struct {
-	Seq            uint64         `table:"seq,default_sort" json:"seq"`
+	SequenceNumber uint64         `table:"sequence_number,default_sort" json:"sequence_number"`
 	Time           time.Time      `table:"time" json:"time"`
 	Kind           unit.EventKind `table:"kind" json:"kind"`
-	Unit           unit.ID        `table:"unit" json:"unit"`
-	From           unit.Status    `table:"from" json:"from,omitempty"`
-	To             unit.Status    `table:"to" json:"to,omitempty"`
-	DependsOn      unit.ID        `table:"depends on" json:"depends_on,omitempty"`
+	UnitID         unit.ID        `table:"unit" json:"unit_id"`
+	FromStatus     unit.Status    `table:"from" json:"from_status,omitempty"`
+	ToStatus       unit.Status    `table:"to" json:"to_status,omitempty"`
+	DependsOnUnit  unit.ID        `table:"depends on" json:"depends_on_unit,omitempty"`
 	RequiredStatus unit.Status    `table:"required status" json:"required_status,omitempty"`
 }
 

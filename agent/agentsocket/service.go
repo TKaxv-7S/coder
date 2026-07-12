@@ -189,7 +189,7 @@ func (s *DRPCAgentSocketService) SyncStatus(_ context.Context, req *proto.SyncSt
 
 	var history []*proto.UnitEvent
 	for _, ev := range s.unitManager.Events() {
-		if ev.Unit != unitID {
+		if ev.UnitID != unitID {
 			continue
 		}
 		history = append(history, unitEventToProto(ev))
@@ -245,13 +245,13 @@ func (s *DRPCAgentSocketService) SyncTimeline(_ context.Context, _ *proto.SyncTi
 // unitEventToProto converts a unit.Event to its on-wire form.
 func unitEventToProto(ev unit.Event) *proto.UnitEvent {
 	return &proto.UnitEvent{
-		Seq:            ev.Seq,
+		SequenceNumber: ev.SequenceNumber,
 		Time:           timestamppb.New(ev.Time),
 		Kind:           string(ev.Kind),
-		Unit:           string(ev.Unit),
-		From:           string(ev.From),
-		To:             string(ev.To),
-		DependsOn:      string(ev.DependsOn),
+		UnitId:         string(ev.UnitID),
+		FromStatus:     string(ev.FromStatus),
+		ToStatus:       string(ev.ToStatus),
+		DependsOnUnit:  string(ev.DependsOnUnit),
 		RequiredStatus: string(ev.RequiredStatus),
 	}
 }
