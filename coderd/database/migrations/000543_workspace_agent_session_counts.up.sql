@@ -6,7 +6,7 @@ CREATE TABLE workspace_agent_session_counts (
 );
 
 COMMENT ON TABLE workspace_agent_session_counts IS 'Session counts per app for each workspace agent stats row. Rows are removed together with their parent workspace_agent_stats row.';
-COMMENT ON COLUMN workspace_agent_session_counts.app_name IS 'App identifier as reported by the client (e.g. vscode, jetbrains, ssh, reconnecting_pty), canonicalized at ingestion. Family grouping is applied at read time.';
+COMMENT ON COLUMN workspace_agent_session_counts.app_name IS 'App identifier as reported by the client (e.g. vscode, jetbrains, ssh, reconnecting_pty), canonicalized at ingestion: lowercased with hyphens folded to underscores. Family grouping is applied at read time.';
 
 -- Copy the ephemeral buffer (~1 day of rows) into the new table so that
 -- template usage rollup and deployment stats see no gap during the upgrade.

@@ -27,7 +27,7 @@ func TestExtractMagicSessionType(t *testing.T) {
 		{name: "EmptyValueDefaultsToSSH", env: envWith(""), want: MagicSessionTypeSSH},
 		{name: "VSCode", env: envWith("vscode"), want: MagicSessionTypeVSCode},
 		{name: "JetBrainsLegacyCasing", env: envWith("JetBrains"), want: MagicSessionTypeJetBrains},
-		{name: "UnknownPreservedRaw", env: envWith("Cursor Nightly"), want: MagicSessionType("Cursor Nightly")},
+		{name: "UnknownFoldedToCanonicalForm", env: envWith("Cursor Nightly"), want: MagicSessionType("cursor nightly")},
 		{name: "LastInstanceWins", env: append(envWith("vscode"), MagicSessionTypeEnvironmentVariable+"=cursor"), want: MagicSessionType("cursor")},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

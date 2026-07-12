@@ -75,12 +75,13 @@ func TestSessionCountsFromProto(t *testing.T) {
 		}
 		got := workspacestats.SessionCountsFromProto(&agentproto.Stats{SessionCounts: sessionCounts})
 		// 64 named entries (well-known first, then lexicographic) plus
-		// "other" holding the 137 overflow counts.
+		// "other" holding the 137 overflow counts. Names are stored in
+		// canonical form, so the hyphens fold to underscores.
 		require.Len(t, got, 65)
 		require.EqualValues(t, 5, got["vscode"])
-		require.EqualValues(t, 1, got["zz-ide-000"])
+		require.EqualValues(t, 1, got["zz_ide_000"])
 		require.EqualValues(t, 137, got["other"])
-		require.NotContains(t, got, "zz-ide-199")
+		require.NotContains(t, got, "zz_ide_199")
 	})
 
 	t.Run("Empty", func(t *testing.T) {

@@ -1,9 +1,8 @@
 // Package idemetadata is the single source of truth for metadata about IDEs
 // and other session types that report workspace usage. App names are stored
-// as reported throughout the stats pipeline; well-known spellings are
-// canonicalized at ingestion and grouped into families at API and metrics
-// boundaries. It is a leaf package so both agent and coderd code can import
-// it.
+// in canonical form (see Normalize) and grouped into families at API and
+// metrics boundaries. It is a leaf package so both agent and coderd code can
+// import it.
 package idemetadata
 
 import (
@@ -29,11 +28,11 @@ const (
 	AppNameOther = "other"
 )
 
-// families maps canonical (lowercase) app names to their family, keeping
-// metric-label cardinality bounded while arbitrary app names flow through
-// the pipeline. A family is named after its canonical app name. Names are
-// stored as reported and grouped at read time, so extending this map needs
-// no migration and applies retroactively to stored data.
+// families maps canonical app names to their family, keeping metric-label
+// cardinality bounded while arbitrary app names flow through the pipeline.
+// A family is named after its canonical app name. Grouping happens at read
+// time, so extending this map needs no migration and applies retroactively
+// to stored data.
 var families = map[string]string{
 	AppNameVSCode:          AppNameVSCode,
 	"vscode_insiders":      AppNameVSCode,
@@ -64,20 +63,18 @@ func Family(appName string) string {
 
 // Normalize prepares a client-supplied app name for storage: it strips null
 // bytes (which Postgres TEXT rejects), truncates to MaxAppNameLength runes,
-// and canonicalizes well-known names case-insensitively. Unrecognized names
-// are preserved as-is, including casing, and grouped at display time via
-// Family. An empty result becomes AppNameUnknown so a bad name never
-// invalidates the surrounding report.
+// lowercases, and folds hyphens to underscores. Every name is stored in this
+// canonical form so aggregation keys never split across spellings once they
+// reach the durable rollup; display casing for well-known names comes from
+// IDE metadata at the API boundary. An empty result becomes AppNameUnknown
+// so a bad name never invalidates the surrounding report.
 func Normalize(appName string) string {
 	appName = strings.ReplaceAll(appName, "\x00", "")
 	appName = utilstrings.Truncate(appName, MaxAppNameLength)
 	if appName == "" {
 		return AppNameUnknown
 	}
-	if key := canonicalKey(appName); families[key] != "" {
-		return key
-	}
-	return appName
+	return canonicalKey(appName)
 }
 
 // canonicalKey lowercases the app name and folds hyphens to underscores so

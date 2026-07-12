@@ -6496,7 +6496,7 @@ type WorkspaceAgentScriptTiming struct {
 // Session counts per app for each workspace agent stats row. Rows are removed together with their parent workspace_agent_stats row.
 type WorkspaceAgentSessionCount struct {
 	WorkspaceAgentStatsID uuid.UUID `db:"workspace_agent_stats_id" json:"workspace_agent_stats_id"`
-	// App identifier as reported by the client (e.g. vscode, jetbrains, ssh, reconnecting_pty), canonicalized at ingestion. Family grouping is applied at read time.
+	// App identifier as reported by the client (e.g. vscode, jetbrains, ssh, reconnecting_pty), canonicalized at ingestion: lowercased with hyphens folded to underscores. Family grouping is applied at read time.
 	AppName string `db:"app_name" json:"app_name"`
 	Count   int64  `db:"count" json:"count"`
 }

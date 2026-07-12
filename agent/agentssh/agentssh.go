@@ -363,8 +363,8 @@ func extractMagicSessionType(env []string) (sessionType MagicSessionType, filter
 		// No magic session type set: this is a plain SSH session.
 		sessionType = MagicSessionTypeSSH
 	} else {
-		// Clean, do not classify: the raw string is preserved (well-known
-		// names are canonicalized) so new IDEs flow through unchanged.
+		// Canonicalize, do not classify: unknown names flow through in
+		// canonical form so new IDEs need no code changes.
 		sessionType = MagicSessionType(idemetadata.Normalize(rawType))
 	}
 
