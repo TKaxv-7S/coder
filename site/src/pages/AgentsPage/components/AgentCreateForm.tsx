@@ -434,6 +434,7 @@ export const AgentCreateForm: FC<AgentCreateFormProps> = ({
 	// Locks the composer across the whole create/upload/send sequence,
 	// which spans more than the create mutation's pending window.
 	const [isUploadSubmitPending, setIsUploadSubmitPending] = useState(false);
+	const isSubmitPending = isCreating || isUploadSubmitPending;
 
 	// Workspace files can only upload into a workspace whose agent is
 	// connected. Losing that (deselecting, an org change, or switching
@@ -576,6 +577,7 @@ export const AgentCreateForm: FC<AgentCreateFormProps> = ({
 						<CompactOrgSelector
 							value={selectedOrg}
 							options={permittedOrgs}
+							disabled={isSubmitPending}
 							onChange={(newOrg) => {
 								const orgChanged = newOrg.id !== selectedOrg?.id;
 								// Queued workspace files are dropped alongside DB
@@ -601,14 +603,13 @@ export const AgentCreateForm: FC<AgentCreateFormProps> = ({
 						sendShortcut={sendShortcut}
 						placeholder="Ask Coder to build, fix bugs, or explore your project..."
 						isDisabled={
-							isCreating ||
-							isUploadSubmitPending ||
+							isSubmitPending ||
 							isForbidden ||
 							isPersonalModelOverridesLoading ||
 							!hasModelOptions ||
 							Boolean(aiGatewayDisabled)
 						}
-						isLoading={isCreating || isUploadSubmitPending}
+						isLoading={isSubmitPending}
 						initialValue={initialInputValue}
 						initialEditorState={initialEditorState}
 						onContentChange={handleContentChange}
@@ -645,7 +646,9 @@ export const AgentCreateForm: FC<AgentCreateFormProps> = ({
 						onMCPAuthComplete={onMCPAuthComplete}
 						workspaceOptions={filteredWorkspaces}
 						selectedWorkspaceId={effectiveWorkspaceId}
-						onWorkspaceChange={handleWorkspaceChange}
+						onWorkspaceChange={
+							isSubmitPending ? undefined : handleWorkspaceChange
+						}
 						isWorkspaceLoading={isWorkspacesLoading}
 						canConfigureAgentSetup={canConfigureAgentSetup}
 						providerCount={providerCount}
