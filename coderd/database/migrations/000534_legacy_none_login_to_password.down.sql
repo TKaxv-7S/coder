@@ -1,2 +1,0 @@
--- We do not track which users had login_type 'none' before this migration.
--- This is a destructive migration that cannot be undone.
