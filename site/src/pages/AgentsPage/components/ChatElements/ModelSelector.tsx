@@ -1,4 +1,4 @@
-import { CheckIcon } from "lucide-react";
+import { CheckIcon, InfoIcon } from "lucide-react";
 import { type FC, useState } from "react";
 import { ChevronDownIcon } from "#/components/AnimatedIcons/ChevronDown";
 import { Button } from "#/components/Button/Button";
@@ -15,15 +15,28 @@ import {
 	PopoverContent,
 	PopoverTrigger,
 } from "#/components/Popover/Popover";
+import { Slider } from "#/components/Slider/Slider";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "#/components/Tooltip/Tooltip";
+import { ProviderIcon } from "#/pages/AISettingsPage/ProvidersPage/components/ProviderIcon";
 import { formatProviderLabel as defaultFormatProviderLabel } from "#/utils/aiProviders";
 import { cn } from "#/utils/cn";
+import { formatReasoningEffort } from "../../utils/reasoningEffort";
 
 export interface ModelSelectorOption {
 	id: string;
 	provider: string;
+	providerId?: string;
+	providerLabel?: string;
+	providerIcon?: string;
 	model: string;
 	displayName: string;
 	contextLimit?: number;
+	reasoningEffortDefault?: string;
+	reasoningEfforts?: readonly string[];
 }
 
 interface ModelSelectorProps {
@@ -40,6 +53,8 @@ interface ModelSelectorProps {
 	contentClassName?: string;
 	onTriggerTouchStart?: () => void;
 	enableMobileFullWidthDropdown?: boolean;
+	reasoningEffort?: string;
+	onReasoningEffortChange?: (value: string) => void;
 }
 
 const formatContextLimit = (tokens: number): string => {
@@ -50,6 +65,11 @@ const formatContextLimit = (tokens: number): string => {
 	const k = Math.round(tokens / 1_000);
 	return `${k}K`;
 };
+
+const getProviderLabel = (
+	option: ModelSelectorOption,
+	formatProviderLabel: (provider: string) => string,
+) => option.providerLabel?.trim() || formatProviderLabel(option.provider);
 
 const getSearchText = (option: ModelSelectorOption, providerLabel: string) =>
 	[
@@ -76,6 +96,8 @@ export const ModelSelector: FC<ModelSelectorProps> = ({
 	contentClassName,
 	onTriggerTouchStart,
 	enableMobileFullWidthDropdown = false,
+	reasoningEffort,
+	onReasoningEffortChange,
 }) => {
 	const [open, setOpen] = useState(false);
 	const [search, setSearch] = useState("");
@@ -92,17 +114,18 @@ export const ModelSelector: FC<ModelSelectorProps> = ({
 		const grouped = new Map<string, ModelSelectorOption[]>();
 
 		for (const option of options) {
-			const providerLabel = formatProviderLabel(option.provider);
+			const providerLabel = getProviderLabel(option, formatProviderLabel);
 			if (query && !getSearchText(option, providerLabel).includes(query)) {
 				continue;
 			}
 
-			const providerOptions = grouped.get(option.provider);
+			const groupKey = option.providerId?.trim() || option.provider;
+			const providerOptions = grouped.get(groupKey);
 			if (providerOptions) {
 				providerOptions.push(option);
 				continue;
 			}
-			grouped.set(option.provider, [option]);
+			grouped.set(groupKey, [option]);
 		}
 
 		return Array.from(grouped.entries());
@@ -173,33 +196,121 @@ export const ModelSelector: FC<ModelSelectorProps> = ({
 						<CommandEmpty className="py-3 text-xs font-normal leading-[18px] text-content-secondary">
 							{emptyMessage}
 						</CommandEmpty>
-						{optionsByProvider.map(([provider, providerOptions], index) => (
-							<CommandGroup
-								key={provider}
-								heading={formatProviderLabel(provider)}
-								className={cn(
-									"p-1 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:leading-[18px] [&_[cmdk-group-heading]]:text-content-secondary",
-									index > 0 &&
-										"border-0 border-t border-solid border-border-default",
-								)}
-							>
-								{providerOptions.map((option) => (
-									<ModelOptionItem
-										key={option.id}
-										option={option}
-										isSelected={option.id === value}
-										onSelect={() => {
-											onValueChange(option.id);
-											handleOpenChange(false);
-										}}
-									/>
-								))}
-							</CommandGroup>
-						))}
+						{optionsByProvider.map(([providerKey, providerOptions], index) => {
+							const firstOption = providerOptions[0];
+							const providerLabel = getProviderLabel(
+								firstOption,
+								formatProviderLabel,
+							);
+							return (
+								<CommandGroup
+									key={providerKey}
+									heading={
+										<span className="flex items-center gap-1.5">
+											<ProviderIcon
+												provider={firstOption.provider}
+												icon={firstOption.providerIcon}
+												className="size-3.5"
+											/>
+											<span>{providerLabel}</span>
+										</span>
+									}
+									className={cn(
+										"p-1 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:leading-[18px] [&_[cmdk-group-heading]]:text-content-secondary",
+										index > 0 &&
+											"border-0 border-t border-solid border-border-default",
+									)}
+								>
+									{providerOptions.map((option) => (
+										<ModelOptionItem
+											key={option.id}
+											option={option}
+											isSelected={option.id === value}
+											onSelect={() => {
+												onValueChange(option.id);
+												handleOpenChange(false);
+											}}
+										/>
+									))}
+								</CommandGroup>
+							);
+						})}
 					</CommandList>
 				</Command>
+				{selectedModel &&
+					reasoningEffort !== undefined &&
+					onReasoningEffortChange && (
+						<ReasoningEffortRow
+							option={selectedModel}
+							value={reasoningEffort}
+							onChange={onReasoningEffortChange}
+						/>
+					)}
 			</PopoverContent>
 		</Popover>
+	);
+};
+
+interface ReasoningEffortRowProps {
+	option: ModelSelectorOption;
+	value: string;
+	onChange: (value: string) => void;
+}
+
+// Effort row pinned below the model list. Lives outside the Command
+// so it stays visible while the list scrolls and cmdk's arrow-key
+// navigation does not capture the slider's keyboard interaction.
+const ReasoningEffortRow: FC<ReasoningEffortRowProps> = ({
+	option,
+	value,
+	onChange,
+}) => {
+	const selectableEfforts = option.reasoningEfforts ?? [];
+	if (selectableEfforts.length === 0) {
+		return null;
+	}
+	const valueIndex = selectableEfforts.indexOf(value);
+	const effortIndex = valueIndex >= 0 ? valueIndex : 0;
+
+	return (
+		<div className="flex items-center gap-3 border-0 border-t border-solid border-border-default px-3 py-2">
+			<div className="flex shrink-0 items-center gap-1">
+				<span className="text-xs font-medium leading-[18px] text-content-secondary">
+					Effort
+				</span>
+				<Tooltip>
+					<TooltipTrigger asChild>
+						<button
+							type="button"
+							aria-label="About reasoning effort"
+							className="inline-flex size-3 items-center justify-center rounded-sm border-none bg-transparent p-0 text-content-secondary outline-none focus-visible:ring-2 focus-visible:ring-content-link"
+						>
+							<InfoIcon aria-hidden="true" className="size-3" />
+						</button>
+					</TooltipTrigger>
+					<TooltipContent side="top" className="max-w-[240px]">
+						Controls how much reasoning the model performs before responding.
+						Higher effort can improve quality but is slower and costs more.
+					</TooltipContent>
+				</Tooltip>
+			</div>
+			<Slider
+				aria-label="Reasoning effort"
+				value={[effortIndex]}
+				onValueChange={([index]) => {
+					const nextEffort = selectableEfforts[index];
+					if (nextEffort && nextEffort !== value) {
+						onChange(nextEffort);
+					}
+				}}
+				min={0}
+				max={selectableEfforts.length - 1}
+				step={1}
+			/>
+			<span className="shrink-0 rounded bg-surface-secondary px-1.5 py-0.5 text-xs font-medium leading-[18px] text-content-secondary">
+				{formatReasoningEffort(value)}
+			</span>
+		</div>
 	);
 };
 

@@ -200,7 +200,16 @@ func createOIDCConfig(ctx context.Context, logger slog.Logger, vals *codersdk.De
 			return nil, xerrors.Errorf("parse oidc redirect url %q", err)
 		}
 		logger.Warn(ctx, "custom OIDC redirect URL used instead of 'access_url', ensure this matches the value configured in your OIDC provider")
+		if len(vals.OIDC.RedirectAllowedHosts.Value()) > 0 {
+			// Static override takes precedence; keep the behavior explicit and
+			// loud rather than silently mixing the two modes.
+			logger.Warn(ctx, "ignoring CODER_OIDC_REDIRECT_ALLOWED_HOSTS because CODER_OIDC_REDIRECT_URL is set")
+		}
 	}
+	// Capture the configured scheme for the dynamic-host code path so that
+	// the dynamic redirect_uri uses the same scheme as the static one even
+	// when upstream proxies report a misleading X-Forwarded-Proto.
+	redirectDefaultScheme := redirectURL.Scheme
 
 	// If the scopes contain 'groups', we enable group support.
 	// Do not override any custom value set by the user.
@@ -259,6 +268,17 @@ func createOIDCConfig(ctx context.Context, logger slog.Logger, vals *codersdk.De
 		return nil, xerrors.Errorf("pkce detect in claims: %w", err)
 	}
 
+	// CODER_OIDC_REDIRECT_URL is a strict override: when set, the redirect_uri
+	// is fixed at startup and dynamic-host selection is disabled. Otherwise,
+	// surface the allowlist to the middleware.
+	var redirectAllowedHosts []string
+	if vals.OIDC.RedirectURL.String() == "" {
+		redirectAllowedHosts = vals.OIDC.RedirectAllowedHosts.Value()
+	} else {
+		// Static-override mode does not need the dynamic default scheme.
+		redirectDefaultScheme = ""
+	}
+
 	return &coderd.OIDCConfig{
 		OAuth2Config: useCfg,
 		Provider:     oidcProvider,
@@ -268,19 +288,21 @@ func createOIDCConfig(ctx context.Context, logger slog.Logger, vals *codersdk.De
 			// matches the issuer URL. This is not recommended.
 			SkipIssuerCheck: vals.OIDC.SkipIssuerChecks.Value(),
 		}),
-		EmailDomain:         vals.OIDC.EmailDomain,
-		AllowSignups:        vals.OIDC.AllowSignups.Value(),
-		UsernameField:       vals.OIDC.UsernameField.String(),
-		NameField:           vals.OIDC.NameField.String(),
-		EmailField:          vals.OIDC.EmailField.String(),
-		AuthURLParams:       vals.OIDC.AuthURLParams.Value,
-		SecondaryClaims:     secondaryClaimsSrc,
-		SignInText:          vals.OIDC.SignInText.String(),
-		SignupsDisabledText: vals.OIDC.SignupsDisabledText.String(),
-		IconURL:             vals.OIDC.IconURL.String(),
-		IgnoreEmailVerified: vals.OIDC.IgnoreEmailVerified.Value(),
-		PKCEMethods:         pkceSupport.CodeChallengeMethodsSupported,
-		EmailFallback:       vals.OIDC.EmailFallback.Value(),
+		EmailDomain:           vals.OIDC.EmailDomain,
+		AllowSignups:          vals.OIDC.AllowSignups.Value(),
+		UsernameField:         vals.OIDC.UsernameField.String(),
+		NameField:             vals.OIDC.NameField.String(),
+		EmailField:            vals.OIDC.EmailField.String(),
+		AuthURLParams:         vals.OIDC.AuthURLParams.Value,
+		SecondaryClaims:       secondaryClaimsSrc,
+		SignInText:            vals.OIDC.SignInText.String(),
+		SignupsDisabledText:   vals.OIDC.SignupsDisabledText.String(),
+		IconURL:               vals.OIDC.IconURL.String(),
+		IgnoreEmailVerified:   vals.OIDC.IgnoreEmailVerified.Value(),
+		PKCEMethods:           pkceSupport.CodeChallengeMethodsSupported,
+		EmailFallback:         vals.OIDC.EmailFallback.Value(),
+		RedirectAllowedHosts:  redirectAllowedHosts,
+		RedirectDefaultScheme: redirectDefaultScheme,
 	}, nil
 }
 
@@ -2390,6 +2412,15 @@ func startBuiltinPostgres(ctx context.Context, cfg config.Root, logger slog.Logg
 	if customCacheDir != "" {
 		cachePath = filepath.Join(customCacheDir, "postgres")
 	}
+	// Tests get a fresh config root per invocation, so the default cache path
+	// never hits and each test re-downloads the archive from Maven, which
+	// rate-limits CI runners. EMBEDDED_PG_CACHE_DIR (restored from the actions
+	// cache) lets them share one copy.
+	if flag.Lookup("test.v") != nil {
+		if dir := os.Getenv("EMBEDDED_PG_CACHE_DIR"); dir != "" {
+			cachePath = dir
+		}
+	}
 	stdlibLogger := slog.Stdlib(ctx, logger.Named("postgres"), slog.LevelDebug)
 
 	// If the port is not defined, an available port will be found dynamically. This has
@@ -2769,6 +2800,17 @@ func ConfigureTraceProvider(
 	logger slog.Logger,
 	cfg *codersdk.DeploymentValues,
 ) (trace.TracerProvider, string, func(context.Context) error) {
+	return ConfigureTraceProviderWithService(ctx, logger, cfg, "coderd")
+}
+
+// ConfigureTraceProviderWithService configures trace provider
+// with a specified service name.
+func ConfigureTraceProviderWithService(
+	ctx context.Context,
+	logger slog.Logger,
+	cfg *codersdk.DeploymentValues,
+	serviceName string,
+) (trace.TracerProvider, string, func(context.Context) error) {
 	var (
 		tracerProvider = trace.NewNoopTracerProvider()
 		closeTracing   = func(context.Context) error { return nil }
@@ -2783,7 +2825,7 @@ func ConfigureTraceProvider(
 	)
 
 	if cfg.Trace.Enable.Value() || cfg.Trace.DataDog.Value() || cfg.Trace.HoneycombAPIKey != "" {
-		sdkTracerProvider, _closeTracing, err := tracing.TracerProvider(ctx, "coderd", tracing.TracerOpts{
+		sdkTracerProvider, _closeTracing, err := tracing.TracerProvider(ctx, serviceName, tracing.TracerOpts{
 			Default:   cfg.Trace.Enable.Value(),
 			DataDog:   cfg.Trace.DataDog.Value(),
 			Honeycomb: cfg.Trace.HoneycombAPIKey.String(),

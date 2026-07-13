@@ -16,7 +16,6 @@ import (
 	"github.com/coder/coder/v2/coderd/database"
 	"github.com/coder/coder/v2/coderd/x/chatd/chatadvisor"
 	"github.com/coder/coder/v2/coderd/x/chatd/chatloop"
-	"github.com/coder/coder/v2/coderd/x/chatd/chatopenai"
 	"github.com/coder/coder/v2/coderd/x/chatd/chatprompt"
 	"github.com/coder/coder/v2/coderd/x/chatd/chatprovider"
 	"github.com/coder/coder/v2/coderd/x/chatd/chatsanitize"
@@ -533,17 +532,16 @@ func (server *Server) prepareGeneration(
 		}
 	}
 
-	providerOptions := chatprovider.ProviderOptionsFromChatModelConfig(model, callConfig.ProviderOptions)
-	chainInfo := chatopenai.ResolveChainMode(promptRows)
-	if !input.ChainModeDisabled && chatopenai.ShouldActivateChainMode(
-		providerOptions,
-		chainInfo,
-		modelConfig.ID,
-		isPlanModeTurn,
-	) {
-		providerOptions = chatopenai.WithPreviousResponseID(providerOptions, chainInfo.PreviousResponseID())
-		prompt = chatopenai.FilterPromptForChainMode(prompt, chainInfo)
+	var requestedEffort *string
+	if chat.LastReasoningEffort.Valid {
+		requestedEffort = new(string(chat.LastReasoningEffort.ChatReasoningEffort))
 	}
+	reasoningEffort := chatprovider.ResolveReasoningEffort(
+		requestedEffort,
+		callConfig.ReasoningEffort,
+	)
+	providerOptions := chatprovider.ProviderOptionsFromChatModelConfig(model, callConfig.ProviderOptions)
+	providerOptions = chatprovider.ApplyReasoningEffort(model, providerOptions, reasoningEffort)
 
 	activeToolNames := activeToolNamesForTurn(tools, currentPlanMode, chat.ParentChatID, approvedPlanMCPConfigIDs)
 	if isExploreSubagent {

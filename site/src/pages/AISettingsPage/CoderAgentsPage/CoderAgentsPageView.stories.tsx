@@ -104,9 +104,12 @@ const allModelConfigs: TypesGen.ChatModelConfig[] = [
 	exploreDisabledModelConfig,
 ];
 
-const providerTypeByID = new Map<string, string>([
-	["provider-1", "openai"],
-	["provider-anthropic", "anthropic"],
+const providerInfoByID = new Map([
+	["provider-1", { provider: "openai", displayName: "OpenAI", icon: "" }],
+	[
+		"provider-anthropic",
+		{ provider: "anthropic", displayName: "Anthropic", icon: "" },
+	],
 ]);
 
 const buildArgs = (
@@ -123,7 +126,7 @@ const buildArgs = (
 	titleGenerationModelOverrideData: buildTitleGenerationModelOverrideData(),
 	exploreModelOverrideData: buildOverrideData("explore"),
 	modelConfigsData: allModelConfigs,
-	providerTypeByID,
+	providerInfoByID,
 	modelConfigsError: undefined,
 	isLoadingModelConfigs: false,
 	isFetchingModelConfigs: false,
@@ -502,7 +505,7 @@ export const AdvisorSettingsVisible: Story = {
 		const section = await getSection(canvasElement, "Advisor");
 		expect(
 			within(section).getByRole("spinbutton", {
-				name: "Max uses per run",
+				name: "Max uses per turn",
 			}),
 		).toHaveValue(3);
 		expect(
@@ -516,7 +519,7 @@ export const AdvisorSettingsVisible: Story = {
 
 		// Changing a value exposes the Save button.
 		const maxUses = within(section).getByRole("spinbutton", {
-			name: "Max uses per run",
+			name: "Max uses per turn",
 		});
 		await userEvent.clear(maxUses);
 		await userEvent.type(maxUses, "5");
@@ -550,7 +553,7 @@ export const AdvisorClearButton: Story = {
 		await userEvent.click(clearButton);
 		expect(
 			within(section).getByRole("spinbutton", {
-				name: "Max uses per run",
+				name: "Max uses per turn",
 			}),
 		).toHaveValue(0);
 		expect(

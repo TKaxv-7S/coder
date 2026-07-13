@@ -26,6 +26,7 @@ interface ModuleSettingsStepProps {
 		moduleId: string,
 		variables: Record<string, string>,
 	) => void;
+	onRemoveModule: (moduleId: string) => void;
 }
 
 function variableToField(
@@ -107,6 +108,7 @@ export const ModuleSettingsStep: FC<ModuleSettingsStepProps> = ({
 	selectedModuleIds,
 	moduleVariables,
 	onChangeModuleVariables,
+	onRemoveModule,
 }) => {
 	const { data } = useQuery(templateBuilderModules(baseId));
 	const modules = data?.modules ?? [];
@@ -135,8 +137,11 @@ export const ModuleSettingsStep: FC<ModuleSettingsStepProps> = ({
 					const vars = moduleVariables[mod.id] ?? {};
 
 					const toField = (v: TemplateBuilderModuleVariable) =>
-						variableToField(mod.id, v, vars[v.name] ?? "", (name, val) =>
-							handleChange(mod.id, name, val),
+						variableToField(
+							mod.id,
+							v,
+							vars[v.name] ?? defaultPlaceholder(v.default) ?? "",
+							(name, val) => handleChange(mod.id, name, val),
 						);
 
 					const requiredVars = configurableVars.filter((v) => v.required);
@@ -154,6 +159,7 @@ export const ModuleSettingsStep: FC<ModuleSettingsStepProps> = ({
 								detailsUrl={moduleDetailsUrl(mod.id)}
 								fields={requiredFields}
 								optionalFields={optionalFields}
+								onRemove={() => onRemoveModule(mod.id)}
 							/>
 
 							{sensitiveVars.length > 0 && (
