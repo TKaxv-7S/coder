@@ -1,0 +1,6 @@
+-- This migration is intentionally irreversible.
+--
+-- The up migration converts legacy login_type='none' users into service
+-- accounts and blanks their email to satisfy the users_email_not_empty
+-- constraint. We do not record which users were affected, nor their original
+-- email addresses, so there is nothing to restore here.
